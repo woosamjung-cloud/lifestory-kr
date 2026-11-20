@@ -47,8 +47,12 @@ export class Ambience {
     this.waveFilter.type = 'lowpass';
     this.waveFilter.frequency.value = 400;
     this.waveGain = ctx.createGain();
-    this.waveGain.gain.value = 0.15;
-    wsrc.connect(this.waveFilter).connect(this.waveGain).connect(this.master);
+    this.waveGain.gain.value = 0.05;
+    // 웅장하게 울리는 낮은 소리를 걷어내 잔잔한 물결 소리로
+    const waveHp = ctx.createBiquadFilter();
+    waveHp.type = 'highpass';
+    waveHp.frequency.value = 220;
+    wsrc.connect(this.waveFilter).connect(waveHp).connect(this.waveGain).connect(this.master);
     // 부서지는 물보라 (고역 잡음, 파도 정점에서만)
     const fsrc = this.loop(1.7);
     this.foamFilter = ctx.createBiquadFilter();
@@ -74,7 +78,7 @@ export class Ambience {
     rf.type = 'lowpass';
     rf.frequency.value = 180;
     this.fireGain = ctx.createGain();
-    this.fireGain.gain.value = 0.18;
+    this.fireGain.gain.value = 0.07;
     rsrc.connect(rf).connect(this.fireGain).connect(this.master);
     this.crackleBus = ctx.createGain();
     this.crackleBus.gain.value = 0.5;
@@ -94,21 +98,21 @@ export class Ambience {
   scheduleWave() {
     if (!this.on) return;
     const t = this.ctx.currentTime;
-    const rise = 2.6 + Math.random() * 1.6;
-    const fall = 4 + Math.random() * 2.5;
-    const peak = 0.38 + Math.random() * 0.22;
+    const rise = 1.8 + Math.random() * 1.2;
+    const fall = 3 + Math.random() * 2;
+    const peak = 0.11 + Math.random() * 0.07;
     const g = this.waveGain.gain;
     const f = this.waveFilter.frequency;
     g.cancelScheduledValues(t);
     f.cancelScheduledValues(t);
     g.setTargetAtTime(peak, t, rise / 3);
-    f.setTargetAtTime(1100 + Math.random() * 500, t, rise / 3);
-    g.setTargetAtTime(0.1, t + rise, fall / 3);
-    f.setTargetAtTime(320, t + rise, fall / 3);
+    f.setTargetAtTime(750 + Math.random() * 300, t, rise / 3);
+    g.setTargetAtTime(0.035, t + rise, fall / 3);
+    f.setTargetAtTime(420, t + rise, fall / 3);
     const fg = this.foamGain.gain;
     fg.cancelScheduledValues(t);
     fg.setTargetAtTime(0.0, t, 0.3);
-    fg.setTargetAtTime(0.09 * peak, t + rise * 0.85, 0.25);
+    fg.setTargetAtTime(0.25 * peak, t + rise * 0.85, 0.2);
     fg.setTargetAtTime(0.0, t + rise + 0.6, 1.2);
     this.timers.push(setTimeout(() => this.scheduleWave(), (rise + fall * 0.8) * 1000));
   }
@@ -207,7 +211,7 @@ export class Ambience {
     if (this.ctx.state === 'suspended') await this.ctx.resume();
     if (this.on) return true;
     this.on = true;
-    this.master.gain.setTargetAtTime(0.55, this.ctx.currentTime, 1.2);
+    this.master.gain.setTargetAtTime(0.5, this.ctx.currentTime, 1.2);
     this.scheduleWave();
     this.scheduleWind();
     this.scheduleCrackle();

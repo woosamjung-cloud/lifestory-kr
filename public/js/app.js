@@ -811,6 +811,16 @@ $('toggle-stars').addEventListener('click', () => {
   toast(on ? '별자리 선과 이름을 보여드려요' : '별자리를 숨겼어요');
 });
 
+// ---------- 창 바깥(어두운 여백)을 누르면 닫기 ----------
+document.querySelectorAll('dialog.modal').forEach((dlg) =>
+  dlg.addEventListener('click', (e) => {
+    if (e.target !== dlg) return;
+    const r = dlg.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!inside) dlg.close();
+  }),
+);
+
 // ---------- 알림 ----------
 let toastTimer = null;
 function toast(msg) {
