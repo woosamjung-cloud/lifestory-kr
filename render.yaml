@@ -1,0 +1,15 @@
+# Render(https://render.com) 배포 설정
+# Render 대시보드 → New → Blueprint → 이 저장소를 고르면 자동으로 만들어집니다.
+services:
+  - type: web
+    name: bangguseok-haedoti
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: SEATS
+        value: "500"
+      - key: NODE_VERSION
+        value: "22"
