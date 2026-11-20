@@ -103,7 +103,8 @@ export class Scene {
   // 좌석(자리) 배치: 바다 가까운 줄부터, 가운데부터 채웁니다. 내 자리는 따로 둡니다.
   layoutSlots() {
     const { W, H } = this;
-    const top = this.shoreY + H * 0.035;
+    // 맨 앞줄 머리 꼭대기가 파도 거품선(최대 shoreY+16px)보다 아래에 오도록
+    const top = this.shoreY + 20 + H * 0.036 * 0.85;
     const bottom = H - Math.max(130, H * 0.2); // 아래쪽 버튼 영역을 피합니다
     const rows = 5;
     const slots = [];

@@ -241,15 +241,37 @@ function face(ctx, x, y, s, happy) {
   }
 }
 
-function arms(ctx, x, y, s, m, up) {
+// 손: 둥근 손바닥 + 작은 손가락 세 개 (끝이 바깥쪽을 향함)
+function hand(ctx, cx, cy, s, ang, m) {
+  const r = s * 0.075;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(ang);
   ctx.fillStyle = m.fill;
   ctx.strokeStyle = INK;
-  ctx.lineWidth = Math.max(1, s * 0.028);
-  for (const sg of [-1, 1]) {
-    if (up) ellipse(ctx, x + sg * s * 0.5, y - s * 0.58, s * 0.07, s * 0.1, sg * -0.5);
-    else ellipse(ctx, x + sg * s * 0.4, y - s * 0.16, s * 0.07, s * 0.055, sg * 0.4);
+  ctx.lineWidth = Math.max(1, s * 0.024);
+  // 손가락 (손바닥 뒤에 먼저)
+  for (let k = -1; k <= 1; k++) {
+    const fa = k * 0.55;
+    ellipse(ctx, Math.cos(fa) * r * 1.05, Math.sin(fa) * r * 1.05, r * 0.42, r * 0.34, fa);
     ctx.fill();
     ctx.stroke();
+  }
+  // 엄지
+  ellipse(ctx, r * 0.15, -r * 0.95, r * 0.36, r * 0.3, -1.2);
+  ctx.fill();
+  ctx.stroke();
+  // 손바닥
+  ellipse(ctx, 0, 0, r, r * 0.9);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function arms(ctx, x, y, s, m, up) {
+  for (const sg of [-1, 1]) {
+    if (up) hand(ctx, x + sg * s * 0.52, y - s * 0.6, s, sg > 0 ? -1.1 : -2.04, m);
+    else hand(ctx, x + sg * s * 0.42, y - s * 0.16, s, sg > 0 ? 0.35 : Math.PI - 0.35, m);
   }
 }
 
@@ -377,7 +399,6 @@ export function drawCritterFast(ctx, o) {
     ctx.stroke();
     ctx.restore();
   }
-  if (steam && variant === 'back') drawSteam(ctx, x + s * 0.3, y - s * 0.62, s, t, phase);
 }
 
 // 캐릭터 고르기·승차권용: 노을빛 원 안에서 정면 얼굴
