@@ -62,7 +62,7 @@ const store = {
 
 const state = {
   screen: 'home',
-  profile: { name: store.get('name', ''), char: store.get('char', 'otter'), color: store.get('color', 0) },
+  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0) },
   placeMode: 'auto', // auto | east | west
   event: null,
   netStatus: 'connecting',
@@ -74,6 +74,10 @@ const state = {
   lastElev: null,
   celebratedKey: null,
 };
+
+// 예전 캐릭터(동물)를 고른 적이 있으면 새 캐릭터로 바꿉니다.
+if (!CHAR_LIST.some((c) => c.key === state.profile.char)) state.profile.char = CHAR_LIST[0].key;
+state.profile.color = Math.abs(Number(state.profile.color) || 0) % 8;
 
 const scene = new Scene($('scene'));
 
@@ -93,7 +97,7 @@ const net = new Net({
     if (m.people.length || !m.seated) {
       scene.people = m.people
         .filter(([seat]) => seat !== state.seat)
-        .map(([seat, code]) => ({ seat, char: CHAR_LIST[Math.floor(code / 8)]?.key || 'otter', color: code % 8 }));
+        .map(([seat, code]) => ({ seat, char: CHAR_LIST[Math.floor(code / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
     }
     updateOnlineLabels();
   },
@@ -296,8 +300,8 @@ function buildPicker() {
     b.type = 'button';
     b.className = 'swatch';
     b.setAttribute('role', 'radio');
-    b.setAttribute('aria-label', `담요 색 ${i + 1}`);
-    b.style.background = `repeating-linear-gradient(0deg, ${base} 0 7px, ${stripe} 7px 10px)`;
+    b.setAttribute('aria-label', `옷 색 ${i + 1}`);
+    b.style.background = `radial-gradient(circle at 35% 30%, ${stripe} 0 18%, ${base} 60%)`;
     b.addEventListener('click', () => {
       state.profile.color = i;
       refreshPicker();
@@ -360,7 +364,7 @@ $('board-form').addEventListener('submit', async (e) => {
   $('ticket-img').src = ticketCanvas.toDataURL('image/png');
   net.stat('ticket');
   btn.disabled = false;
-  btn.textContent = '승차권 받기 🎫';
+  btn.textContent = '승차권 받기';
   show('ticket');
 });
 

@@ -20,7 +20,7 @@ const SEATS = Math.max(1, Number(process.env.SEATS || 1000)); // 장소(방)마�
 const MAX_CLIENTS = Number(process.env.MAX_CLIENTS || 20000); // 서버 전체 접속 상한
 const MAX_PER_IP = Number(process.env.MAX_PER_IP || 30); // 한 IP에서 동시 접속 상한 (회사·학교 와이파이 고려)
 const PEOPLE_IN_SNAPSHOT = 150; // 화면에 그릴 수 있는 앞쪽 좌석만 보냅니다.
-const CHARS = ['otter', 'penguin', 'rabbit', 'bear', 'cat'];
+const CHARS = ['blanket', 'hood', 'scarf', 'beanie', 'coat']; // public/js/characters.js 의 CHAR_LIST 순서와 같아야 함
 const ROOMS = ['east', 'west'];
 const WITNESS_BEFORE_MS = 30 * 60 * 1000; // 이벤트 30분 전부터
 const WITNESS_AFTER_MS = 20 * 60 * 1000; // 이벤트 20분 후까지 자리에 있으면 "함께 본 사람"
@@ -250,7 +250,7 @@ function handle(c, msg) {
   switch (msg.t) {
     case 'join': {
       if (!ROOMS.includes(msg.room)) return;
-      c.char = CHARS.includes(msg.char) ? msg.char : 'otter';
+      c.char = CHARS.includes(msg.char) ? msg.char : CHARS[0];
       c.color = Number.isInteger(msg.color) ? Math.abs(msg.color) % 8 : 0;
       if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
       joinRoom(c, msg.room);
@@ -393,7 +393,7 @@ wss.on('connection', (ws, req) => {
     room: null,
     seat: null,
     queued: false,
-    char: 'otter',
+    char: CHARS[0],
     color: 0,
     lastCheer: 0,
     lastRitual: 0,

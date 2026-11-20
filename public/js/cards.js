@@ -1,19 +1,19 @@
 // 승차권과 인증 카드 이미지 만들기 (인스타그램 4:5 비율, 1080x1350)
 
 import { PLACES, formatHM, formatDateKo } from './sun.js';
-import { drawCritter, CHAR_LIST } from './characters.js';
+import { renderPortrait, CHAR_LIST } from './characters.js';
 import { roundRect } from './scene.js';
 
 const W = 1080;
 const H = 1350;
-const FONT = '"Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-const TITLE = '"Jua", "Gowun Dodum", sans-serif';
+const FONT = '"Gowun Batang", "AppleMyungjo", "Batang", serif';
+const TITLE = '"Nanum Brush Script", "Gowun Batang", serif';
 
 // 구글 웹 글꼴은 글자 묶음별로 나눠 내려받기 때문에, 캔버스에 쓸 글자를 미리 불러옵니다.
 async function loadGlyphs(text) {
   if (!document.fonts || !document.fonts.load) return;
   try {
-    await Promise.all([document.fonts.load(`40px "Jua"`, text), document.fonts.load(`40px "Gowun Dodum"`, text)]);
+    await Promise.all([document.fonts.load(`40px "Nanum Brush Script"`, text), document.fonts.load(`40px "Gowun Batang"`, text), document.fonts.load(`700 40px "Gowun Batang"`, text)]);
   } catch {
     /* 글꼴을 못 불러와도 기본 글꼴로 그립니다 */
   }
@@ -33,7 +33,7 @@ export function seatLabel(seat, fallbackSeed = 0) {
 }
 
 export async function makeTicket({ name, char, color, event, seat, seed }) {
-  await loadGlyphs(`방구석해돋이호해넘이열차승차권편도잠옷착용출발도착내방정동진정서진승객날짜일출일몰예정좌석호차번익명의여행자년월일새해첫마지막이불밖은추우니에서봐요졸린수달아기펭귄토끼꼬마곰귤고양이→0123456789:${name || ''}`);
+  await loadGlyphs(`방구석해돋이호해넘이열차승차권편도잠옷착용출발도착내방정동진정서진승객날짜일출일몰예정좌석호차번익명의여행자년월일새해첫마지막이불밖은추우니에서봐요담요를두른후드를쓴목도리를한비니를쓴코트를입은→0123456789:${name || ''}`);
   const c = newCanvas();
   const ctx = c.getContext('2d');
   const place = PLACES[event.place];
@@ -69,7 +69,7 @@ export async function makeTicket({ name, char, color, event, seat, seed }) {
   ctx.save();
   roundRect(ctx, tx, ty, tw, th, 36);
   ctx.clip();
-  ctx.fillStyle = east ? '#e8574f' : '#3b6fd8';
+  ctx.fillStyle = east ? '#b9574e' : '#4c5f8f';
   ctx.fillRect(tx, ty, tw, 150);
   ctx.restore();
   ctx.fillStyle = '#fff';
@@ -118,7 +118,10 @@ export async function makeTicket({ name, char, color, event, seat, seed }) {
   });
 
   // 캐릭터
-  drawCritter(ctx, { x: tx + tw - 190, y: ty + 790, s: 230, type: char, color, facing: 'front' });
+  const pc = document.createElement('canvas');
+  pc.width = pc.height = 300;
+  renderPortrait(pc, char, color);
+  ctx.drawImage(pc, tx + tw - 330, ty + 500, 280, 280);
   ctx.fillStyle = '#9a7b66';
   ctx.font = `28px ${FONT}`;
   ctx.textAlign = 'center';

@@ -417,9 +417,9 @@ export class Scene {
     if (this.self && !this.selfStanding) {
       const sl = this.mySlot;
       const label = this.self.name ? `나 · ${this.self.name}` : '나';
-      ctx.font = `600 ${Math.max(12, sl.s * 0.24)}px "Gowun Dodum", sans-serif`;
+      ctx.font = `700 ${Math.max(12, sl.s * 0.22)}px "Gowun Batang", serif`;
       const tw = ctx.measureText(label).width + 16;
-      const ly = sl.y - sl.s * (this.self.char === 'rabbit' ? 1.95 : 1.62);
+      const ly = sl.y - sl.s * 1.5;
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       roundRect(ctx, sl.x - tw / 2, ly - 12, tw, 22, 11);
       ctx.fill();
@@ -432,6 +432,13 @@ export class Scene {
     // 효과들
     this.renderEffects(nowMs, sun);
 
+    // 종이 질감 (일러스트 느낌)
+    ctx.save();
+    ctx.globalAlpha = 0.07;
+    ctx.fillStyle = this.grainPattern();
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
     // 밤에는 전체적으로 살짝 어둡게
     if (light < 1) {
       ctx.fillStyle = `rgba(5,8,25,${(1 - light) * 0.18})`;
@@ -439,6 +446,24 @@ export class Scene {
     }
 
     return sun;
+  }
+
+  grainPattern() {
+    if (this._grain) return this._grain;
+    const c = document.createElement('canvas');
+    c.width = c.height = 160;
+    const g = c.getContext('2d');
+    const img = g.createImageData(160, 160);
+    let r = 12345;
+    for (let i = 0; i < img.data.length; i += 4) {
+      r = (r * 1664525 + 1013904223) >>> 0;
+      const v = r & 255;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    this._grain = this.ctx.createPattern(c, 'repeat');
+    return this._grain;
   }
 
   hopPhase(slot, nowMs) {
@@ -459,7 +484,7 @@ export class Scene {
       if (fx.kind === 'cheer') {
         if (age > 1.4) return false;
         const a = 1 - age / 1.4;
-        ctx.font = `700 ${Math.max(13, fx.slot.s * (fx.self ? 0.42 : 0.3))}px "Jua", "Gowun Dodum", sans-serif`;
+        ctx.font = `${Math.max(16, fx.slot.s * (fx.self ? 0.55 : 0.4))}px "Nanum Brush Script", "Gowun Batang", serif`;
         ctx.textAlign = 'center';
         ctx.fillStyle = `rgba(255,255,255,${a})`;
         ctx.strokeStyle = `rgba(120,50,20,${a * 0.6})`;
@@ -482,11 +507,29 @@ export class Scene {
         glow.addColorStop(1, 'rgba(255,160,60,0)');
         ctx.fillStyle = glow;
         ctx.fillRect(x - s * 2.2, y - s * 2.2, s * 4.4, s * 4.4);
-        ctx.fillStyle = `rgba(255,${fx.self ? 140 : 170},70,${a})`;
-        roundRect(ctx, x - s * 0.45, y - s * 0.6, s * 0.9, s * 1.1, s * 0.25);
+        // 한지 풍등: 위가 넓고 아래가 좁은 모양, 안에서 빛이 번짐
+        const lg = ctx.createLinearGradient(x, y - s * 0.6, x, y + s * 0.5);
+        lg.addColorStop(0, `rgba(240,${fx.self ? 120 : 140},70,${a})`);
+        lg.addColorStop(0.7, `rgba(255,${fx.self ? 175 : 190},110,${a})`);
+        lg.addColorStop(1, `rgba(255,230,170,${a})`);
+        ctx.fillStyle = lg;
+        ctx.beginPath();
+        ctx.moveTo(x - s * 0.42, y - s * 0.55);
+        ctx.quadraticCurveTo(x, y - s * 0.72, x + s * 0.42, y - s * 0.55);
+        ctx.lineTo(x + s * 0.28, y + s * 0.42);
+        ctx.quadraticCurveTo(x, y + s * 0.5, x - s * 0.28, y + s * 0.42);
+        ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = `rgba(255,240,180,${a})`;
-        ctx.fillRect(x - s * 0.15, y + s * 0.35, s * 0.3, s * 0.12);
+        ctx.strokeStyle = `rgba(150,80,40,${a * 0.35})`;
+        ctx.lineWidth = Math.max(0.6, s * 0.04);
+        ctx.beginPath();
+        ctx.moveTo(x, y - s * 0.62);
+        ctx.lineTo(x, y + s * 0.46);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,250,210,${a})`;
+        ctx.beginPath();
+        ctx.arc(x, y + s * 0.36, s * 0.09, 0, Math.PI * 2);
+        ctx.fill();
         return true;
       }
       if (fx.kind === 'boat') {

@@ -19,7 +19,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Nanum+Brush+Script&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="config.js"></script>
 </head>
@@ -51,13 +51,13 @@
         <label class="field-label" for="nick">승객 이름 <span class="muted">(선택, 승차권에만 써요)</span></label>
         <input id="nick" name="nick" maxlength="10" placeholder="예) 잠꾸러기">
 
-        <span class="field-label" id="char-label">승객 캐릭터</span>
+        <span class="field-label" id="char-label">나의 모습</span>
         <div class="char-grid" id="char-grid" role="radiogroup" aria-labelledby="char-label"></div>
 
-        <span class="field-label" id="color-label">담요 색</span>
+        <span class="field-label" id="color-label">옷 색</span>
         <div class="color-row" id="color-row" role="radiogroup" aria-labelledby="color-label"></div>
 
-        <button type="submit" class="btn primary big" id="get-ticket">승차권 받기 🎫</button>
+        <button type="submit" class="btn primary big" id="get-ticket">승차권 받기</button>
       </form>
       <p class="fineprint">가입·설치 없음 · 적은 소원은 내 기기에만 남아요</p>
     </div>
@@ -70,7 +70,7 @@
       <img id="ticket-img" alt="방구석 해돋이호 승차권">
       <div class="btn-row">
         <button class="btn" id="save-ticket">저장·공유</button>
-        <button class="btn primary" id="board">탑승하기 🚂</button>
+        <button class="btn primary" id="board">탑승하기</button>
       </div>
     </div>
   </section>
@@ -168,48 +168,50 @@
   <div id="train" class="overlay train-overlay" hidden>
     <div class="train-track">
       <div class="train" aria-hidden="true">
-        <svg viewBox="0 -34 420 144" width="378" height="130">
-          <g class="puffs">
-            <circle class="puff p1" cx="371" cy="14" r="12"/>
-            <circle class="puff p2" cx="371" cy="12" r="10"/>
-            <circle class="puff p3" cx="371" cy="10" r="9"/>
-            <circle class="puff p4" cx="371" cy="12" r="11"/>
-          </g>
-          <!-- 객차 2량 -->
+        <svg viewBox="0 -8 560 128" width="460" height="105">
+          <defs>
+            <linearGradient id="tb" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffffff"/><stop offset="0.7" stop-color="#eeeae4"/><stop offset="1" stop-color="#d8d3cb"/>
+            </linearGradient>
+            <linearGradient id="dawn" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#e46f86"/><stop offset="0.5" stop-color="#f08a5d"/><stop offset="1" stop-color="#f4c26b"/>
+            </linearGradient>
+          </defs>
+          <!-- 지붕 위 축하 깃발 -->
+          <path d="M8 6 Q280 14 520 6" stroke="#8a7a70" stroke-width="1.2" fill="none"/>
+          <g class="flags"><path d="M14 6 L30 6 L22 18 Z" fill="#f08a5d"/><path d="M36 6 L52 6 L44 18 Z" fill="#f4c26b"/><path d="M58 6 L74 6 L66 18 Z" fill="#e46f86"/><path d="M80 6 L96 6 L88 18 Z" fill="#8fb0d9"/><path d="M102 6 L118 6 L110 18 Z" fill="#9cc6a5"/><path d="M124 6 L140 6 L132 18 Z" fill="#f08a5d"/><path d="M146 6 L162 6 L154 18 Z" fill="#f4c26b"/><path d="M168 6 L184 6 L176 18 Z" fill="#e46f86"/><path d="M190 6 L206 6 L198 18 Z" fill="#8fb0d9"/><path d="M212 6 L228 6 L220 18 Z" fill="#9cc6a5"/><path d="M234 6 L250 6 L242 18 Z" fill="#f08a5d"/><path d="M256 6 L272 6 L264 18 Z" fill="#f4c26b"/><path d="M278 6 L294 6 L286 18 Z" fill="#e46f86"/><path d="M300 6 L316 6 L308 18 Z" fill="#8fb0d9"/><path d="M322 6 L338 6 L330 18 Z" fill="#9cc6a5"/><path d="M344 6 L360 6 L352 18 Z" fill="#f08a5d"/><path d="M366 6 L382 6 L374 18 Z" fill="#f4c26b"/><path d="M388 6 L404 6 L396 18 Z" fill="#e46f86"/><path d="M410 6 L426 6 L418 18 Z" fill="#8fb0d9"/><path d="M432 6 L448 6 L440 18 Z" fill="#9cc6a5"/><path d="M454 6 L470 6 L462 18 Z" fill="#f08a5d"/><path d="M476 6 L492 6 L484 18 Z" fill="#f4c26b"/></g>
+          <!-- 객차 1 -->
           <g class="car">
-            <rect x="8" y="36" width="104" height="50" rx="12" fill="#f2b8a0"/>
-            <rect x="8" y="30" width="104" height="12" rx="6" fill="#e48f78"/>
-            <rect x="20" y="48" width="22" height="18" rx="5" fill="#ffe7a8"/>
-            <rect x="49" y="48" width="22" height="18" rx="5" fill="#ffe7a8"/>
-            <rect x="78" y="48" width="22" height="18" rx="5" fill="#ffe7a8"/>
-            <g class="riders"><ellipse cx="28" cy="52" rx="2" ry="5" fill="#f6ece2"/><ellipse cx="34" cy="52" rx="2" ry="5" fill="#f6ece2"/><circle cx="31" cy="60" r="5.5" fill="#f6ece2"/><path d="M54 58 L55 51 L59 55 Z M66 58 L65 51 L61 55 Z" fill="#f2b066"/><circle cx="60" cy="60" r="5.5" fill="#f2b066"/><circle cx="84.5" cy="55" r="2.3" fill="#b07a52"/><circle cx="93.5" cy="55" r="2.3" fill="#b07a52"/><circle cx="89" cy="60" r="5.5" fill="#b07a52"/></g>
-            <rect x="8" y="74" width="104" height="5" fill="#e48f78"/>
+            <rect x="6" y="28" width="160" height="62" rx="14" fill="url(#tb)"/>
+            <rect x="14" y="42" width="144" height="24" rx="8" fill="#2c3346"/>
+            <circle cx="28" cy="57" r="5.2" fill="#2a211d"/><path d="M20 66 Q28 58 36 66 Z" fill="#6c5a52"/><circle cx="54" cy="57" r="5.2" fill="#3a2b23"/><path d="M46 66 Q54 58 62 66 Z" fill="#6c5a52"/><circle cx="80" cy="57" r="5.2" fill="#4a3428"/><path d="M72 66 Q80 58 88 66 Z" fill="#6c5a52"/><circle cx="106" cy="57" r="5.2" fill="#1e1a19"/><path d="M98 66 Q106 58 114 66 Z" fill="#6c5a52"/><circle cx="132" cy="57" r="5.2" fill="#2a211d"/><path d="M124 66 Q132 58 140 66 Z" fill="#6c5a52"/><circle cx="158" cy="57" r="5.2" fill="#3a2b23"/><path d="M150 66 Q158 58 166 66 Z" fill="#6c5a52"/>
+            <rect x="6" y="72" width="160" height="7" fill="url(#dawn)"/>
+            <rect x="6" y="82" width="160" height="8" rx="3" fill="#4b4f5c"/>
           </g>
-          <rect x="112" y="66" width="12" height="5" rx="2" fill="#7b5a4a"/>
+          <!-- 객차 2: 특별열차 표지 -->
           <g class="car c2">
-            <rect x="124" y="36" width="104" height="50" rx="12" fill="#a9c2ea"/>
-            <rect x="124" y="30" width="104" height="12" rx="6" fill="#7f9fd6"/>
-            <rect x="136" y="48" width="22" height="18" rx="5" fill="#ffe7a8"/>
-            <rect x="165" y="48" width="22" height="18" rx="5" fill="#ffe7a8"/>
-            <rect x="194" y="48" width="22" height="18" rx="5" fill="#ffe7a8"/>
-            <g class="riders"><ellipse cx="144" cy="52" rx="2" ry="5" fill="#f6ece2"/><ellipse cx="150" cy="52" rx="2" ry="5" fill="#f6ece2"/><circle cx="147" cy="60" r="5.5" fill="#f6ece2"/><path d="M170 58 L171 51 L175 55 Z M182 58 L181 51 L177 55 Z" fill="#f2b066"/><circle cx="176" cy="60" r="5.5" fill="#f2b066"/><circle cx="200.5" cy="55" r="2.3" fill="#b07a52"/><circle cx="209.5" cy="55" r="2.3" fill="#b07a52"/><circle cx="205" cy="60" r="5.5" fill="#b07a52"/></g>
-            <rect x="124" y="74" width="104" height="5" fill="#7f9fd6"/>
+            <rect x="170" y="28" width="160" height="62" rx="14" fill="url(#tb)"/>
+            <rect x="178" y="42" width="144" height="24" rx="8" fill="#2c3346"/>
+            <circle cx="192" cy="57" r="5.2" fill="#2a211d"/><path d="M184 66 Q192 58 200 66 Z" fill="#6c5a52"/><circle cx="218" cy="57" r="5.2" fill="#3a2b23"/><path d="M210 66 Q218 58 226 66 Z" fill="#6c5a52"/><circle cx="244" cy="57" r="5.2" fill="#4a3428"/><path d="M236 66 Q244 58 252 66 Z" fill="#6c5a52"/><circle cx="270" cy="57" r="5.2" fill="#1e1a19"/><path d="M262 66 Q270 58 278 66 Z" fill="#6c5a52"/><circle cx="296" cy="57" r="5.2" fill="#2a211d"/><path d="M288 66 Q296 58 304 66 Z" fill="#6c5a52"/><circle cx="322" cy="57" r="5.2" fill="#3a2b23"/><path d="M314 66 Q322 58 330 66 Z" fill="#6c5a52"/>
+            <rect x="170" y="72" width="160" height="7" fill="url(#dawn)"/>
+            <rect x="170" y="82" width="160" height="8" rx="3" fill="#4b4f5c"/>
+            <rect x="196" y="12" width="108" height="20" rx="10" fill="#fffaf0" stroke="#e8b48a" stroke-width="1.5"/>
+            <text x="250" y="27" text-anchor="middle" font-family="Nanum Brush Script, Gowun Batang, serif" font-size="18" fill="#b9574e">해돋이 특별열차</text>
           </g>
-          <rect x="228" y="66" width="12" height="5" rx="2" fill="#7b5a4a"/>
-          <!-- 기관차 (오른쪽이 앞) -->
+          <!-- 동력차: 오른쪽이 앞 (날렵한 고속열차 앞모양) -->
           <g class="car c3">
-            <rect x="240" y="26" width="58" height="60" rx="10" fill="#e8574f"/>
-            <rect x="248" y="36" width="36" height="24" rx="6" fill="#ffe7a8"/>
-            <rect x="236" y="20" width="68" height="10" rx="5" fill="#c9433c"/>
-            <rect x="296" y="46" width="78" height="40" rx="14" fill="#e8574f"/>
-            <rect x="362" y="24" width="18" height="26" rx="4" fill="#5b4038"/>
-            <circle cx="384" cy="70" r="6" fill="#ffe7a8"/>
-            <path d="M372 86 L398 86 L388 74 Z" fill="#5b4038"/>
+            <path d="M334 28 L440 28 C492 30 528 52 552 80 Q556 90 544 90 L334 90 Z" fill="url(#tb)"/>
+            <path d="M342 42 L430 42 C462 43 486 50 504 62 L504 66 L342 66 Z" fill="#2c3346"/>
+            <circle cx="356" cy="57" r="5.2" fill="#2a211d"/><path d="M348 66 Q356 58 364 66 Z" fill="#6c5a52"/><circle cx="382" cy="57" r="5.2" fill="#3a2b23"/><path d="M374 66 Q382 58 390 66 Z" fill="#6c5a52"/><circle cx="408" cy="57" r="5.2" fill="#4a3428"/><path d="M400 66 Q408 58 416 66 Z" fill="#6c5a52"/><circle cx="434" cy="57" r="5.2" fill="#1e1a19"/><path d="M426 66 Q434 58 442 66 Z" fill="#6c5a52"/>
+            <path d="M334 72 L530 72 Q540 76 546 82 L334 82 Z" fill="url(#dawn)"/>
+            <rect x="334" y="82" width="214" height="8" rx="3" fill="#4b4f5c"/>
+            <circle cx="534" cy="70" r="3.5" fill="#fff4c2"/>
+            <circle cx="486" cy="54" r="5" fill="#f4c26b" opacity="0.9"/>
           </g>
-          <g fill="#4a3530">
-            <circle class="wheel" cx="32" cy="90" r="10"/><circle class="wheel" cx="88" cy="90" r="10"/>
-            <circle class="wheel" cx="148" cy="90" r="10"/><circle class="wheel" cx="204" cy="90" r="10"/>
-            <circle class="wheel" cx="262" cy="90" r="11"/><circle class="wheel" cx="312" cy="90" r="11"/><circle class="wheel" cx="356" cy="90" r="9"/>
+          <g fill="#3a3d47">
+            <rect x="24" y="90" width="40" height="7" rx="3"/><rect x="108" y="90" width="40" height="7" rx="3"/>
+            <rect x="188" y="90" width="40" height="7" rx="3"/><rect x="272" y="90" width="40" height="7" rx="3"/>
+            <rect x="352" y="90" width="40" height="7" rx="3"/><rect x="470" y="90" width="40" height="7" rx="3"/>
           </g>
         </svg>
       </div>
