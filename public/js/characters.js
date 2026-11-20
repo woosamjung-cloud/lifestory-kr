@@ -497,22 +497,29 @@ export function drawPet(ctx, o) {
   ctx.ellipse(x, y + k * 0.02, k * 0.5, k * 0.07, 0, 0, Math.PI * 2);
   ctx.fill();
   // 살랑이는 꼬리
-  const wag = Math.sin(t / (dog ? 140 : 520)) * (dog ? 0.6 : 0.35);
+  // 살랑살랑 꼬리 (강아지는 신나게 빠르게, 고양이는 느긋하게 크게)
+  const wag = Math.sin(t / (dog ? 110 : 420)) * (dog ? 1 : 0.9);
   ctx.strokeStyle = dog ? F : D;
   ctx.lineCap = 'round';
   ctx.lineWidth = k * (dog ? 0.13 : 0.1);
   ctx.beginPath();
   ctx.moveTo(x + k * 0.05, by - k * 0.08);
-  if (dog) ctx.quadraticCurveTo(x + k * 0.45, by - k * 0.2, x + k * 0.4 + Math.sin(wag) * k * 0.25, by - k * 0.5);
-  else ctx.bezierCurveTo(x + k * 0.55, by, x + k * 0.6, by - k * 0.5, x + k * 0.35 + Math.sin(wag) * k * 0.15, by - k * 0.62);
+  if (dog) ctx.quadraticCurveTo(x + k * 0.42 + wag * k * 0.12, by - k * 0.22, x + k * 0.38 + wag * k * 0.32, by - k * 0.52);
+  else ctx.bezierCurveTo(x + k * 0.55, by, x + k * 0.62 + wag * k * 0.15, by - k * 0.5, x + k * 0.32 + wag * k * 0.3, by - k * 0.66 + Math.abs(wag) * k * 0.05);
   ctx.stroke();
   // 몸 (앉은 뒷모습)
   ctx.fillStyle = F;
   ctx.beginPath();
   ctx.ellipse(x, by - k * 0.32, k * 0.34, k * 0.36, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 머리
+  // 머리: 까딱까딱 고개를 갸웃 (가끔 멈췄다 다시)
   const hy = by - k * 0.82;
+  const beat = Math.sin(t / (dog ? 260 : 380));
+  const tilt = (dog ? 0.3 : 0.24) * Math.sign(beat) * Math.pow(Math.abs(beat), 0.6) * (0.6 + 0.4 * Math.sin(t / 2300));
+  ctx.save();
+  ctx.translate(x, hy + k * 0.2);
+  ctx.rotate(tilt);
+  ctx.translate(-x, -(hy + k * 0.2));
   ctx.beginPath();
   ctx.arc(x, hy, k * 0.26, 0, Math.PI * 2);
   ctx.fill();
@@ -544,6 +551,7 @@ export function drawPet(ctx, o) {
       ctx.stroke();
     }
   }
+  ctx.restore();
   // 목줄 / 방울
   ctx.fillStyle = dog ? '#c9574e' : '#e2b04a';
   ctx.beginPath();
