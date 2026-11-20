@@ -63,7 +63,12 @@ export class Net {
       } catch {
         return;
       }
-      if (m.t === 'welcome') this.myId = m.id;
+      if (m.t === 'welcome') {
+        this.myId = m.id;
+        // 처음 받은 버전과 다르면 서버가 새로 배포된 것
+        if (!this.version) this.version = m.version;
+        else if (m.version && m.version !== this.version && this.h.onNewVersion) this.h.onNewVersion();
+      }
       else if (m.t === 'room') this.h.onRoom(m);
       else if (m.t === 'seat') this.h.onSeat(m.seat);
       else if (m.t === 'queue') this.h.onQueue(m.pos);

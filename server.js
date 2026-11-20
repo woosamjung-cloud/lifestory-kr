@@ -18,6 +18,8 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'counts.json');
 
 const PORT = Number(process.env.PORT || 3000);
+// 배포 버전 (Render는 커밋 번호를 알려줌). 바뀌면 접속자 화면이 새 버전으로 다시 열림
+const VERSION = process.env.RENDER_GIT_COMMIT || String(Date.now());
 const SEATS = Math.max(1, Number(process.env.SEATS || 1000)); // 장소(방)마다 좌석 수
 const MAX_CLIENTS = Number(process.env.MAX_CLIENTS || 20000); // 서버 전체 접속 상한
 const MAX_PER_IP = Number(process.env.MAX_PER_IP || 30); // 한 IP에서 동시 접속 상한 (회사·학교 와이파이 고려)
@@ -531,7 +533,7 @@ wss.on('connection', (ws, req) => {
   };
   clients.add(c);
   notePeak();
-  send(ws, { t: 'welcome', id: c.id, seats: SEATS });
+  send(ws, { t: 'welcome', id: c.id, seats: SEATS, version: VERSION });
 
   ws.on('pong', () => {
     c.alive = true;

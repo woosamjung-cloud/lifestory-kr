@@ -17,7 +17,7 @@ const DAY = 86400000;
 // 판매 상품 (가격은 서버에서만 정함 - 화면에서 바꿔도 소용없음)
 export const PRODUCTS = {
   candle: { name: '촛불 (30일)', price: 1000, grants: { items: ['candle'] }, icon: '🕯️', desc: '내 자리 앞에 촛불이 일렁여요' },
-  flash: { name: '후레쉬 (30일)', price: 1000, grants: { items: ['flash'] }, icon: '🔦', desc: '해 뜨는 순간 다 같이 불빛을 흔들어요' },
+  flash: { name: '후레쉬 (30일)', price: 1000, grants: { items: ['flash'] }, icon: '🔦', desc: '손전등으로 밤바다를 은은하게 비춰요' },
   fireworks: { name: '폭죽 (30일)', price: 2000, grants: { items: ['fireworks'] }, icon: '🎆', desc: '하늘에 불꽃놀이, 모든 사람 화면에 보여요' },
   bigfire: { name: '큰 캠프파이어 (30일)', price: 2900, grants: { items: ['bigfire'] }, icon: '🔥', desc: '더 크고 화려한 색 불꽃' },
   package: { name: '연말 패키지 (30일)', price: 4900, grants: { items: ['candle', 'flash', 'fireworks', 'bigfire'], coins: 5 }, icon: '🎁', desc: '네 가지 아이템 + 동전 5개' },

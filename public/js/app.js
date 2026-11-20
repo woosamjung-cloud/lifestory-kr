@@ -121,6 +121,16 @@ const net = new Net({
     $('queue-pos').textContent = pos.toLocaleString('ko-KR');
     $('queue').hidden = state.screen !== 'ride';
   },
+  onNewVersion() {
+    // 새 버전 배포: 잠시 알린 뒤 새로 고침, 탑승 중이었다면 자동으로 다시 탑승
+    toast('새 버전으로 바뀌어요 ✨');
+    try {
+      if (state.screen === 'ride') sessionStorage.setItem('haedoti.autoboard', '1');
+    } catch {
+      /* 저장 불가 */
+    }
+    setTimeout(() => location.reload(), 2500);
+  },
   onWallet(w) {
     setWallet(w);
   },
@@ -856,6 +866,7 @@ scene.onBoom = () => ambience.boom();
 scene.onCoin = () => ambience.plop();
 loadShop();
 
+
 // ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------
 let lastSay = 0;
 function showSay(text, me) {
@@ -958,6 +969,26 @@ applyEvent(pickEvent(realNow()));
 buildPicker();
 document.fonts && document.fonts.ready.then(refreshPicker);
 requestAnimationFrame(frame);
+
+// 새 버전으로 새로 고침된 경우 바로 다시 탑승
+(() => {
+  let auto = false;
+  try {
+    auto = sessionStorage.getItem('haedoti.autoboard') === '1';
+    sessionStorage.removeItem('haedoti.autoboard');
+  } catch {
+    /* 저장 불가 */
+  }
+  if (!auto) return;
+  $('board-form').requestSubmit();
+  const iv = setInterval(() => {
+    if (state.screen === 'ticket') {
+      clearInterval(iv);
+      $('board').click();
+    }
+  }, 200);
+  setTimeout(() => clearInterval(iv), 10000);
+})();
 
 // 개발·시험용
 window.__haedoti = { state, scene, net, solarPosition, EVENT_AFTERGLOW_MS, setClock, ambience };
