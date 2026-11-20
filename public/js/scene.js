@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritter } from './characters.js';
+import { drawCritterFast } from './characters.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -82,6 +82,7 @@ export class Scene {
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.dpr = dpr;
     this.W = w;
     this.H = h;
     this.horizonY = h * 0.5;
@@ -110,7 +111,7 @@ export class Scene {
       const t = r / (rows - 1);
       const y = lerp(top, bottom, t ** 1.15);
       const s = lerp(H * 0.03, H * 0.075, t);
-      const gap = s * 1.25;
+      const gap = s * 1.38;
       const n = Math.max(3, Math.floor((W * 0.92) / gap));
       const row = [];
       for (let c = 0; c < n; c++) {
@@ -315,13 +316,15 @@ export class Scene {
     }
 
     // 땅 (정동진: 모래사장 / 정서진: 나무 데크)
+    // 밝기 필터 대신 색 자체를 어둡게 섞습니다 (필터는 매우 느림)
     const bright = 0.45 + 0.55 * light;
+    const night = [8, 10, 28];
+    const dk = (hex) => rgb(mix(hex, night, 1 - bright));
     ctx.save();
-    ctx.filter = `brightness(${bright.toFixed(2)})`;
     if (this.place === 'east') {
       const sand = ctx.createLinearGradient(0, shoreY, 0, H);
-      sand.addColorStop(0, '#e9cfa3');
-      sand.addColorStop(1, '#c9a375');
+      sand.addColorStop(0, dk('#e9cfa3'));
+      sand.addColorStop(1, dk('#c9a375'));
       ctx.fillStyle = sand;
       ctx.beginPath();
       ctx.moveTo(0, shoreY + 6);
@@ -332,7 +335,7 @@ export class Scene {
       ctx.fill();
       // 밀려오는 파도 거품
       const foam = (Math.sin(nowMs / 2200) + 1) / 2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.strokeStyle = `rgba(255,255,255,${(0.75 * bright).toFixed(2)})`;
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       for (let x = 0; x < W + 16; x += 16) {
@@ -342,7 +345,7 @@ export class Scene {
       }
       ctx.stroke();
       // 왼쪽 바위
-      ctx.fillStyle = '#5d5a62';
+      ctx.fillStyle = dk('#5d5a62');
       ctx.beginPath();
       ctx.moveTo(-10, shoreY + 30);
       ctx.quadraticCurveTo(W * 0.04, shoreY - H * 0.06, W * 0.12, shoreY + 8);
@@ -351,9 +354,9 @@ export class Scene {
       ctx.fill();
     } else {
       const deckTop = shoreY;
-      ctx.fillStyle = '#9a6a45';
+      ctx.fillStyle = dk('#9a6a45');
       ctx.fillRect(0, deckTop, W, H - deckTop);
-      ctx.strokeStyle = 'rgba(60,35,20,0.45)';
+      ctx.strokeStyle = rgb(mix('#3c2314', night, 1 - bright), 0.45);
       ctx.lineWidth = 1.2;
       for (let i = 0; i < 18; i++) {
         const t = i / 18;
@@ -364,7 +367,7 @@ export class Scene {
         ctx.stroke();
       }
       // 난간
-      ctx.strokeStyle = '#6b4329';
+      ctx.strokeStyle = dk('#6b4329');
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(0, deckTop - H * 0.025);
@@ -379,7 +382,8 @@ export class Scene {
       }
     }
 
-    // 승객들 (먼 줄부터)
+    // 승객들 (먼 줄부터) - 이불 색이 탁해지지 않도록 땅보다 덜 어둡게
+    const critterBright = 0.72 + 0.28 * light;
     const rim = { x: sun.x > W / 2 ? 1 : -1, color: 'rgb(255,190,120)', a: clamp(1 - Math.abs(e - 2) / 8) * 0.9 };
     const celebrating = nowMs - this.celebrateAt < 4000;
     const draw = [];
@@ -392,16 +396,19 @@ export class Scene {
     for (const { sl, p } of draw) {
       const hopT = this.hopPhase(sl, nowMs);
       const cel = celebrating ? Math.abs(Math.sin((nowMs - this.celebrateAt) / 260 + sl.x)) : 0;
-      drawCritter(ctx, {
+      drawCritterFast(ctx, {
         x: sl.x,
         y: sl.y,
         s: sl.s,
         type: p.char,
         color: p.color,
-        facing: 'back',
         arms: Math.max(hopT > 0 ? 1 : 0, celebrating ? 1 : 0),
         hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5),
         rim,
+        t: nowMs,
+        steam: p.me || sl.r >= 3,
+        dpr: this.dpr,
+        bright: critterBright,
       });
     }
     ctx.restore();
@@ -412,7 +419,7 @@ export class Scene {
       const label = this.self.name ? `나 · ${this.self.name}` : '나';
       ctx.font = `600 ${Math.max(12, sl.s * 0.24)}px "Gowun Dodum", sans-serif`;
       const tw = ctx.measureText(label).width + 16;
-      const ly = sl.y - sl.s * 1.62;
+      const ly = sl.y - sl.s * (this.self.char === 'rabbit' ? 1.95 : 1.62);
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       roundRect(ctx, sl.x - tw / 2, ly - 12, tw, 22, 11);
       ctx.fill();

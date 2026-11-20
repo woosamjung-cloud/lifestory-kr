@@ -345,13 +345,24 @@ textarea { resize: none; line-height: 1.5; }
 
 .train-overlay { background: #0b1027; flex-direction: column; gap: 22px; color: #fff8ee; z-index: 6; }
 .train-track { width: 100%; overflow: hidden; border-bottom: 3px dashed rgba(255, 255, 255, 0.3); padding-bottom: 6px; }
-.train { white-space: nowrap; font-size: 56px; animation: chug 2.6s linear forwards; display: inline-block; }
-.train .car { display: inline-block; animation: bob 0.35s ease-in-out infinite alternate; }
-.train .car:nth-child(2) { animation-delay: 0.1s; }
-.train .car:nth-child(3) { animation-delay: 0.2s; }
-.train .car:nth-child(4) { animation-delay: 0.3s; }
-@keyframes chug { from { transform: translateX(110vw) scaleX(-1); } to { transform: translateX(-120%) scaleX(-1); } }
-@keyframes bob { to { transform: translateY(-3px); } }
+.train { display: inline-block; animation: chug 2.6s linear forwards; will-change: transform; }
+.train svg { display: block; max-width: 86vw; height: auto; }
+.train .car { animation: bob 0.32s ease-in-out infinite alternate; }
+.train .c2 { animation-delay: 0.1s; }
+.train .c3 { animation-delay: 0.2s; }
+.train .puff { fill: rgba(255, 255, 255, 0.85); animation: puff 0.9s ease-out infinite; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.train .p2 { animation-delay: 0.3s; }
+.train .p3 { animation-delay: 0.45s; }
+.train .p4 { animation-delay: 0.68s; }
+/* 기관차가 오른쪽(앞)에 있으므로 왼쪽에서 오른쪽으로 달립니다 */
+@keyframes chug {
+  0% { transform: translateX(-100%); animation-timing-function: ease-out; }
+  45% { transform: translateX(calc(50vw - 50%)); }
+  62% { transform: translateX(calc(50vw - 50%)); animation-timing-function: ease-in; }
+  100% { transform: translateX(100vw); }
+}
+@keyframes bob { to { transform: translateY(-2px); } }
+@keyframes puff { from { opacity: 0.9; transform: translate(0, 0) scale(0.6); } to { opacity: 0; transform: translate(-46px, -20px) scale(2); } }
 .train-text { font-family: var(--title); font-size: 22px; margin: 0; text-align: center; padding: 0 16px; }
 
 .toast {
@@ -374,5 +385,5 @@ textarea { resize: none; line-height: 1.5; }
 .noscript { position: fixed; inset: auto 0 40% 0; text-align: center; color: #fff; z-index: 9; }
 
 @media (prefers-reduced-motion: reduce) {
-  .train, .train .car, .home-sheet, .act.glow { animation: none; }
+  .train, .train .car, .train .puff, .home-sheet, .act.glow { animation: none; }
 }
