@@ -77,6 +77,9 @@ export class Scene {
     this.gulls = Array.from({ length: 3 }, () => ({ x: rnd(), y: 0.2 + rnd() * 0.15, v: 0.01 + rnd() * 0.01, p: rnd() * 6 }));
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    // 휴대폰을 옆으로 돌렸을 때 (일부 브라우저는 resize가 늦게 옴)
+    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 250));
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', () => this.resize());
   }
 
   resize() {
@@ -89,8 +92,10 @@ export class Scene {
     this.dpr = dpr;
     this.W = w;
     this.H = h;
-    this.horizonY = h * 0.5;
-    this.shoreY = this.horizonY + h * 0.13;
+    // 가로 화면(휴대폰을 옆으로 돌림)은 높이가 낮아서 수평선을 조금 위로 올리고 해변을 넓게
+    this.landscape = w > h * 1.25;
+    this.horizonY = h * (this.landscape ? 0.4 : 0.5);
+    this.shoreY = this.horizonY + h * (this.landscape ? 0.1 : 0.13);
     this.pxPerDeg = Math.max(w / 75, h / 48);
     this.sunR = Math.max(16, h * 0.042);
     this.layoutSlots();
@@ -109,14 +114,18 @@ export class Scene {
   layoutSlots() {
     const { W, H } = this;
     // 맨 앞줄 머리 꼭대기가 파도 거품선(최대 shoreY+16px)보다 아래에 오도록
-    const top = this.shoreY + 20 + H * 0.03 * 1.05;
-    const bottom = H - Math.max(130, H * 0.2); // 아래쪽 버튼 영역을 피합니다
+    // 캐릭터 크기 기준: 가로 화면은 높이가 낮으므로 조금 키움
+    const unit = this.landscape ? H * 1.3 : H;
+    const top = this.shoreY + 20 + unit * 0.03 * 1.05;
+    // 아래쪽 버튼 영역을 피합니다 (가로 화면은 버튼이 낮아 덜 비움)
+    let bottom = H - (this.landscape ? 84 : Math.max(130, H * 0.2));
+    if (bottom < top + unit * 0.08) bottom = top + unit * 0.08;
     const rows = 5;
     const slots = [];
     for (let r = 0; r < rows; r++) {
       const t = r / (rows - 1);
       const y = lerp(top, bottom, t ** 1.15);
-      const s = lerp(H * 0.03, H * 0.075, t);
+      const s = lerp(unit * 0.03, unit * 0.075, t);
       const gap = s * 1.38;
       const n = Math.max(3, Math.floor((W * 0.92) / gap));
       const row = [];

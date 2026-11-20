@@ -376,7 +376,8 @@ const server = http.createServer((req, res) => {
     const ext = path.extname(filePath);
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
+      // 고칠 때마다 바로 반영되도록 항상 새로 확인 (이미지·글꼴만 잠시 보관)
+      'Cache-Control': ['.png', '.svg', '.ico'].includes(ext) ? 'public, max-age=300' : 'no-cache',
     });
     res.end(data);
   });
