@@ -130,6 +130,42 @@ const net = new Net({
 });
 net.connect();
 
+// ---------- 실제 날씨 (기상청) ----------
+// 시험용: 주소 뒤에 ?wx=4,3,-2 (하늘 1맑음/3구름많음/4흐림, 강수 0없음/1비/3눈, 기온)
+const weather = { data: null };
+const wxParam = params.get('wx');
+function applyWeather() {
+  let w = null;
+  if (wxParam) {
+    const [sky, pty, temp] = wxParam.split(',').map(Number);
+    const label = { 1: '비', 2: '비/눈', 3: '눈', 5: '빗방울', 7: '눈날림' }[pty] || { 1: '맑음', 3: '구름많음', 4: '흐림' }[sky] || '';
+    w = { sky: sky || 1, pty: pty || 0, temp: Number.isFinite(temp) ? temp : null, label };
+  } else if (weather.data && weather.data.available && state.event) {
+    w = weather.data[state.event.place];
+  }
+  scene.weather = w;
+  const el = $('hud-weather');
+  if (w) {
+    const icon = w.pty ? ([3, 7].includes(w.pty) ? '❄️' : '🌧️') : { 1: '☀️', 3: '⛅', 4: '☁️' }[w.sky] || '';
+    el.textContent = `${icon} ${w.label}${w.temp != null ? ` ${Math.round(w.temp)}°C` : ''}`;
+    el.title = '기상청 초단기예보 기준 실제 날씨';
+    el.hidden = false;
+  } else el.hidden = true;
+}
+async function loadWeather() {
+  try {
+    const r = await fetch('api/weather', { cache: 'no-store' });
+    if (r.ok) weather.data = await r.json();
+  } catch {
+    /* 서버 없음 (정적 호스팅) */
+  }
+  applyWeather();
+}
+if (location.protocol !== 'file:') {
+  loadWeather();
+  setInterval(loadWeather, 10 * 60 * 1000);
+}
+
 // ---------- 이벤트(장소) 결정 ----------
 function pickEvent(now) {
   if (state.placeMode === 'auto') return currentEvent(now);
@@ -150,6 +186,7 @@ function applyEvent(ev, { animate = false } = {}) {
     if (animate && state.screen === 'ride') playTrain(ev);
   }
   renderEventTexts();
+  if (typeof applyWeather === 'function') applyWeather();
 }
 
 function renderEventTexts() {
@@ -269,6 +306,14 @@ function frame(ts) {
   if (ts - lastTextUpdate > 250) {
     lastTextUpdate = ts;
     updateTexts(now, tScene);
+    const sh = scene.night.shower;
+    const skyEl = $('hud-sky');
+    if (sh && sh.rate >= 10) {
+      const p = sh.peak;
+      const md = `${new Date(p.getTime() + 9 * 3600e3).getUTCMonth() + 1}/${new Date(p.getTime() + 9 * 3600e3).getUTCDate()}`;
+      skyEl.textContent = `☄️ ${sh.name}${Math.abs(sh.daysFromPeak) < 1 ? ' 극대' : ` (극대 ${md})`}`;
+      skyEl.hidden = false;
+    } else skyEl.hidden = true;
   }
   requestAnimationFrame(frame);
 }

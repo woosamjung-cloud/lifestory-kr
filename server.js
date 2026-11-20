@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { nextEventAt, dateKey } from './public/js/sun.js';
+import { startWeather, weatherStatus } from './weather.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -325,6 +326,11 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ online: clients.size, seats: SEATS, rooms: body }));
     return;
   }
+  if (url.pathname === '/api/weather') {
+    res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'public, max-age=60' });
+    res.end(JSON.stringify(weatherStatus()));
+    return;
+  }
   if (url.pathname === '/api/stats') {
     const days = Object.keys(counts.daily).sort().reverse().slice(0, 30);
     const total = { visitors: 0, ticket: 0, card: 0, save: 0, preview: 0, cheer: 0, ritual: 0, peak: 0 };
@@ -445,6 +451,8 @@ function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+startWeather();
 
 server.listen(PORT, () => {
   console.log(`방구석 해돋이호 운행 시작: http://localhost:${PORT}  (방마다 좌석 ${SEATS}석)`);

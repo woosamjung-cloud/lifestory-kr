@@ -3,6 +3,7 @@
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
 import { drawCritterFast } from './characters.js';
+import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -58,6 +59,7 @@ export class Scene {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.place = 'east';
+    this.placeInfo = PLACES.east;
     this.centerAz = 115;
     this.time = new Date();
     this.people = []; // 다른 승객 [{id, seat, char, color}]
@@ -67,8 +69,10 @@ export class Scene {
     this.hops = new Map(); // slotIndex -> 시작 시각
     this.celebrateAt = 0;
     const rnd = seeded(7);
-    this.stars = Array.from({ length: 160 }, () => ({ x: rnd(), y: rnd() ** 1.6, r: rnd() * 1.3 + 0.3, p: rnd() * 6 }));
+    this.night = new NightSky();
+    this.weather = null; // { sky, pty, temp, label } 기상청 실제 날씨
     this.clouds = Array.from({ length: 6 }, (_, i) => ({ x: rnd(), y: 0.12 + rnd() * 0.25, w: 0.12 + rnd() * 0.16, v: 0.002 + rnd() * 0.004, k: i }));
+    this.cloudsMore = [...this.clouds, ...Array.from({ length: 7 }, (_, i) => ({ x: rnd(), y: 0.08 + rnd() * 0.55, w: 0.14 + rnd() * 0.18, v: 0.002 + rnd() * 0.004, k: i + 6 }))];
     this.islands = Array.from({ length: 4 }, () => ({ x: rnd(), w: 0.06 + rnd() * 0.12, h: 0.008 + rnd() * 0.018 }));
     this.gulls = Array.from({ length: 3 }, () => ({ x: rnd(), y: 0.2 + rnd() * 0.15, v: 0.01 + rnd() * 0.01, p: rnd() * 6 }));
     this.resize();
@@ -95,6 +99,7 @@ export class Scene {
   setPlace(placeKey, eventTime) {
     this.place = placeKey;
     const p = PLACES[placeKey];
+    this.placeInfo = p;
     this.centerAz = solarPosition(eventTime, p.lat, p.lon).azimuth;
     this.effects = [];
     this.layoutSlots();
@@ -201,25 +206,22 @@ export class Scene {
       ctx.fillRect(0, 0, W, horizonY + 1);
     }
 
-    // 별
+    // 실제 밤하늘: 별·별자리·달·유성 (구름량에 따라 가려짐)
+    const wx = this.weather;
+    const cover = wx ? { 1: 0.1, 3: 0.55, 4: 0.9 }[wx.sky] ?? 0.25 : 0.25;
     const starA = clamp((-e - 4) / 8);
-    if (starA > 0) {
-      for (const st of this.stars) {
-        const tw = 0.6 + 0.4 * Math.sin(nowMs / 700 + st.p);
-        ctx.fillStyle = `rgba(255,255,240,${starA * tw})`;
-        ctx.beginPath();
-        ctx.arc(st.x * W, st.y * horizonY * 0.95, st.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    this.night.draw(ctx, this, this.time, nowMs, starA, cover);
+    this.night.drawOvercast(ctx, this, cover, light);
 
     // 구름
     const cloudBase = mix(mix('#2a3156', '#ffffff', light), hor, 0.35 * warm);
     const cloudUnder = mix(cloudBase, [255, 140, 110], 0.6 * warm);
-    for (const c of this.clouds) {
+    const cloudList = cover > 0.4 ? this.cloudsMore : this.clouds;
+    const cloudScale = cover > 0.4 ? 1.35 : 1;
+    for (const c of cloudList) {
       const cx = (((c.x + (nowMs / 1000) * c.v * 0.05) % 1.3) - 0.15) * W;
       const cy = c.y * horizonY;
-      const cw = c.w * W;
+      const cw = c.w * W * cloudScale;
       ctx.fillStyle = rgb(cloudBase, 0.55 + 0.25 * light);
       for (let i = 0; i < 4; i++) {
         ctx.beginPath();
@@ -247,6 +249,7 @@ export class Scene {
       ctx.beginPath();
       ctx.rect(0, 0, W, horizonY);
       ctx.clip();
+      ctx.globalAlpha = 1 - clamp((cover - 0.4) * 1.3, 0, 0.75);
       const glow = ctx.createRadialGradient(sun.x, sun.y, sunR * 0.5, sun.x, sun.y, sunR * 4);
       glow.addColorStop(0, 'rgba(255,220,150,0.55)');
       glow.addColorStop(1, 'rgba(255,200,120,0)');
@@ -463,6 +466,9 @@ export class Scene {
 
     // 효과들
     this.renderEffects(nowMs, sun);
+
+    // 비·눈 (실제 날씨)
+    if (wx) this.night.drawPrecip(ctx, this, wx.pty, nowMs);
 
     // 종이 질감 (일러스트 느낌)
     ctx.save();
