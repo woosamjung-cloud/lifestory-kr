@@ -33,7 +33,7 @@ export function seatLabel(seat, fallbackSeed = 0) {
 }
 
 export async function makeTicket({ name, char, color, event, seat, seed }) {
-  await loadGlyphs(`방구석해돋이호해넘이열차승차권편도잠옷착용출발도착내방정동진정서진승객날짜일출일몰예정좌석호차번익명의여행자년월일새해첫마지막이불밖은추우니에서봐요담요를두른후드를쓴목도리를한비니를쓴코트를입은→0123456789:${name || ''}`);
+  await loadGlyphs(`방구석해돋이호해넘이열차승차권편도잠옷착용출발도착내방정동진정서진승객날짜일출일몰예정좌석호차번익명의여행자년월일새해첫마지막이불밖은추우니에서봐요백설기인절미쑥떡꿀떡흑임자→0123456789:${name || ''}`);
   const c = newCanvas();
   const ctx = c.getContext('2d');
   const place = PLACES[event.place];

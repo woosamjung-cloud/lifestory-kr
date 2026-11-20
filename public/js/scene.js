@@ -110,8 +110,8 @@ export class Scene {
     for (let r = 0; r < rows; r++) {
       const t = r / (rows - 1);
       const y = lerp(top, bottom, t ** 1.15);
-      const s = lerp(H * 0.03, H * 0.075, t);
-      const gap = s * 1.38;
+      const s = lerp(H * 0.036, H * 0.088, t);
+      const gap = s * 1.18;
       const n = Math.max(3, Math.floor((W * 0.92) / gap));
       const row = [];
       for (let c = 0; c < n; c++) {
@@ -229,6 +229,14 @@ export class Scene {
       ctx.beginPath();
       ctx.ellipse(cx, cy + cw * 0.06, cw * 0.5, cw * 0.05, 0, 0, Math.PI * 2);
       ctx.fill();
+      // 손그림 잉크 윤곽 (위쪽 둥근 선만)
+      ctx.strokeStyle = `rgba(74,53,44,${0.12 + 0.18 * light})`;
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.ellipse(cx + (i - 1.5) * cw * 0.28, cy - Math.sin(i * 1.7 + c.k) * cw * 0.06, cw * 0.24, cw * 0.11, 0, Math.PI * 1.08, Math.PI * 1.92);
+        ctx.stroke();
+      }
     }
 
     // 해
@@ -345,13 +353,36 @@ export class Scene {
       }
       ctx.stroke();
       // 왼쪽 바위
-      ctx.fillStyle = dk('#5d5a62');
+      // 소나무 (바위 뒤)
+      this.drawPines(ctx, W, H, shoreY, dk, bright);
+      ctx.fillStyle = dk('#6b6570');
       ctx.beginPath();
-      ctx.moveTo(-10, shoreY + 30);
-      ctx.quadraticCurveTo(W * 0.04, shoreY - H * 0.06, W * 0.12, shoreY + 8);
-      ctx.quadraticCurveTo(W * 0.16, shoreY + 20, W * 0.1, shoreY + 40);
-      ctx.lineTo(-10, shoreY + 50);
+      const rk = Math.min(W * 0.22, H * 0.16); // 해안 절벽 크기
+      ctx.moveTo(-10, shoreY - rk * 0.55);
+      ctx.quadraticCurveTo(rk * 0.35, shoreY - rk * 0.72, rk * 0.62, shoreY - rk * 0.3);
+      ctx.quadraticCurveTo(rk * 0.95, shoreY + rk * 0.05, rk * 0.85, shoreY + rk * 0.35);
+      ctx.lineTo(-10, shoreY + rk * 0.45);
       ctx.fill();
+      ctx.strokeStyle = rgb(mix('#4a352c', night, 1 - bright), 0.8);
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      // 바위 결
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rk * 0.2, shoreY - rk * 0.45);
+      ctx.quadraticCurveTo(rk * 0.35, shoreY - rk * 0.2, rk * 0.3, shoreY + rk * 0.15);
+      ctx.moveTo(rk * 0.55, shoreY - rk * 0.15);
+      ctx.lineTo(rk * 0.6, shoreY + rk * 0.12);
+      ctx.stroke();
+      // 모래 위 조약돌
+      ctx.fillStyle = dk('#b49a78');
+      for (let i = 0; i < 14; i++) {
+        const px = ((i * 137) % 100) / 100 * W;
+        const py = shoreY + 24 + (((i * 61) % 100) / 100) * (H - shoreY - 40);
+        ctx.beginPath();
+        ctx.ellipse(px, py, 2.2 + (i % 3), 1.4 + (i % 2), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else {
       const deckTop = shoreY;
       ctx.fillStyle = dk('#9a6a45');
@@ -419,7 +450,7 @@ export class Scene {
       const label = this.self.name ? `나 · ${this.self.name}` : '나';
       ctx.font = `700 ${Math.max(12, sl.s * 0.22)}px "Gowun Batang", serif`;
       const tw = ctx.measureText(label).width + 16;
-      const ly = sl.y - sl.s * 1.5;
+      const ly = sl.y - sl.s * 1.18;
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       roundRect(ctx, sl.x - tw / 2, ly - 12, tw, 22, 11);
       ctx.fill();
@@ -446,6 +477,38 @@ export class Scene {
     }
 
     return sun;
+  }
+
+  // 정동진 바위 위 소나무 (손그림 느낌)
+  drawPines(ctx, W, H, shoreY, dk, bright) {
+    const ink = `rgba(${Math.round(74 * bright)},${Math.round(53 * bright)},${Math.round(44 * bright)},0.85)`;
+    const rk = Math.min(W * 0.22, H * 0.16);
+    const trees = [
+      [rk * 0.18, shoreY - rk * 0.6, rk * 0.75, -0.1],
+      [rk * 0.45, shoreY - rk * 0.5, rk * 0.55, 0.12],
+    ];
+    for (const [tx, ty, th, lean] of trees) {
+      ctx.strokeStyle = dk('#5a4032');
+      ctx.lineWidth = Math.max(2, th * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.quadraticCurveTo(tx + lean * th, ty - th * 0.5, tx + lean * th * 1.6, ty - th);
+      ctx.stroke();
+      for (let k = 0; k < 3; k++) {
+        const ly = ty - th * (0.45 + k * 0.22);
+        const lx = tx + lean * th * (0.8 + k * 0.4);
+        const lw = th * (0.42 - k * 0.09);
+        ctx.fillStyle = dk(k % 2 ? '#3f5d48' : '#4a6b52');
+        ctx.beginPath();
+        ctx.ellipse(lx, ly, lw, th * 0.09, lean, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(lx, ly, lw, th * 0.09, lean, Math.PI, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
   }
 
   grainPattern() {
@@ -489,7 +552,7 @@ export class Scene {
         ctx.fillStyle = `rgba(255,255,255,${a})`;
         ctx.strokeStyle = `rgba(120,50,20,${a * 0.6})`;
         ctx.lineWidth = 3;
-        const ty = fx.slot.y - fx.slot.s * 1.75 - age * 40;
+        const ty = fx.slot.y - fx.slot.s * 1.3 - age * 40;
         ctx.strokeText('와!', fx.slot.x, ty);
         ctx.fillText('와!', fx.slot.x, ty);
         return true;
