@@ -216,7 +216,8 @@ export class Scene {
     // 구름
     const cloudBase = mix(mix('#2a3156', '#ffffff', light), hor, 0.35 * warm);
     const cloudUnder = mix(cloudBase, [255, 140, 110], 0.6 * warm);
-    const cloudList = cover > 0.4 ? this.cloudsMore : this.clouds;
+    // 맑음이면 구름 두 조각만, 구름많음·흐림이면 더 많이
+    const cloudList = cover > 0.4 ? this.cloudsMore : cover < 0.2 ? this.clouds.slice(0, 2) : this.clouds;
     const cloudScale = cover > 0.4 ? 1.35 : 1;
     for (const c of cloudList) {
       const cx = (((c.x + (nowMs / 1000) * c.v * 0.05) % 1.3) - 0.15) * W;

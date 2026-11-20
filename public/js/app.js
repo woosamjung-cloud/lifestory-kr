@@ -146,7 +146,8 @@ function applyWeather() {
   scene.weather = w;
   const el = $('hud-weather');
   if (w) {
-    const icon = w.pty ? ([3, 7].includes(w.pty) ? '❄️' : '🌧️') : { 1: '☀️', 3: '⛅', 4: '☁️' }[w.sky] || '';
+    const night = scene.sunInfo().elevation < -3;
+    const icon = w.pty ? ([3, 7].includes(w.pty) ? '❄️' : '🌧️') : { 1: night ? '🌙' : '☀️', 3: night ? '☁️' : '⛅', 4: '☁️' }[w.sky] || '';
     el.textContent = `${icon} ${w.label}${w.temp != null ? ` ${Math.round(w.temp)}°C` : ''}`;
     el.title = '기상청 초단기예보 기준 실제 날씨';
     el.hidden = false;
