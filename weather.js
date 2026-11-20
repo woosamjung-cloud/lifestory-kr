@@ -66,7 +66,8 @@ export function parseForecast(items) {
   const pty = Number(pick.PTY) || 0;
   const temp = pick.T1H != null ? Number(pick.T1H) : null;
   const label = PTY_LABEL[pty] || SKY_LABEL[sky] || '';
-  return { sky, pty, temp, label, lightning: Number(pick.LGT) > 0, forecastAt: first };
+  const wind = pick.WSD != null ? Number(pick.WSD) : null; // 풍속 m/s
+  return { sky, pty, temp, wind, label, lightning: Number(pick.LGT) > 0, forecastAt: first };
 }
 
 const cache = { east: null, west: null, updatedAt: null, error: null };

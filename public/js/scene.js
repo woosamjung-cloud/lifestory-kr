@@ -428,8 +428,17 @@ export class Scene {
       if (sl) draw.push({ sl, p });
     }
     if (this.self && !this.selfStanding) draw.push({ sl: this.mySlot, p: { ...this.self, me: true } });
+    // 불멍 화로: 내 자리 오른쪽 앞
+    const fire = this.fireSpot();
+    const fireNight = clamp(1 - light);
+    this.drawFireGlow(ctx, fire, nowMs, fireNight);
+    draw.push({ sl: { y: fire.y, x: fire.x }, fire: true });
     draw.sort((a, b) => a.sl.y - b.sl.y);
-    for (const { sl, p } of draw) {
+    for (const { sl, p, fire: isFire } of draw) {
+      if (isFire) {
+        this.drawFire(ctx, fire, nowMs, fireNight);
+        continue;
+      }
       const hopT = this.hopPhase(sl, nowMs);
       const cel = celebrating ? Math.abs(Math.sin((nowMs - this.celebrateAt) / 260 + sl.x)) : 0;
       drawCritterFast(ctx, {
@@ -448,6 +457,8 @@ export class Scene {
       });
     }
     ctx.restore();
+    // 불빛이 가까운 사람들을 따뜻하게 비춤
+    this.drawFireLight(ctx, fire, nowMs, fireNight);
 
     // 내 이름표
     if (this.self && !this.selfStanding) {
@@ -517,6 +528,155 @@ export class Scene {
         ctx.stroke();
       }
     }
+  }
+
+  // ---------- 불멍 화로 ----------
+  fireSpot() {
+    const sl = this.mySlot;
+    const fs = Math.min(sl.s * 1.5, this.W * 0.16);
+    return { x: Math.min(sl.x + this.W * 0.22, this.W - fs * 0.8), y: sl.y - sl.s * 0.1, s: fs };
+  }
+
+  flicker(t, k = 0) {
+    return 0.82 + 0.1 * Math.sin(t / 97 + k) + 0.06 * Math.sin(t / 41 + k * 2.3) + 0.04 * Math.sin(t / 23 + k * 5.1);
+  }
+
+  drawFireGlow(ctx, f, t, night) {
+    const fl = this.flicker(t);
+    const R = f.s * (2 + night * 1.8) * fl;
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+    g.addColorStop(0, `rgba(255,160,70,${(0.12 + 0.38 * night) * fl})`);
+    g.addColorStop(0.45, `rgba(255,120,50,${(0.05 + 0.16 * night) * fl})`);
+    g.addColorStop(1, 'rgba(255,100,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(f.x, f.y, R, R * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawFireLight(ctx, f, t, night) {
+    if (night < 0.15) return;
+    const fl = this.flicker(t, 1);
+    const R = f.s * 2.6 * fl;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(f.x, f.y - f.s * 0.4, 0, f.x, f.y - f.s * 0.4, R);
+    g.addColorStop(0, `rgba(255,140,60,${0.16 * night * fl})`);
+    g.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(f.x - R, f.y - f.s * 0.4 - R, R * 2, R * 2);
+    ctx.restore();
+  }
+
+  drawFire(ctx, f, t, night) {
+    const { x, y, s } = f;
+    const west = this.place === 'west';
+    ctx.save();
+    if (west) {
+      // 정서진: 무쇠 화로 (나무 데크 위)
+      ctx.fillStyle = '#2f2724';
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.42, y - s * 0.22);
+      ctx.quadraticCurveTo(x, y + s * 0.12, x + s * 0.42, y - s * 0.22);
+      ctx.lineTo(x + s * 0.36, y - s * 0.28);
+      ctx.lineTo(x - s * 0.36, y - s * 0.28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#2f2724';
+      ctx.lineWidth = Math.max(1.5, s * 0.05);
+      for (const sg of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(x + sg * s * 0.2, y - s * 0.08);
+        ctx.lineTo(x + sg * s * 0.28, y + s * 0.04);
+        ctx.stroke();
+      }
+    } else {
+      // 정동진: 돌을 둘러 쌓은 모닥불
+      for (let i = 0; i < 9; i++) {
+        const a = Math.PI + (i / 8) * Math.PI;
+        ctx.fillStyle = i % 2 ? '#6d6a70' : '#7d7980';
+        ctx.beginPath();
+        ctx.ellipse(x + Math.cos(a) * s * 0.42, y + Math.sin(a) * s * 0.1 + s * 0.02, s * 0.11, s * 0.075, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // 장작
+    ctx.strokeStyle = '#4a2f22';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = s * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(x - s * 0.3, y - s * 0.2 - (west ? s * 0.12 : 0));
+    ctx.lineTo(x + s * 0.22, y - s * 0.08 - (west ? s * 0.12 : 0));
+    ctx.moveTo(x + s * 0.3, y - s * 0.22 - (west ? s * 0.12 : 0));
+    ctx.lineTo(x - s * 0.2, y - s * 0.07 - (west ? s * 0.12 : 0));
+    ctx.stroke();
+    // 숯불
+    const base = y - s * (west ? 0.27 : 0.14);
+    const ember = ctx.createRadialGradient(x, base, 0, x, base, s * 0.32);
+    ember.addColorStop(0, `rgba(255,190,90,${0.9 * this.flicker(t, 2)})`);
+    ember.addColorStop(1, 'rgba(200,60,20,0)');
+    ctx.fillStyle = ember;
+    ctx.beginPath();
+    ctx.ellipse(x, base, s * 0.32, s * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 불꽃: 여러 갈래가 서로 다른 박자로 일렁임
+    ctx.globalCompositeOperation = 'lighter';
+    const tongues = [
+      [-0.16, 0.55, 0.13, 1.0],
+      [0.14, 0.6, 0.12, 2.1],
+      [0, 0.85, 0.17, 0.3],
+      [-0.06, 0.65, 0.1, 3.7],
+      [0.08, 0.5, 0.09, 5.2],
+    ];
+    for (const [ox, hh, ww, k] of tongues) {
+      const h = s * hh * (0.75 + 0.25 * Math.sin(t / (150 + k * 30) + k) + 0.1 * Math.sin(t / 53 + k * 3));
+      const w = s * ww;
+      const sway = Math.sin(t / 310 + k) * s * 0.06 + Math.sin(t / 89 + k * 2) * s * 0.025;
+      const bx = x + ox * s;
+      const g = ctx.createLinearGradient(bx, base, bx, base - h);
+      g.addColorStop(0, 'rgba(255,170,60,0.85)');
+      g.addColorStop(0.45, 'rgba(255,110,30,0.55)');
+      g.addColorStop(1, 'rgba(230,60,20,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(bx - w, base);
+      ctx.bezierCurveTo(bx - w * 1.1, base - h * 0.45, bx + sway - w * 0.2, base - h * 0.75, bx + sway, base - h);
+      ctx.bezierCurveTo(bx + sway + w * 0.2, base - h * 0.75, bx + w * 1.1, base - h * 0.45, bx + w, base);
+      ctx.closePath();
+      ctx.fill();
+      // 안쪽 밝은 심지
+      const ih = h * 0.55;
+      const ig = ctx.createLinearGradient(bx, base, bx, base - ih);
+      ig.addColorStop(0, 'rgba(255,245,200,0.75)');
+      ig.addColorStop(1, 'rgba(255,200,90,0)');
+      ctx.fillStyle = ig;
+      ctx.beginPath();
+      ctx.moveTo(bx - w * 0.45, base);
+      ctx.quadraticCurveTo(bx + sway * 0.5, base - ih * 1.2, bx + w * 0.45, base);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 불티: 위로 올라가며 사라짐
+    if (!this.embers) this.embers = [];
+    const dt = this._fireT ? Math.min(0.1, (t - this._fireT) / 1000) : 0;
+    this._fireT = t;
+    if (Math.random() < dt * 9) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
+    this.embers = this.embers.filter((e) => {
+      e.life += dt;
+      if (e.life > e.max) return false;
+      e.x += (e.vx + Math.sin(t / 300 + e.ph) * s * 0.25) * dt;
+      e.y += e.vy * dt;
+      e.vy *= 0.995;
+      const a = (1 - e.life / e.max) * (0.6 + 0.4 * Math.sin(t / 60 + e.ph));
+      ctx.fillStyle = `rgba(255,${150 + Math.floor(60 * (1 - e.life / e.max))},70,${a})`;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+      ctx.fill();
+      return true;
+    });
+    ctx.restore();
   }
 
   grainPattern() {

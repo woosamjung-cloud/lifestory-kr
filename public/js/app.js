@@ -14,6 +14,7 @@ import { Scene } from './scene.js';
 import { CHAR_LIST, BLANKETS, renderPortrait } from './characters.js';
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare } from './cards.js';
+import { Ambience } from './ambience.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -80,6 +81,7 @@ if (!CHAR_LIST.some((c) => c.key === state.profile.char)) state.profile.char = C
 state.profile.color = Math.abs(Number(state.profile.color) || 0) % 8;
 
 const scene = new Scene($('scene'));
+const ambience = new Ambience();
 
 // ---------- 서버 ----------
 const net = new Net({
@@ -144,6 +146,7 @@ function applyWeather() {
     w = weather.data[state.event.place];
   }
   scene.weather = w;
+  if (w && w.wind != null) ambience.setWind(w.wind);
   const el = $('hud-weather');
   if (w) {
     const night = scene.sunInfo().elevation < -3;
@@ -425,6 +428,8 @@ $('save-ticket').addEventListener('click', async () => {
 
 $('board').addEventListener('click', () => {
   scene.self = { ...state.profile };
+  // 탑승 버튼을 누른 순간 배경음 시작 (브라우저는 사용자가 누른 뒤에만 소리를 허용)
+  if (store.get('sound', true)) ambience.start().then((ok) => ok && setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200));
   show('ride');
   playTrain(state.event);
 });
@@ -532,6 +537,25 @@ $('show-help').addEventListener('click', () => {
 });
 $('help-close').addEventListener('click', () => $('help').close());
 
+// ---------- 배경음 (파도·바람·모닥불) ----------
+function soundButton() {
+  const on = ambience.on;
+  $('toggle-sound').setAttribute('aria-pressed', String(on));
+  $('toggle-sound').title = on ? '소리 끄기' : '소리 켜기';
+}
+$('toggle-sound').addEventListener('click', async () => {
+  if (ambience.on) {
+    ambience.stop();
+    store.set('sound', false);
+  } else {
+    await ambience.start();
+    store.set('sound', true);
+  }
+  soundButton();
+});
+document.addEventListener('visibilitychange', () => ambience.setHidden(document.hidden));
+setInterval(soundButton, 1000);
+
 // ---------- 별자리 보기 (기본은 끔, 기기에 기억) ----------
 function setConstellations(on) {
   scene.night.showConstellations = on;
@@ -569,4 +593,4 @@ document.fonts && document.fonts.ready.then(refreshPicker);
 requestAnimationFrame(frame);
 
 // 개발·시험용
-window.__haedoti = { state, scene, net, solarPosition, EVENT_AFTERGLOW_MS, setClock };
+window.__haedoti = { state, scene, net, solarPosition, EVENT_AFTERGLOW_MS, setClock, ambience };
