@@ -485,6 +485,8 @@ $('save-ticket').addEventListener('click', async () => {
 
 $('board').addEventListener('click', () => {
   scene.self = { ...state.profile };
+  // 탑승 화면의 버튼 위치에 맞춰 자리 다시 배치
+  requestAnimationFrame(() => scene.layoutSlots());
   // 탑승 버튼을 누른 순간 배경음 시작 (브라우저는 사용자가 누른 뒤에만 소리를 허용)
   if (store.get('sound', true)) ambience.start().then((ok) => ok && setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200));
   show('ride');

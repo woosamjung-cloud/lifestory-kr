@@ -123,6 +123,12 @@ export class Scene {
     const top = this.shoreY + 20 + unit * 0.03 * 1.05;
     // 아래쪽 버튼 영역을 피합니다 (가로 화면은 버튼이 낮아 덜 비움)
     let bottom = H - (this.landscape ? 84 : Math.max(130, H * 0.2));
+    // 실제 화면 아래 버튼들의 위치를 재서, 캐릭터가 버튼에 가리지 않게
+    const ctrlTop = Math.min(...['#ride .actions', '#ride .itembar']
+      .map((sel) => document.querySelector(sel))
+      .filter((el) => el && el.offsetParent && el.getBoundingClientRect().height > 0)
+      .map((el) => el.getBoundingClientRect().top), Infinity);
+    if (Number.isFinite(ctrlTop)) bottom = Math.min(bottom, ctrlTop - 12);
     if (bottom < top + unit * 0.08) bottom = top + unit * 0.08;
     const rows = 5;
     const slots = [];
