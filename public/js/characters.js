@@ -1,363 +1,165 @@
-// 떡 친구들: 한국 떡을 닮은 말랑한 캐릭터 (손그림 잉크 선 + 수채화 느낌, 캔버스로 직접 그림)
-// 평소에는 바다를 바라보는 뒷모습, "와!"·해 뜨는 순간에는 뒤돌아 얼굴을 보여줌.
+// 해를 기다리는 사람들의 뒷모습 (어른 감성 일러스트, 캔버스로 직접 그림 · 외부 이미지 없음)
+// 담요를 두르거나 후드·목도리·비니·코트 차림으로 바닷가에 앉아 있는 모습.
+// 차분한 단색 옷, 옷 주름 음영, 종이 질감(그레인), 역광에 빛나는 윤곽선.
 
 export const CHAR_LIST = [
-  { key: 'baekseolgi', name: '백설기' },
-  { key: 'injeolmi', name: '인절미' },
-  { key: 'ssuk', name: '쑥떡' },
-  { key: 'kkul', name: '꿀떡' },
-  { key: 'heugimja', name: '흑임자' },
+  { key: 'blanket', name: '담요를 두른' },
+  { key: 'hood', name: '후드를 쓴' },
+  { key: 'scarf', name: '목도리를 한' },
+  { key: 'beanie', name: '비니를 쓴' },
+  { key: 'coat', name: '코트를 입은' },
 ];
 
-// 목도리 색 (바탕, 무늬)
+// 옷 색 (바탕, 포인트) - 뮤트 톤
 export const BLANKETS = [
-  ['#d9776b', '#f3c3b5'],
-  ['#6f8fc9', '#c9d8f2'],
-  ['#7fae8a', '#d2e8d5'],
-  ['#e0b04e', '#f7e2ad'],
-  ['#9b7fc4', '#ddd0ef'],
-  ['#e58fae', '#f8d3e0'],
-  ['#5aa5b3', '#c4e6ec'],
-  ['#a58466', '#e6d4c1'],
+  ['#b98580', '#e8cfc6'], // 더스티 로즈
+  ['#7f9583', '#d9e2d3'], // 세이지
+  ['#c2ad8f', '#efe5d4'], // 오트밀
+  ['#3f4a63', '#b9c2d6'], // 네이비
+  ['#b8934a', '#efd9a6'], // 머스터드
+  ['#76596e', '#d8c4d0'], // 플럼
+  ['#66737e', '#ccd5db'], // 슬레이트
+  ['#9c7150', '#e4cdb6'], // 카멜
 ];
 
-const MOCHI = {
-  baekseolgi: { fill: '#fbf7ee', shade: '#e8e0d0' },
-  injeolmi: { fill: '#ecd29e', shade: '#d6b679', dots: '#b38d4f' },
-  ssuk: { fill: '#c3d7a4', shade: '#a6c084' },
-  kkul: { fill: '#f6c3cc', shade: '#e8a3b0' },
-  heugimja: { fill: '#b9b4b7', shade: '#9d979b', dots: '#3c3537' },
-};
-const INK = '#4a352c';
+const HAIR = ['#2a211d', '#3a2b23', '#1e1a19', '#4a3428', '#2f2420'];
+const SKIN = '#e9c8b0';
 
-// ---------- 도우미 ----------
+// ---------- 색 도우미 ----------
+function hexRgb(h) {
+  const n = parseInt(h.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function tone(h, amt, a = 1) {
+  const [r, g, b] = hexRgb(h);
+  const f = (c) => Math.max(0, Math.min(255, Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt))));
+  return a < 1 ? `rgba(${f(r)},${f(g)},${f(b)},${a})` : `rgb(${f(r)},${f(g)},${f(b)})`;
+}
 function ellipse(ctx, x, y, rx, ry, rot = 0) {
   ctx.beginPath();
   ctx.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), rot, 0, Math.PI * 2);
 }
-function rng(seed) {
-  let r = seed >>> 0 || 1;
-  return () => {
-    r = (r * 1664525 + 1013904223) >>> 0;
-    return r / 4294967296;
+
+// 사람 한 명의 기준 치수
+function geom(x, y, s, breathe = 0) {
+  const headR = s * 0.2;
+  const headY = y - s * 0.95 + breathe * s * 0.008;
+  return {
+    headR,
+    headY,
+    neckY: headY + headR * 0.92,
+    shY: y - s * 0.64 + breathe * s * 0.006, // 어깨 높이 (웅크린 자세라 낮음)
+    sw: s * 0.29, // 어깨 반폭
+    bw: s * 0.4, // 앉은 엉덩이 반폭
   };
 }
 
-// 떡 몸통 윤곽: 아래가 살짝 퍼진 찹쌀떡 모양, 손으로 그린 듯 미세하게 흔들림
-function blobPoints(x, y, s, seed) {
-  const R = rng(seed);
-  const pts = [];
-  const n = 40;
-  const w = s * 0.5;
-  const h = s * 0.39;
-  const cy = y - h;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    const sn = Math.sin(a);
-    const rx = w * (sn > 0 ? 1.06 : 1);
-    const ry = h * (sn > 0 ? 0.92 : 1.05);
-    const j = 1 + (R() - 0.5) * 0.025;
-    pts.push([x + Math.cos(a) * rx * j, cy + sn * ry * j]);
-  }
-  return pts;
-}
-function tracePts(ctx, pts) {
+// 몸(옷) 실루엣
+function bodyPath(ctx, x, y, s, g, wide = 1) {
+  const bw = g.bw * wide;
+  const sw = g.sw * (wide > 1 ? 1.12 : 1);
   ctx.beginPath();
-  const n = pts.length;
-  for (let i = 0; i < n; i++) {
-    const p0 = pts[i];
-    const p1 = pts[(i + 1) % n];
-    const mx = (p0[0] + p1[0]) / 2;
-    const my = (p0[1] + p1[1]) / 2;
-    if (i === 0) ctx.moveTo(mx, my);
-    else ctx.quadraticCurveTo(p0[0], p0[1], mx, my);
-  }
-  const p0 = pts[0];
-  const p1 = pts[1];
-  ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+  ctx.moveTo(x - bw, y);
+  // 왼쪽 무릎이 살짝 보이는 옆선
+  ctx.bezierCurveTo(x - bw * 1.12, y - s * 0.12, x - bw * 1.1, y - s * 0.22, x - bw * 0.98, y - s * 0.26);
+  ctx.bezierCurveTo(x - sw * 1.18, g.shY + s * 0.2, x - sw * 1.1, g.shY + s * 0.04, x - sw * 0.92, g.shY);
+  ctx.bezierCurveTo(x - sw * 0.6, g.shY - s * 0.06, x - s * 0.12, g.neckY + s * 0.01, x - s * 0.07, g.neckY);
+  ctx.lineTo(x + s * 0.07, g.neckY);
+  ctx.bezierCurveTo(x + s * 0.12, g.neckY + s * 0.01, x + sw * 0.6, g.shY - s * 0.06, x + sw * 0.92, g.shY);
+  ctx.bezierCurveTo(x + sw * 1.1, g.shY + s * 0.04, x + sw * 1.18, g.shY + s * 0.2, x + bw * 0.98, y - s * 0.26);
+  ctx.bezierCurveTo(x + bw * 1.1, y - s * 0.22, x + bw * 1.12, y - s * 0.12, x + bw, y);
+  ctx.quadraticCurveTo(x, y + s * 0.03, x - bw, y);
   ctx.closePath();
 }
 
-function inkStroke(ctx, s, alpha = 0.9) {
-  ctx.strokeStyle = INK;
-  ctx.globalAlpha = alpha;
-  ctx.lineWidth = Math.max(1, s * 0.026);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+function clothFill(ctx, x, y, s, g, base, lightX) {
+  const gr = ctx.createLinearGradient(x + lightX * s * 0.5, g.shY, x - lightX * s * 0.5, y);
+  gr.addColorStop(0, tone(base, 0.12));
+  gr.addColorStop(0.5, base);
+  gr.addColorStop(1, tone(base, -0.18));
+  return gr;
 }
 
-function watercolor(ctx, x, y, s, m, seed) {
-  const cy = y - s * 0.42;
-  const g = ctx.createRadialGradient(x - s * 0.12, cy - s * 0.15, s * 0.05, x, cy + s * 0.1, s * 0.62);
-  g.addColorStop(0, m.fill);
-  g.addColorStop(0.45, m.fill);
-  g.addColorStop(1, m.shade);
-  ctx.fillStyle = g;
-  ctx.fill();
-  const R = rng(seed + 99);
+// 옷 주름: 부드러운 어두운 곡선
+function folds(ctx, x, y, s, g, base, n = 3) {
   ctx.save();
-  ctx.clip();
-  for (let i = 0; i < 6; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${0.08 + R() * 0.08})`;
-    ellipse(ctx, x + (R() - 0.5) * s * 0.7, cy + (R() - 0.5) * s * 0.6, s * (0.08 + R() * 0.12), s * (0.05 + R() * 0.08), R() * 3);
-    ctx.fill();
-  }
-  if (m.dots) {
-    for (let i = 0; i < 26; i++) {
-      ctx.fillStyle = m.dots;
-      ctx.globalAlpha = 0.55 + R() * 0.3;
-      ellipse(ctx, x + (R() - 0.5) * s * 0.85, cy + (R() - 0.5) * s * 0.75, s * 0.012, s * 0.009, R() * 3);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-  ctx.restore();
-}
-
-function topFeature(ctx, type, x, top, s) {
-  ctx.lineWidth = Math.max(1, s * 0.028);
-  ctx.strokeStyle = INK;
-  if (type === 'ssuk') {
-    ctx.beginPath();
-    ctx.moveTo(x, top + s * 0.02);
-    ctx.quadraticCurveTo(x + s * 0.01, top - s * 0.06, x + s * 0.02, top - s * 0.1);
-    ctx.stroke();
-    for (const sg of [-1, 1]) {
-      ctx.fillStyle = '#7fa65a';
-      ctx.beginPath();
-      ctx.moveTo(x + s * 0.02, top - s * 0.09);
-      ctx.quadraticCurveTo(x + sg * s * 0.1, top - s * 0.2, x + sg * s * 0.14, top - s * 0.1);
-      ctx.quadraticCurveTo(x + sg * s * 0.07, top - s * 0.06, x + s * 0.02, top - s * 0.09);
-      ctx.fill();
-      ctx.stroke();
-    }
-  } else if (type === 'kkul') {
-    ctx.fillStyle = '#f2d39b';
-    ellipse(ctx, x, top + s * 0.01, s * 0.045, s * 0.025, 0.3);
-    ctx.fill();
-    ctx.stroke();
-  } else if (type === 'baekseolgi') {
-    ctx.fillStyle = '#8a5a44';
-    ellipse(ctx, x + s * 0.05, top + s * 0.035, s * 0.035, s * 0.028, -0.4);
-    ctx.fill();
-  }
-}
-
-function scarf(ctx, x, y, s, color, back) {
-  const [base, knit] = BLANKETS[color % BLANKETS.length];
-  const ny = y - s * 0.33;
-  const w = s * 0.5;
-  ctx.save();
-  ctx.lineWidth = Math.max(1, s * 0.028);
-  ctx.strokeStyle = INK;
-  ctx.fillStyle = base;
-  ctx.beginPath();
-  ctx.moveTo(x - w, ny - s * 0.02);
-  ctx.quadraticCurveTo(x, ny + s * 0.08, x + w, ny - s * 0.02);
-  ctx.lineTo(x + w * 0.97, ny + s * 0.08);
-  ctx.quadraticCurveTo(x, ny + s * 0.18, x - w * 0.97, ny + s * 0.08);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = knit;
+  ctx.strokeStyle = tone(base, -0.3, 0.2);
   ctx.lineWidth = Math.max(0.8, s * 0.016);
-  for (let k = -3; k <= 3; k++) {
-    const kx = x + k * w * 0.27;
-    ctx.beginPath();
-    ctx.moveTo(kx, ny + s * 0.02 - Math.abs(k) * s * 0.006);
-    ctx.lineTo(kx + s * 0.015, ny + s * 0.1 - Math.abs(k) * s * 0.008);
-    ctx.stroke();
-  }
-  const tx = back ? x + w * 0.35 : x + w * 0.55;
-  ctx.fillStyle = base;
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = Math.max(1, s * 0.028);
-  ctx.beginPath();
-  ctx.moveTo(tx - s * 0.06, ny + s * 0.1);
-  ctx.lineTo(tx - s * 0.04, ny + s * 0.3);
-  ctx.lineTo(tx + s * 0.07, ny + s * 0.29);
-  ctx.lineTo(tx + s * 0.06, ny + s * 0.09);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = knit;
-  ctx.lineWidth = Math.max(0.8, s * 0.014);
-  for (let k = 0; k < 3; k++) {
-    ctx.beginPath();
-    ctx.moveTo(tx - s * 0.035 + k * s * 0.035, ny + s * 0.29);
-    ctx.lineTo(tx - s * 0.035 + k * s * 0.035, ny + s * 0.33);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function face(ctx, x, y, s, happy) {
-  const cy = y - s * 0.56;
-  const ex = s * 0.15;
-  ctx.fillStyle = INK;
-  ctx.strokeStyle = INK;
   ctx.lineCap = 'round';
-  if (happy) {
-    ctx.lineWidth = Math.max(1, s * 0.03);
-    for (const sg of [-1, 1]) {
-      ctx.beginPath();
-      ctx.arc(x + sg * ex, cy + s * 0.02, s * 0.045, 1.15 * Math.PI, 1.85 * Math.PI);
-      ctx.stroke();
-    }
-  } else {
-    for (const sg of [-1, 1]) {
-      ellipse(ctx, x + sg * ex, cy, s * 0.04, s * 0.05);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ellipse(ctx, x + sg * ex - s * 0.012, cy - s * 0.018, s * 0.013, s * 0.013);
-      ctx.fill();
-      ctx.fillStyle = INK;
-    }
-  }
-  ctx.lineWidth = Math.max(1, s * 0.022);
+  // 등이 둥글게 굽은 주름 두 줄 (세로줄 대신 부드러운 곡선)
   ctx.beginPath();
-  if (happy) {
-    ctx.moveTo(x - s * 0.05, cy + s * 0.07);
-    ctx.quadraticCurveTo(x, cy + s * 0.15, x + s * 0.05, cy + s * 0.07);
-    ctx.closePath();
-    ctx.fillStyle = '#c9655f';
-    ctx.fill();
-    ctx.stroke();
-  } else {
-    // 작은 반달 미소
-    ctx.arc(x, cy + s * 0.055, s * 0.04, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.stroke();
-  }
-  // 수채화처럼 번지는 동그란 볼터치
-  for (const sg of [-1, 1]) {
-    const bx = x + sg * s * 0.27;
-    const by = cy + s * 0.07;
-    const bg = ctx.createRadialGradient(bx, by, 0, bx, by, s * 0.08);
-    bg.addColorStop(0, 'rgba(240,130,135,0.6)');
-    bg.addColorStop(1, 'rgba(240,130,135,0)');
-    ctx.fillStyle = bg;
-    ellipse(ctx, bx, by, s * 0.08, s * 0.055);
-    ctx.fill();
-  }
-}
-
-// 손: 둥근 손바닥 + 작은 손가락 세 개 (끝이 바깥쪽을 향함)
-function hand(ctx, cx, cy, s, ang, m) {
-  const r = s * 0.075;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(ang);
-  ctx.fillStyle = m.fill;
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = Math.max(1, s * 0.024);
-  // 손가락 (손바닥 뒤에 먼저)
-  for (let k = -1; k <= 1; k++) {
-    const fa = k * 0.55;
-    ellipse(ctx, Math.cos(fa) * r * 1.05, Math.sin(fa) * r * 1.05, r * 0.42, r * 0.34, fa);
-    ctx.fill();
-    ctx.stroke();
-  }
-  // 엄지
-  ellipse(ctx, r * 0.15, -r * 0.95, r * 0.36, r * 0.3, -1.2);
-  ctx.fill();
+  ctx.moveTo(x - g.sw * 0.7, g.shY + s * 0.16);
+  ctx.quadraticCurveTo(x, g.shY + s * 0.24, x + g.sw * 0.7, g.shY + s * 0.16);
   ctx.stroke();
-  // 손바닥
-  ellipse(ctx, 0, 0, r, r * 0.9);
-  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + g.sw * 0.35, y - s * 0.24);
+  ctx.quadraticCurveTo(x + g.sw * 0.55, y - s * 0.12, x + g.sw * 0.45, y - s * 0.03);
   ctx.stroke();
   ctx.restore();
 }
 
-function arms(ctx, x, y, s, m, up) {
-  for (const sg of [-1, 1]) {
-    if (up) hand(ctx, x + sg * s * 0.52, y - s * 0.6, s, sg > 0 ? -1.1 : -2.04, m);
-    else hand(ctx, x + sg * s * 0.42, y - s * 0.16, s, sg > 0 ? 0.35 : Math.PI - 0.35, m);
-  }
-}
-
-/**
- * 떡 친구 그리기
- * o: { x, y(바닥), s(크기), type, color, facing:'back'|'front', happy, armsUp }
- */
-export function drawCritter(ctx, o) {
-  const { x, y, s, type = 'baekseolgi', color = 0, facing = 'back', happy = false, armsUp = false } = o;
-  const m = MOCHI[type] || MOCHI.baekseolgi;
-  const seed = Math.max(0, CHAR_LIST.findIndex((c) => c.key === type)) * 97 + color * 7 + 3;
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  ctx.fillStyle = 'rgba(60,40,30,0.16)';
-  ellipse(ctx, x, y + s * 0.01, s * 0.5, s * 0.06);
-  ctx.fill();
-
-  if (facing === 'front' && armsUp) arms(ctx, x, y, s, m, true);
-
-  const pts = blobPoints(x, y, s, seed);
-  tracePts(ctx, pts);
-  watercolor(ctx, x, y, s, m, seed);
-  tracePts(ctx, pts);
-  inkStroke(ctx, s);
-  ctx.save();
-  ctx.translate(s * 0.006, -s * 0.004);
-  tracePts(ctx, pts);
-  inkStroke(ctx, s, 0.25);
-  ctx.restore();
-
-  topFeature(ctx, type, x, y - s * 0.8, s);
-  scarf(ctx, x, y, s, color, facing === 'back');
-
-  if (facing === 'front') {
-    face(ctx, x, y, s, happy);
-    if (!armsUp) arms(ctx, x, y, s, m, false);
-  } else {
-    ctx.strokeStyle = INK;
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = Math.max(0.8, s * 0.02);
+function hair(ctx, kind, x, g, s, color) {
+  const { headR: r, headY: hy } = g;
+  ctx.fillStyle = color;
+  if (kind === 'long') {
+    // 긴 생머리: 어깨 아래까지
     ctx.beginPath();
-    ctx.moveTo(x - s * 0.06, y - s * 0.06);
-    ctx.quadraticCurveTo(x, y - s * 0.1, x + s * 0.06, y - s * 0.06);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.moveTo(x - r * 1.02, hy);
+    ctx.bezierCurveTo(x - r * 1.1, hy + r * 1.4, x - r * 1.0, g.shY + s * 0.1, x - r * 0.75, g.shY + s * 0.2);
+    ctx.quadraticCurveTo(x, g.shY + s * 0.26, x + r * 0.75, g.shY + s * 0.2);
+    ctx.bezierCurveTo(x + r * 1.0, g.shY + s * 0.1, x + r * 1.1, hy + r * 1.4, x + r * 1.02, hy);
+    ctx.arc(x, hy, r * 1.02, 0, Math.PI, true);
+    ctx.fill();
+  } else if (kind === 'bob') {
+    ctx.beginPath();
+    ctx.moveTo(x - r * 1.08, hy);
+    ctx.quadraticCurveTo(x - r * 1.15, hy + r * 1.05, x - r * 0.8, hy + r * 1.2);
+    ctx.lineTo(x + r * 0.8, hy + r * 1.2);
+    ctx.quadraticCurveTo(x + r * 1.15, hy + r * 1.05, x + r * 1.08, hy);
+    ctx.arc(x, hy, r * 1.08, 0, Math.PI, true);
+    ctx.fill();
+  } else if (kind === 'bun') {
+    ellipse(ctx, x, hy, r * 1.02, r * 1.02);
+    ctx.fill();
+    ellipse(ctx, x + r * 0.1, hy - r * 1.05, r * 0.45, r * 0.42);
+    ctx.fill();
+  } else {
+    // 짧은 머리
+    ellipse(ctx, x, hy + r * 0.05, r * 1.03, r * 1.05);
+    ctx.fill();
+  }
+  // 머리결 하이라이트
+  ctx.strokeStyle = tone(color, 0.25, 0.5);
+  ctx.lineWidth = Math.max(0.7, s * 0.01);
+  ctx.beginPath();
+  ctx.arc(x - r * 0.1, hy - r * 0.1, r * 0.7, 1.15 * Math.PI, 1.55 * Math.PI);
+  ctx.stroke();
+}
+
+// 종이 질감: 인물 위에만 아주 옅은 점
+function grain(ctx, x0, y0, w, h, seed) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-atop';
+  let r = seed >>> 0 || 1;
+  const n = Math.min(4000, Math.floor((w * h) / 9));
+  for (let i = 0; i < n; i++) {
+    r = (r * 1664525 + 1013904223) >>> 0;
+    const px = x0 + ((r % 1000) / 1000) * w;
+    r = (r * 1664525 + 1013904223) >>> 0;
+    const py = y0 + ((r % 1000) / 1000) * h;
+    ctx.fillStyle = r & 1 ? 'rgba(255,248,235,0.07)' : 'rgba(30,20,15,0.08)';
+    ctx.fillRect(px, py, 1, 1);
   }
   ctx.restore();
 }
 
-// ---------- 빠르게 그리기 (장면용, 이미지 캐시) ----------
-const spriteCache = new Map();
-const SPRITE_W = 1.5;
-const SPRITE_H = 1.35;
-const SPRITE_FOOT = 0.12;
-
-function getSprite(type, color, s, dpr, bright, variant) {
-  const sz = Math.max(6, Math.round(s));
-  const b = Math.round(bright * 20) / 20;
-  const key = `${type}|${color}|${sz}|${dpr}|${b}|${variant}`;
-  let sp = spriteCache.get(key);
-  if (sp) return sp;
-  const c = document.createElement('canvas');
-  c.width = Math.ceil(sz * SPRITE_W * dpr);
-  c.height = Math.ceil(sz * SPRITE_H * dpr);
-  const g = c.getContext('2d');
-  g.scale(dpr, dpr);
-  if (b < 0.999) g.filter = `brightness(${b})`;
-  const opt = { x: (sz * SPRITE_W) / 2, y: sz * (SPRITE_H - SPRITE_FOOT), s: sz, type, color };
-  if (variant === 'cheer') Object.assign(opt, { facing: 'front', happy: true, armsUp: true });
-  else Object.assign(opt, { facing: 'back' });
-  drawCritter(g, opt);
-  sp = { canvas: c, sz };
-  if (spriteCache.size > 900) spriteCache.clear();
-  spriteCache.set(key, sp);
-  return sp;
-}
-
-function drawSteam(ctx, x, y, s, t, phase) {
+function drawSteam(ctx, x, y, s, t, phase, alpha = 0.4, rgb = '255,255,255') {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineWidth = Math.max(0.8, s * 0.022);
   for (let i = 0; i < 2; i++) {
     const p = (((t / 2600 + phase + i * 0.5) % 1) + 1) % 1;
-    ctx.strokeStyle = `rgba(255,255,255,${0.4 * (1 - p) * Math.min(1, p * 4)})`;
+    ctx.strokeStyle = `rgba(${rgb},${alpha * (1 - p) * Math.min(1, p * 4)})`;
     const bx = x + i * s * 0.05;
     const by = y - p * s * 0.3;
     ctx.beginPath();
@@ -369,39 +171,266 @@ function drawSteam(ctx, x, y, s, t, phase) {
 }
 
 /**
- * 장면용: 평소 뒷모습, "와!"·축하 때는 뒤돌아 웃는 얼굴로 만세
+ * 사람 뒷모습 그리기 (몸통만, 움직이는 부분 제외)
+ * o: { x, y(바닥), s(크기), type, color, lightX }
+ */
+export function drawCritter(ctx, o) {
+  const { x, y, s, type = 'blanket', color = 0, lightX = -1 } = o;
+  const [base, accent] = BLANKETS[color % BLANKETS.length];
+  const seed = color * 13 + type.length * 31 + 7;
+  const hairColor = HAIR[(color + type.length) % HAIR.length];
+  const g = geom(x, y, s);
+  const line = tone(base, -0.45, 0.35);
+  const hairKind = { blanket: 'long', scarf: 'bob', coat: 'bun', beanie: 'short', hood: 'none' }[type] || 'short';
+
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  // 그림자
+  ctx.fillStyle = 'rgba(30,18,12,0.18)';
+  ellipse(ctx, x, y + s * 0.015, s * 0.55, s * 0.06);
+  ctx.fill();
+
+  // 목덜미
+  ctx.fillStyle = tone(SKIN, -0.08);
+  ctx.fillRect(x - s * 0.05, g.headY + g.headR * 0.5, s * 0.1, g.neckY - g.headY);
+
+  if (type === 'hood') {
+    bodyPath(ctx, x, y, s, g);
+    ctx.fillStyle = clothFill(ctx, x, y, s, g, base, lightX);
+    ctx.fill();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = Math.max(0.8, s * 0.014);
+    ctx.stroke();
+    folds(ctx, x, y, s, g, base, 2);
+    // 머리를 감싼 후드
+    ctx.fillStyle = clothFill(ctx, x, g.neckY, s, g, base, lightX);
+    ctx.beginPath();
+    ctx.moveTo(x - g.sw * 0.75, g.shY + s * 0.03);
+    ctx.bezierCurveTo(x - g.headR * 1.7, g.headY + g.headR * 1.2, x - g.headR * 1.35, g.headY - g.headR * 0.4, x - g.headR * 0.9, g.headY - g.headR * 0.85);
+    ctx.quadraticCurveTo(x, g.headY - g.headR * 1.45, x + g.headR * 0.9, g.headY - g.headR * 0.85);
+    ctx.bezierCurveTo(x + g.headR * 1.35, g.headY - g.headR * 0.4, x + g.headR * 1.7, g.headY + g.headR * 1.2, x + g.sw * 0.75, g.shY + s * 0.03);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = tone(base, -0.3, 0.45);
+    ctx.beginPath();
+    ctx.moveTo(x, g.headY - g.headR * 1.2);
+    ctx.quadraticCurveTo(x + g.headR * 0.08, g.headY + g.headR * 0.4, x, g.shY + s * 0.02);
+    ctx.stroke();
+  } else {
+    const wide = type === 'blanket' ? 1.16 : 1;
+    bodyPath(ctx, x, y, s, g, wide);
+    ctx.fillStyle = clothFill(ctx, x, y, s, g, base, lightX);
+    ctx.fill();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = Math.max(0.8, s * 0.014);
+    ctx.stroke();
+    folds(ctx, x, y, s, g, base, type === 'blanket' ? 4 : 3);
+
+    if (type === 'blanket') {
+      // 담요 가장자리 술 장식과 겹쳐 두른 자락
+      ctx.strokeStyle = tone(accent, -0.1, 0.8);
+      ctx.lineWidth = Math.max(0.7, s * 0.012);
+      for (let k = -6; k <= 6; k++) {
+        const fx = x + k * g.bw * 1.16 * 0.15;
+        ctx.beginPath();
+        ctx.moveTo(fx, y - s * 0.01);
+        ctx.lineTo(fx + s * 0.005, y + s * 0.035);
+        ctx.stroke();
+      }
+    }
+    if (type === 'coat') {
+      // 코트 깃과 허리 벨트
+      ctx.fillStyle = tone(base, -0.12);
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.16, g.neckY - s * 0.02);
+      ctx.quadraticCurveTo(x, g.neckY + s * 0.07, x + s * 0.16, g.neckY - s * 0.02);
+      ctx.lineTo(x + s * 0.13, g.neckY + s * 0.05);
+      ctx.quadraticCurveTo(x, g.neckY + s * 0.11, x - s * 0.13, g.neckY + s * 0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = tone(base, -0.32, 0.6);
+      ctx.lineWidth = Math.max(1, s * 0.03);
+      ctx.beginPath();
+      ctx.moveTo(x - g.bw * 0.9, y - s * 0.22);
+      ctx.quadraticCurveTo(x, y - s * 0.19, x + g.bw * 0.9, y - s * 0.22);
+      ctx.stroke();
+    }
+
+    // 머리카락 (긴 머리는 등 위로 흘러내림)
+    hair(ctx, hairKind, x, g, s, hairColor);
+
+    if (type === 'scarf') {
+      // 목도리: 목에 감고 한쪽 자락이 바람에 날림
+      ctx.fillStyle = accent;
+      ctx.strokeStyle = tone(accent, -0.35, 0.5);
+      ctx.lineWidth = Math.max(0.7, s * 0.012);
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.17, g.neckY - s * 0.04);
+      ctx.quadraticCurveTo(x, g.neckY + s * 0.05, x + s * 0.17, g.neckY - s * 0.04);
+      ctx.lineTo(x + s * 0.18, g.neckY + s * 0.05);
+      ctx.quadraticCurveTo(x, g.neckY + s * 0.14, x - s * 0.18, g.neckY + s * 0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.1, g.neckY + s * 0.06);
+      ctx.quadraticCurveTo(x - s * 0.2, g.shY + s * 0.2, x - s * 0.3, g.shY + s * 0.28);
+      ctx.lineTo(x - s * 0.22, g.shY + s * 0.32);
+      ctx.quadraticCurveTo(x - s * 0.12, g.shY + s * 0.22, x - s * 0.02, g.neckY + s * 0.08);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    if (type === 'beanie') {
+      // 니트 비니: 접힌 단과 작은 방울
+      const r = g.headR;
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(x, g.headY - r * 0.05, r * 1.08, Math.PI, 0);
+      ctx.lineTo(x + r * 1.1, g.headY + r * 0.15);
+      ctx.lineTo(x - r * 1.1, g.headY + r * 0.15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = tone(accent, -0.12);
+      ctx.fillRect(x - r * 1.12, g.headY - r * 0.12, r * 2.24, r * 0.32);
+      ctx.strokeStyle = tone(accent, -0.3, 0.45);
+      ctx.lineWidth = Math.max(0.6, s * 0.009);
+      for (let k = -3; k <= 3; k++) {
+        ctx.beginPath();
+        ctx.moveTo(x + k * r * 0.3, g.headY - r * 0.12);
+        ctx.lineTo(x + k * r * 0.3, g.headY + r * 0.2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = tone(accent, 0.15);
+      ellipse(ctx, x, g.headY - r * 1.15, r * 0.3, r * 0.28);
+      ctx.fill();
+    }
+  }
+
+  // 종이 질감
+  grain(ctx, x - s * 0.6, g.headY - s * 0.35, s * 1.2, y - g.headY + s * 0.4, seed);
+  ctx.restore();
+}
+
+// ---------- 빠르게 그리기 (장면용) ----------
+const spriteCache = new Map();
+const SPRITE_W = 1.5;
+const SPRITE_H = 1.5;
+const SPRITE_FOOT = 0.12;
+
+function getSprite(type, color, s, dpr, bright = 1, lightX = -1) {
+  const sz = Math.max(6, Math.round(s));
+  const b = Math.round(bright * 20) / 20;
+  const key = `${type}|${color}|${sz}|${dpr}|${b}|${lightX}`;
+  let sp = spriteCache.get(key);
+  if (sp) return sp;
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(sz * SPRITE_W * dpr);
+  c.height = Math.ceil(sz * SPRITE_H * dpr);
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  if (b < 0.999) g.filter = `brightness(${b})`;
+  drawCritter(g, { x: (sz * SPRITE_W) / 2, y: sz * (SPRITE_H - SPRITE_FOOT), s: sz, type, color, lightX });
+  sp = { canvas: c, sz };
+  if (spriteCache.size > 800) spriteCache.clear();
+  spriteCache.set(key, sp);
+  return sp;
+}
+
+/**
+ * 장면용: 캐시한 몸통 + 실시간 움직임(숨쉬기, 만세, 역광, 음료 김)
  */
 export function drawCritterFast(ctx, o) {
-  const { x, s, type = 'baekseolgi', color = 0, arms = 0, hop = 0, rim, t = 0, steam = false, dpr = 1, bright = 1 } = o;
+  const { x, s, type = 'blanket', color = 0, arms = 0, hop = 0, rim, t = 0, steam = false, dpr = 1, bright = 1 } = o;
+  const [base] = BLANKETS[color % BLANKETS.length];
   const phase = (Math.abs(x * 7 + color * 13) % 100) / 100;
-  const breathe = Math.sin(t / 1200 + phase * 6.28);
-  const y = o.y - hop * s * 0.3;
-  const variant = arms > 0 ? 'cheer' : 'back';
-  const sp = getSprite(type, color, s, dpr, bright, variant);
+  const breathe = Math.sin(t / 1300 + phase * 6.28);
+  const y = o.y - hop * s * 0.25;
+  const lightX = rim && rim.a > 0.05 ? rim.x : -1;
+  const sp = getSprite(type, color, s, dpr, bright, lightX);
   const k = s / sp.sz;
   const w = sp.sz * SPRITE_W * k;
   const h = sp.sz * SPRITE_H * k;
-  const sy = 1 + breathe * 0.02;
-  const sx = 1 - breathe * 0.012;
-  const foot = sp.sz * SPRITE_FOOT * k;
-  ctx.drawImage(sp.canvas, x - (w * sx) / 2, y + foot - h * sy, w * sx, h * sy);
+  const g = geom(x, y, s, breathe);
 
-  if (rim && rim.a > 0.01 && variant === 'back') {
+  // 만세 하는 팔 (몸 뒤에서)
+  if (arms > 0) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const sg of [-1, 1]) {
+      const ax0 = x + sg * g.sw * 0.8;
+      const ay0 = g.shY + s * 0.04;
+      const ax1 = x + sg * s * (0.3 + 0.08 * arms);
+      const ay1 = g.shY - s * (0.15 + 0.38 * arms);
+      ctx.strokeStyle = tone(base, -0.1 + (bright - 1) * 0.6);
+      ctx.lineWidth = s * 0.11;
+      ctx.beginPath();
+      ctx.moveTo(ax0, ay0);
+      ctx.lineTo(ax1, ay1);
+      ctx.stroke();
+      // 손: 손바닥과 펼친 손가락 네 개, 엄지
+      const skin = tone(SKIN, (bright - 1) * 0.6);
+      const ang = Math.atan2(ay1 - ay0, ax1 - ax0);
+      ctx.save();
+      ctx.translate(ax1, ay1);
+      ctx.rotate(ang);
+      ctx.strokeStyle = skin;
+      ctx.lineWidth = Math.max(1, s * 0.022);
+      for (let f = -1.5; f <= 1.5; f++) {
+        const fa = f * 0.28;
+        ctx.beginPath();
+        ctx.moveTo(s * 0.02, 0);
+        ctx.lineTo(Math.cos(fa) * s * 0.085, Math.sin(fa) * s * 0.085);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(s * 0.035, -sg * s * 0.06);
+      ctx.stroke();
+      ctx.fillStyle = skin;
+      ellipse(ctx, s * 0.01, 0, s * 0.04, s * 0.035);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  const sy = 1 + breathe * 0.008;
+  const foot = sp.sz * SPRITE_FOOT * k;
+  ctx.drawImage(sp.canvas, x - w / 2, y + foot - h * sy, w, h * sy);
+
+  // 역광: 머리와 어깨 윤곽이 빛남
+  if (rim && rim.a > 0.01) {
     ctx.save();
     ctx.globalAlpha = rim.a;
     ctx.strokeStyle = rim.color;
     ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(1, s * 0.03);
-    const cy = y - s * 0.39 * sy;
-    const a0 = rim.x > 0 ? -0.62 * Math.PI : -0.98 * Math.PI;
+    ctx.lineWidth = Math.max(1, s * 0.028);
+    const hr = g.headR * (type === 'hood' ? 1.2 : 1.05);
+    const a0 = rim.x > 0 ? -0.55 * Math.PI : -1.05 * Math.PI;
     ctx.beginPath();
-    ctx.ellipse(x, cy, s * 0.5 * sx, s * 0.41 * sy, 0, a0, a0 + 0.6 * Math.PI);
+    ctx.arc(x, g.headY, hr, a0, a0 + 0.6 * Math.PI);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(0.8, s * 0.02);
+    ctx.globalAlpha = rim.a * 0.8;
+    ctx.beginPath();
+    if (rim.x > 0) {
+      ctx.moveTo(x + s * 0.1, g.neckY + s * 0.01);
+      ctx.quadraticCurveTo(x + g.sw * 0.8, g.neckY, x + g.sw, g.shY + s * 0.02);
+    } else {
+      ctx.moveTo(x - s * 0.1, g.neckY + s * 0.01);
+      ctx.quadraticCurveTo(x - g.sw * 0.8, g.neckY, x - g.sw, g.shY + s * 0.02);
+    }
     ctx.stroke();
     ctx.restore();
   }
+  // 두 손에 든 따뜻한 음료의 김
 }
 
-// 캐릭터 고르기·승차권용: 노을빛 원 안에서 정면 얼굴
+// 캐릭터 고르기·승차권용: 노을빛 원 안에 앉은 뒷모습
 export function renderPortrait(canvas, type, color) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
@@ -413,12 +442,17 @@ export function renderPortrait(canvas, type, color) {
   ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
   ctx.clip();
   const g = ctx.createLinearGradient(0, h / 2 - r, 0, h / 2 + r);
-  g.addColorStop(0, '#f6d9c4');
-  g.addColorStop(0.6, '#f2c2a6');
-  g.addColorStop(0.61, '#c9dbe8');
-  g.addColorStop(1, '#a9c3d8');
+  g.addColorStop(0, '#4a4f78');
+  g.addColorStop(0.55, '#e0927a');
+  g.addColorStop(0.62, '#f2c08a');
+  g.addColorStop(0.63, '#5b6b8a');
+  g.addColorStop(1, '#3d4866');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
-  drawCritter(ctx, { x: w / 2, y: h * 0.9, s: h * 0.72, type, color, facing: 'front' });
+  ctx.fillStyle = 'rgba(255,214,150,0.9)';
+  ctx.beginPath();
+  ctx.arc(w * 0.64, h / 2 - r + r * 1.25, r * 0.13, Math.PI, 0);
+  ctx.fill();
+  drawCritter(ctx, { x: w / 2, y: h * 0.95, s: h * 0.62, type, color, lightX: 1 });
   ctx.restore();
 }

@@ -62,7 +62,7 @@ const store = {
 
 const state = {
   screen: 'home',
-  profile: { name: store.get('name', ''), char: store.get('char', 'baekseolgi'), color: store.get('color', 0) },
+  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0) },
   placeMode: 'auto', // auto | east | west
   event: null,
   netStatus: 'connecting',

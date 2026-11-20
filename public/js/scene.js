@@ -104,15 +104,15 @@ export class Scene {
   layoutSlots() {
     const { W, H } = this;
     // 맨 앞줄 머리 꼭대기가 파도 거품선(최대 shoreY+16px)보다 아래에 오도록
-    const top = this.shoreY + 20 + H * 0.036 * 0.85;
+    const top = this.shoreY + 20 + H * 0.03 * 1.05;
     const bottom = H - Math.max(130, H * 0.2); // 아래쪽 버튼 영역을 피합니다
     const rows = 5;
     const slots = [];
     for (let r = 0; r < rows; r++) {
       const t = r / (rows - 1);
       const y = lerp(top, bottom, t ** 1.15);
-      const s = lerp(H * 0.036, H * 0.088, t);
-      const gap = s * 1.18;
+      const s = lerp(H * 0.03, H * 0.075, t);
+      const gap = s * 1.38;
       const n = Math.max(3, Math.floor((W * 0.92) / gap));
       const row = [];
       for (let c = 0; c < n; c++) {
@@ -451,7 +451,7 @@ export class Scene {
       const label = this.self.name ? `나 · ${this.self.name}` : '나';
       ctx.font = `700 ${Math.max(12, sl.s * 0.22)}px "Gowun Batang", serif`;
       const tw = ctx.measureText(label).width + 16;
-      const ly = sl.y - sl.s * 1.18;
+      const ly = sl.y - sl.s * 1.85;
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       roundRect(ctx, sl.x - tw / 2, ly - 12, tw, 22, 11);
       ctx.fill();
@@ -553,7 +553,7 @@ export class Scene {
         ctx.fillStyle = `rgba(255,255,255,${a})`;
         ctx.strokeStyle = `rgba(120,50,20,${a * 0.6})`;
         ctx.lineWidth = 3;
-        const ty = fx.slot.y - fx.slot.s * 1.3 - age * 40;
+        const ty = fx.slot.y - fx.slot.s * 1.75 - age * 40;
         ctx.strokeText('와!', fx.slot.x, ty);
         ctx.fillText('와!', fx.slot.x, ty);
         return true;
