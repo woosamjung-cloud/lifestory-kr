@@ -16,8 +16,47 @@ function starColor(bv) {
   return '255,205,160';
 }
 
+// 반짝이는 별 이미지 (색·크기별로 한 번만 그려 둠)
+const starSprites = new Map();
+function starSprite(rgb, size, spikes) {
+  const key = `${rgb}|${size}|${spikes}`;
+  let c = starSprites.get(key);
+  if (c) return c;
+  const R = Math.ceil(size * (spikes ? 7 : 3.2));
+  c = document.createElement('canvas');
+  c.width = c.height = R * 2;
+  const g = c.getContext('2d');
+  // 부드러운 빛무리
+  const halo = g.createRadialGradient(R, R, 0, R, R, R);
+  halo.addColorStop(0, `rgba(${rgb},1)`);
+  halo.addColorStop(0.12, `rgba(${rgb},0.85)`);
+  halo.addColorStop(0.3, `rgba(${rgb},0.22)`);
+  halo.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = halo;
+  g.fillRect(0, 0, R * 2, R * 2);
+  if (spikes) {
+    // 가늘게 퍼지는 십자 빛살
+    for (const [w, h, a] of [[R * 2, size * 0.5, 0.55], [size * 0.5, R * 2, 0.55], [R * 1.1, size * 0.35, 0.3]]) {
+      const lg = w > h ? g.createLinearGradient(0, R, R * 2, R) : g.createLinearGradient(R, 0, R, R * 2);
+      lg.addColorStop(0, `rgba(${rgb},0)`);
+      lg.addColorStop(0.5, `rgba(${rgb},${a})`);
+      lg.addColorStop(1, `rgba(${rgb},0)`);
+      g.fillStyle = lg;
+      g.fillRect(R - w / 2, R - h / 2, w, h);
+    }
+  }
+  // 작은 흰 중심
+  g.fillStyle = 'rgba(255,255,255,0.95)';
+  g.beginPath();
+  g.arc(R, R, Math.max(0.5, size * 0.35), 0, Math.PI * 2);
+  g.fill();
+  starSprites.set(key, c);
+  return c;
+}
+
 export class NightSky {
   constructor() {
+    this.showConstellations = false; // 별자리 선·이름 (눈 아이콘으로 켜고 끔)
     this.meteors = [];
     this.lastSpawn = 0;
     this.lastT = 0;
@@ -65,9 +104,10 @@ export class NightSky {
     if (mh.alt > -1) this.drawMoon(ctx, scene, v, mh, moon, starA, cover);
 
     if (vis > 0.02) {
-      // 별자리 선
       ctx.save();
-      ctx.strokeStyle = `rgba(190,205,255,${0.11 * vis})`;
+      if (this.showConstellations) {
+      // 별자리 선
+      ctx.strokeStyle = `rgba(190,205,255,${0.24 * vis})`;
       ctx.lineWidth = 0.7;
       for (const segs of Object.values(LINES)) {
         for (const seg of segs) {
@@ -87,7 +127,7 @@ export class NightSky {
         }
       }
       // 별자리 이름
-      ctx.fillStyle = `rgba(210,220,255,${0.32 * vis})`;
+      ctx.fillStyle = `rgba(215,225,255,${0.6 * vis})`;
       ctx.font = '11px "Gowun Batang", serif';
       ctx.textAlign = 'center';
       for (const [name, ra, dec] of Object.values(NAMES)) {
@@ -96,6 +136,7 @@ export class NightSky {
         const p = this.project(h.alt, h.az, v);
         if (p.x < 20 || p.x > v.W - 20 || p.y < 60) continue;
         ctx.fillText(name, p.x, p.y);
+      }
       }
       // 별
       for (let i = 0; i < STARS.length; i++) {
@@ -106,23 +147,15 @@ export class NightSky {
         if (h.alt < 0.5) continue;
         const p = this.project(h.alt, h.az, v);
         if (p.x < -4 || p.x > v.W + 4 || p.y < -4) continue;
-        const r = Math.max(0.75, (5.4 - mag) * 0.55);
+        const size = Math.max(0.6, (5.2 - mag) * 0.38);
         // 지평선 가까이는 대기에 가려 흐려짐
         const ext = clamp(h.alt / 12, 0.25, 1);
         const tw = 0.75 + 0.25 * Math.sin(nowMs / (380 + (i % 7) * 90) + i);
         const a = clamp(vis * ext * tw * (mag < 2.5 ? 1.1 : 0.9));
-        ctx.fillStyle = `rgba(${starColor(bv)},${a})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-        ctx.fill();
-        if (mag < 2) {
-          // 밝은 별은 은은한 빛무리
-          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 4);
-          g.addColorStop(0, `rgba(${starColor(bv)},${a * 0.35})`);
-          g.addColorStop(1, `rgba(${starColor(bv)},0)`);
-          ctx.fillStyle = g;
-          ctx.fillRect(p.x - r * 4, p.y - r * 4, r * 8, r * 8);
-        }
+        const spr = starSprite(starColor(bv), Math.round(size * 4) / 4, mag < 1.6);
+        ctx.globalAlpha = a;
+        ctx.drawImage(spr, p.x - spr.width / 2, p.y - spr.height / 2);
+        ctx.globalAlpha = 1;
       }
       ctx.restore();
     }

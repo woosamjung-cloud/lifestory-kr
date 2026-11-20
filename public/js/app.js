@@ -307,6 +307,8 @@ function frame(ts) {
   if (ts - lastTextUpdate > 250) {
     lastTextUpdate = ts;
     updateTexts(now, tScene);
+    // 별이 보일 만큼 어두울 때만 별자리 버튼 표시
+    $('toggle-stars').hidden = sun.elevation > -6;
     const sh = scene.night.shower;
     const skyEl = $('hud-sky');
     if (sh && sh.rate >= 10) {
@@ -529,6 +531,20 @@ $('show-help').addEventListener('click', () => {
   $('help').showModal();
 });
 $('help-close').addEventListener('click', () => $('help').close());
+
+// ---------- 별자리 보기 (기본은 끔, 기기에 기억) ----------
+function setConstellations(on) {
+  scene.night.showConstellations = on;
+  $('toggle-stars').setAttribute('aria-pressed', String(on));
+  $('toggle-stars').title = on ? '별자리 숨기기' : '별자리 보기';
+  store.set('constellations', on);
+}
+setConstellations(store.get('constellations', false) === true);
+$('toggle-stars').addEventListener('click', () => {
+  const on = !scene.night.showConstellations;
+  setConstellations(on);
+  toast(on ? '별자리 선과 이름을 보여드려요' : '별자리를 숨겼어요');
+});
 
 // ---------- 알림 ----------
 let toastTimer = null;
