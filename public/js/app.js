@@ -26,7 +26,20 @@ const clockOffset = (() => {
   const ms = Date.parse(t);
   return Number.isNaN(ms) ? 0 : ms - Date.now();
 })();
-const realNow = () => new Date(Date.now() + clockOffset);
+// ?speed=60 을 붙이면 시계가 60배 빠르게 흐릅니다 (홍보 영상·시험용 타임랩스).
+const clock = {
+  anchorReal: Date.now(),
+  anchorScene: Date.now() + clockOffset,
+  speed: Math.min(600, Math.max(1, Number(params.get('speed')) || 1)),
+};
+const realNow = () => new Date(clock.anchorScene + (Date.now() - clock.anchorReal) * clock.speed);
+// 시험·영상 촬영용: 장면 시각과 배속을 바꿉니다. (사용자 화면에는 영향 없음)
+function setClock(sceneMs, speed = 1) {
+  clock.anchorReal = Date.now();
+  clock.anchorScene = sceneMs;
+  clock.speed = Math.min(600, Math.max(1, speed));
+  state.lastElev = null;
+}
 
 // ---------- 상태 ----------
 const store = {
@@ -485,4 +498,4 @@ document.fonts && document.fonts.ready.then(refreshPicker);
 requestAnimationFrame(frame);
 
 // 개발·시험용
-window.__haedoti = { state, scene, net, solarPosition, EVENT_AFTERGLOW_MS };
+window.__haedoti = { state, scene, net, solarPosition, EVENT_AFTERGLOW_MS, setClock };
