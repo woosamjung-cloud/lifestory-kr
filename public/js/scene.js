@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritterFast, drawPet } from './characters.js';
+import { drawCritterFast, drawPet, BLANKETS } from './characters.js';
 import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -481,7 +481,7 @@ export class Scene {
       const candle = p.me ? this.selfItems.candle : p.flags & 1;
       if (candle) this.drawCandle(ctx, sl.x - sl.s * 0.62, sl.y, sl.s, nowMs);
       const fl = this.flashes.get(sl);
-      if (fl) this.drawFlash(ctx, sl, nowMs, fl);
+      if (fl) this.drawFlash(ctx, sl, nowMs, fl, p.color || 0, critterBright);
     }
     ctx.restore();
     // 불빛이 가까운 사람들을 따뜻하게 비춤
@@ -748,28 +748,62 @@ export class Scene {
     if (slot) this.flashes.set(slot, performance.now());
   }
 
-  drawFlash(ctx, sl, t, t0) {
+  // 후레쉬: 한 손을 들어 손전등 빛줄기를 하늘로 쏘아 흔듦 (탐조등처럼)
+  drawFlash(ctx, sl, t, t0, color = 0, bright = 1) {
     const age = (t - t0) / 1000;
     if (age > 6) {
       this.flashes.delete(sl);
       return;
     }
     const a = age < 0.3 ? age / 0.3 : age > 5.4 ? (6 - age) / 0.6 : 1;
-    const sway = Math.sin(age * 4.2) * sl.s * 0.35;
-    const x = sl.x + sway;
-    const y = sl.y - sl.s * 1.35;
+    const s = sl.s;
+    // 오른쪽 어깨 → 위로 뻗은 손
+    const shX = sl.x + s * 0.24;
+    const shY = sl.y - s * 0.62;
+    const hx = sl.x + s * 0.36;
+    const hy = sl.y - s * 1.22;
+    const sleeve = BLANKETS[color % BLANKETS.length][0];
     ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 1.5);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = sleeve;
+    ctx.filter = bright < 0.99 ? `brightness(${bright.toFixed(2)})` : 'none';
+    ctx.lineWidth = s * 0.11;
+    ctx.beginPath();
+    ctx.moveTo(shX, shY);
+    ctx.lineTo(hx, hy + s * 0.05);
+    ctx.stroke();
+    ctx.filter = 'none';
+    // 빛줄기 방향: 하늘 위쪽에서 천천히 좌우로 흔들림
+    const ang = -Math.PI / 2 + Math.sin(age * 1.6 + sl.x * 0.01) * 0.42;
+    const len = Math.hypot(this.W, this.H);
+    const spread = 0.09;
     ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(x, y, 0, x, y, sl.s * 1.1);
-    g.addColorStop(0, `rgba(255,255,235,${0.8 * a})`);
-    g.addColorStop(0.2, `rgba(255,245,210,${0.35 * a})`);
+    const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, len * 0.7);
+    g.addColorStop(0, `rgba(255,250,225,${0.55 * a})`);
+    g.addColorStop(0.2, `rgba(255,245,210,${0.3 * a})`);
     g.addColorStop(1, 'rgba(255,240,200,0)');
     ctx.fillStyle = g;
-    ctx.fillRect(x - sl.s * 1.1, y - sl.s * 1.1, sl.s * 2.2, sl.s * 2.2);
-    ctx.fillStyle = `rgba(255,255,255,${a})`;
     ctx.beginPath();
-    ctx.arc(x, y, Math.max(2, sl.s * 0.05), 0, Math.PI * 2);
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(hx + Math.cos(ang - spread) * len, hy + Math.sin(ang - spread) * len);
+    ctx.lineTo(hx + Math.cos(ang + spread) * len, hy + Math.sin(ang + spread) * len);
+    ctx.closePath();
     ctx.fill();
+    // 손전등 머리의 밝은 점
+    const lg = ctx.createRadialGradient(hx, hy, 0, hx, hy, s * 0.35);
+    lg.addColorStop(0, `rgba(255,255,240,${0.9 * a})`);
+    lg.addColorStop(1, 'rgba(255,250,220,0)');
+    ctx.fillStyle = lg;
+    ctx.fillRect(hx - s * 0.35, hy - s * 0.35, s * 0.7, s * 0.7);
+    ctx.globalCompositeOperation = 'source-over';
+    // 손전등 몸통
+    ctx.translate(hx, hy);
+    ctx.rotate(ang + Math.PI / 2);
+    ctx.fillStyle = '#3b3f4a';
+    ctx.fillRect(-s * 0.035, -s * 0.02, s * 0.07, s * 0.16);
+    ctx.fillStyle = '#c9ced8';
+    ctx.fillRect(-s * 0.05, -s * 0.04, s * 0.1, s * 0.04);
     ctx.restore();
   }
 
