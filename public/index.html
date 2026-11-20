@@ -57,6 +57,12 @@
         <span class="field-label" id="color-label">옷 색</span>
         <div class="color-row" id="color-row" role="radiogroup" aria-labelledby="color-label"></div>
 
+        <span class="field-label" id="hair-label">머리 색</span>
+        <div class="color-row" id="hair-row" role="radiogroup" aria-labelledby="hair-label"></div>
+
+        <span class="field-label" id="pet-label">함께 온 친구</span>
+        <div class="pet-row" id="pet-row" role="radiogroup" aria-labelledby="pet-label"></div>
+
         <button type="submit" class="btn primary big" id="get-ticket">승차권 받기</button>
       </form>
       <p class="fineprint">가입·설치 없음 · 적은 소원은 내 기기에만 남아요</p>
@@ -106,11 +112,14 @@
       <button class="btn tiny" id="preview-stop">실시간으로</button>
     </div>
 
+    <div class="saylog" id="saylog" aria-live="polite"></div>
+    <div class="saypick" id="saypick" hidden></div>
     <div class="itembar" id="itembar" aria-label="내 아이템">
       <button class="item-btn" data-item="candle" hidden title="촛불 켜고 끄기">🕯️</button>
       <button class="item-btn" data-item="flash" hidden title="후레쉬 흔들기">🔦</button>
       <button class="item-btn" data-item="fireworks" hidden title="폭죽 쏘기">🎆</button>
       <button class="item-btn" data-item="bigfire" hidden title="큰 캠프파이어 켜고 끄기">🔥</button>
+      <button class="item-btn" id="open-say" title="응원 한마디">💬 <span>한마디</span></button>
       <button class="item-btn shop-btn" id="open-shop" title="상점">🎁 <span>상점</span></button>
     </div>
 
@@ -145,6 +154,10 @@
       <p class="muted small" id="ritual-desc">해 뜨는 하늘에 소원을 띄워 보내요.</p>
       <textarea id="ritual-text" maxlength="40" rows="3" placeholder="예) 올해는 꼭 합격!"></textarea>
       <p class="fineprint">적은 글은 서버로 보내지 않고, 내 화면과 인증 카드에만 남아요. 다른 승객에게는 불빛만 보여요.</p>
+      <div class="public-wish" id="public-wish" hidden>
+        <p class="pw-title">🪙 동전 1개로 <b>모두에게 보이는 소원</b> 달기 <span class="muted small">(선택 · 내 동전 <b id="pw-coins">0</b>개)</span></p>
+        <div class="pw-chips" id="pw-chips"></div>
+      </div>
       <div class="btn-row">
         <button class="btn ghost" value="cancel">취소</button>
         <button class="btn primary" id="ritual-send" value="send">띄워 보내기</button>

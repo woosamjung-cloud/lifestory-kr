@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritterFast } from './characters.js';
+import { drawCritterFast, drawPet } from './characters.js';
 import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -180,10 +180,11 @@ export class Scene {
     this.effects.push({ kind: 'cheer', slot, t0, self: isSelf });
   }
 
-  ritualAt(slot, isSelf = false) {
+  ritualAt(slot, isSelf = false, text = null) {
+    if (!slot) slot = this.slots[Math.floor(Math.random() * Math.min(40, this.slots.length))];
     if (!slot) return;
-    const kind = this.place === 'east' ? 'lantern' : 'boat';
-    this.effects.push({ kind, x: slot.x, y: slot.y - slot.s * 1.2, s: slot.s, t0: performance.now(), self: isSelf, seed: Math.random() * 6 });
+    const kind = PLACES[this.place].kind === 'sunrise' ? 'lantern' : 'boat';
+    this.effects.push({ kind, x: slot.x, y: slot.y - slot.s * 1.2, s: slot.s, t0: performance.now(), self: isSelf, seed: Math.random() * 6, text });
     if (this.effects.length > 120) this.effects.splice(0, this.effects.length - 120);
   }
 
@@ -467,7 +468,10 @@ export class Scene {
         steam: p.me || sl.r >= 3,
         dpr: this.dpr,
         bright: critterBright,
+        hair: p.hair ?? null,
       });
+      // 함께 온 강아지·고양이 (오른쪽 옆)
+      if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5) });
       const candle = p.me ? this.selfItems.candle : p.flags & 1;
       if (candle) this.drawCandle(ctx, sl.x - sl.s * 0.62, sl.y, sl.s, nowMs);
       const fl = this.flashes.get(sl);
@@ -823,6 +827,17 @@ export class Scene {
     ctx.restore();
   }
 
+  wishLabel(ctx, text, x, y, a, self) {
+    ctx.save();
+    ctx.font = `${self ? 700 : 400} ${Math.max(13, this.H * 0.017)}px "Gowun Batang", serif`;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(255,190,110,0.95)';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = `rgba(255,250,235,${a})`;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
   // 동전을 바다로 던지고, 소원 문구가 하늘로 떠오름
   wishFrom(slot, text, isSelf = false) {
     if (!slot) return;
@@ -964,6 +979,7 @@ export class Scene {
         ctx.beginPath();
         ctx.arc(x, y + s * 0.36, s * 0.09, 0, Math.PI * 2);
         ctx.fill();
+        if (fx.text) this.wishLabel(ctx, fx.text, x, y - s * 1.1, a, fx.self);
         return true;
       }
       if (fx.kind === 'boat') {
@@ -996,6 +1012,7 @@ export class Scene {
           ctx.arc(x + s * 0.05, y - s * 1.2, Math.max(1.5, s * 0.12), 0, Math.PI * 2);
           ctx.fill();
         }
+        if (fx.text) this.wishLabel(ctx, fx.text, x, y - Math.max(10, s * 1.6), a, fx.self);
         return true;
       }
       return false;

@@ -91,8 +91,8 @@ export class Net {
     if (this.ws && this.connected) this.ws.send(JSON.stringify(msg));
   }
 
-  join(room, char, color) {
-    this.want = { room, char, color };
+  join(room, char, color, hair = 0, pet = 0) {
+    this.want = { room, char, color, hair, pet };
     this.send({ t: 'join', ...this.want, visitor: this.visitor });
   }
 
@@ -119,11 +119,15 @@ export class Net {
     if (this.ws) this.ws.close();
   }
 
+  say(i) {
+    this.send({ t: 'say', i });
+  }
+
   cheer() {
     this.send({ t: 'cheer' });
   }
 
-  ritual() {
-    this.send({ t: 'ritual' });
+  ritual(i = null) {
+    this.send(i == null ? { t: 'ritual' } : { t: 'ritual', i });
   }
 }

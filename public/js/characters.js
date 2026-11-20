@@ -23,6 +23,21 @@ export const BLANKETS = [
 ];
 
 const HAIR = ['#2a211d', '#3a2b23', '#1e1a19', '#4a3428', '#2f2420'];
+// 고를 수 있는 머리 색 (이름, 색)
+export const HAIRS = [
+  ['검정', '#1f1a19'],
+  ['흑갈색', '#3b2a22'],
+  ['갈색', '#6e4a30'],
+  ['금발', '#c8a25c'],
+  ['빨강', '#8e3d2a'],
+  ['은발', '#bdb7b0'],
+];
+// 반려동물: 0 없음, 1 강아지, 2 고양이
+export const PETS = [
+  ['없음', ''],
+  ['강아지', '🐶'],
+  ['고양이', '🐱'],
+];
 const SKIN = '#e9c8b0';
 
 // ---------- 색 도우미 ----------
@@ -176,9 +191,10 @@ function drawSteam(ctx, x, y, s, t, phase, alpha = 0.4, rgb = '255,255,255') {
  */
 export function drawCritter(ctx, o) {
   const { x, y, s, type = 'blanket', color = 0, lightX = -1 } = o;
+  const hairIdx = o.hair; // 고른 머리 색 번호 (없으면 옷 색에 따라 자동)
   const [base, accent] = BLANKETS[color % BLANKETS.length];
   const seed = color * 13 + type.length * 31 + 7;
-  const hairColor = HAIR[(color + type.length) % HAIR.length];
+  const hairColor = hairIdx != null && HAIRS[hairIdx] ? HAIRS[hairIdx][1] : HAIR[(color + type.length) % HAIR.length];
   const g = geom(x, y, s);
   const line = tone(base, -0.45, 0.35);
   const hairKind = { blanket: 'long', scarf: 'bob', coat: 'bun', beanie: 'short', hood: 'none' }[type] || 'short';
@@ -321,10 +337,10 @@ const SPRITE_W = 1.5;
 const SPRITE_H = 1.5;
 const SPRITE_FOOT = 0.12;
 
-function getSprite(type, color, s, dpr, bright = 1, lightX = -1) {
+function getSprite(type, color, s, dpr, bright = 1, lightX = -1, hair = null) {
   const sz = Math.max(6, Math.round(s));
   const b = Math.round(bright * 20) / 20;
-  const key = `${type}|${color}|${sz}|${dpr}|${b}|${lightX}`;
+  const key = `${type}|${color}|${sz}|${dpr}|${b}|${lightX}|${hair}`;
   let sp = spriteCache.get(key);
   if (sp) return sp;
   const c = document.createElement('canvas');
@@ -333,7 +349,7 @@ function getSprite(type, color, s, dpr, bright = 1, lightX = -1) {
   const g = c.getContext('2d');
   g.scale(dpr, dpr);
   if (b < 0.999) g.filter = `brightness(${b})`;
-  drawCritter(g, { x: (sz * SPRITE_W) / 2, y: sz * (SPRITE_H - SPRITE_FOOT), s: sz, type, color, lightX });
+  drawCritter(g, { x: (sz * SPRITE_W) / 2, y: sz * (SPRITE_H - SPRITE_FOOT), s: sz, type, color, lightX, hair });
   sp = { canvas: c, sz };
   if (spriteCache.size > 800) spriteCache.clear();
   spriteCache.set(key, sp);
@@ -344,13 +360,13 @@ function getSprite(type, color, s, dpr, bright = 1, lightX = -1) {
  * 장면용: 캐시한 몸통 + 실시간 움직임(숨쉬기, 만세, 역광, 음료 김)
  */
 export function drawCritterFast(ctx, o) {
-  const { x, s, type = 'blanket', color = 0, arms = 0, hop = 0, rim, t = 0, steam = false, dpr = 1, bright = 1 } = o;
+  const { x, s, type = 'blanket', color = 0, arms = 0, hop = 0, rim, t = 0, steam = false, dpr = 1, bright = 1, hair = null } = o;
   const [base] = BLANKETS[color % BLANKETS.length];
   const phase = (Math.abs(x * 7 + color * 13) % 100) / 100;
   const breathe = Math.sin(t / 1300 + phase * 6.28);
   const y = o.y - hop * s * 0.25;
   const lightX = rim && rim.a > 0.05 ? rim.x : -1;
-  const sp = getSprite(type, color, s, dpr, bright, lightX);
+  const sp = getSprite(type, color, s, dpr, bright, lightX, hair);
   const k = s / sp.sz;
   const w = sp.sz * SPRITE_W * k;
   const h = sp.sz * SPRITE_H * k;
@@ -431,7 +447,7 @@ export function drawCritterFast(ctx, o) {
 }
 
 // 캐릭터 고르기·승차권용: 노을빛 원 안에 앉은 뒷모습
-export function renderPortrait(canvas, type, color) {
+export function renderPortrait(canvas, type, color, hair = null, pet = 0) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
@@ -453,6 +469,85 @@ export function renderPortrait(canvas, type, color) {
   ctx.beginPath();
   ctx.arc(w * 0.64, h / 2 - r + r * 1.25, r * 0.13, Math.PI, 0);
   ctx.fill();
-  drawCritter(ctx, { x: w / 2, y: h * 0.95, s: h * 0.62, type, color, lightX: 1 });
+  drawCritter(ctx, { x: w / 2 - (pet ? w * 0.08 : 0), y: h * 0.95, s: h * 0.62, type, color, lightX: 1, hair });
+  if (pet) drawPet(ctx, { x: w * 0.74, y: h * 0.95, s: h * 0.62, kind: pet, t: 0 });
+  ctx.restore();
+}
+
+// ---------- 반려동물 (옆에 나란히 앉은 뒷모습, 꼬리가 살랑) ----------
+export function drawPet(ctx, o) {
+  const { x, y, s, kind = 1, t = 0, bright = 1, hop = 0 } = o;
+  if (!kind) return;
+  const dog = kind === 1;
+  const fur = dog ? '#b98652' : '#8a8f99';
+  const dark = dog ? '#8a5f37' : '#5f646e';
+  const k = s * 0.42; // 사람의 절반쯤 크기
+  const by = y - hop * k * 0.3;
+  const sh = (c, a) => {
+    const n = parseInt(c.slice(1), 16);
+    const f = (v) => Math.round(v * a);
+    return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  };
+  const F = sh(fur, bright);
+  const D = sh(dark, bright);
+  ctx.save();
+  // 그림자
+  ctx.fillStyle = 'rgba(30,18,12,0.16)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + k * 0.02, k * 0.5, k * 0.07, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 살랑이는 꼬리
+  const wag = Math.sin(t / (dog ? 140 : 520)) * (dog ? 0.6 : 0.35);
+  ctx.strokeStyle = dog ? F : D;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = k * (dog ? 0.13 : 0.1);
+  ctx.beginPath();
+  ctx.moveTo(x + k * 0.05, by - k * 0.08);
+  if (dog) ctx.quadraticCurveTo(x + k * 0.45, by - k * 0.2, x + k * 0.4 + Math.sin(wag) * k * 0.25, by - k * 0.5);
+  else ctx.bezierCurveTo(x + k * 0.55, by, x + k * 0.6, by - k * 0.5, x + k * 0.35 + Math.sin(wag) * k * 0.15, by - k * 0.62);
+  ctx.stroke();
+  // 몸 (앉은 뒷모습)
+  ctx.fillStyle = F;
+  ctx.beginPath();
+  ctx.ellipse(x, by - k * 0.32, k * 0.34, k * 0.36, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 머리
+  const hy = by - k * 0.82;
+  ctx.beginPath();
+  ctx.arc(x, hy, k * 0.26, 0, Math.PI * 2);
+  ctx.fill();
+  if (dog) {
+    // 축 처진 귀
+    ctx.fillStyle = D;
+    for (const sg of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(x + sg * k * 0.24, hy + k * 0.02, k * 0.09, k * 0.18, sg * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // 쫑긋한 세모 귀
+    for (const sg of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(x + sg * k * 0.08, hy - k * 0.2);
+      ctx.lineTo(x + sg * k * 0.24, hy - k * 0.38);
+      ctx.lineTo(x + sg * k * 0.26, hy - k * 0.08);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // 줄무늬
+    ctx.strokeStyle = D;
+    ctx.lineWidth = Math.max(0.8, k * 0.04);
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + i * k * 0.12, by - k * 0.62);
+      ctx.lineTo(x + i * k * 0.1, by - k * 0.45);
+      ctx.stroke();
+    }
+  }
+  // 목줄 / 방울
+  ctx.fillStyle = dog ? '#c9574e' : '#e2b04a';
+  ctx.beginPath();
+  ctx.ellipse(x, hy + k * 0.24, k * 0.2, k * 0.05, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }

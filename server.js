@@ -203,7 +203,9 @@ function roomSnapshot(room, withPeople = true) {
       if (c) {
         // 지금 켜 둔 아이템 표시: 촛불 1, 후레쉬 2, 큰 캠프파이어 4
         const flags = (c.show.candle && shop.hasItem(c.visitor, 'candle') ? 1 : 0) | (c.show.bigfire && shop.hasItem(c.visitor, 'bigfire') ? 4 : 0);
-        people.push(flags ? [i, CHARS.indexOf(c.char) * 8 + c.color, flags] : [i, CHARS.indexOf(c.char) * 8 + c.color]);
+        // 모습 코드 = 반려동물*384 + 머리색*64 + 모습*8 + 옷색
+        const code = (c.pet || 0) * 384 + (c.hair || 0) * 64 + CHARS.indexOf(c.char) * 8 + c.color;
+        people.push(flags ? [i, code, flags] : [i, code]);
       }
     }
   }
@@ -259,6 +261,8 @@ function handle(c, msg) {
       if (!ROOMS.includes(msg.room)) return;
       c.char = CHARS.includes(msg.char) ? msg.char : CHARS[0];
       c.color = Number.isInteger(msg.color) ? Math.abs(msg.color) % 8 : 0;
+      c.hair = Number.isInteger(msg.hair) ? Math.abs(msg.hair) % 6 : 0;
+      c.pet = Number.isInteger(msg.pet) ? Math.abs(msg.pet) % 3 : 0;
       if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
       joinRoom(c, msg.room);
       return;
@@ -330,12 +334,33 @@ function handle(c, msg) {
       send(c.ws, { t: 'wallet', wallet: shop.wallet(c.visitor) });
       return;
     }
+    case 'say': {
+      // 응원 한마디: 정해진 문구만, 10초에 한 번
+      const i = Number(msg.i);
+      if (c.seat == null || !Number.isInteger(i) || i < 0 || i >= shop.SAYINGS.length) return;
+      if (now - (c.lastSay || 0) < 10000) return;
+      c.lastSay = now;
+      bump('say');
+      rooms[c.room].fx.push(['say', c.seat, i]);
+      return;
+    }
     case 'ritual': {
       // 풍등(정동진) / 종이배(정서진). 적은 글은 서버로 보내지 않습니다.
       if (c.seat == null || now - c.lastRitual < 8000) return;
+      // 동전 1개를 쓰면 고른 소원 문구가 풍등·종이배에 적혀 모두에게 보임
+      const wi = Number(msg.i);
+      const hasWish = msg.i != null && Number.isInteger(wi) && wi >= 0 && wi < shop.WISHES.length;
+      if (hasWish && !shop.spendCoin(c.visitor)) {
+        send(c.ws, { t: 'need', item: 'coins' });
+        return;
+      }
       c.lastRitual = now;
       bump('ritual');
-      if (c.seat <= PEOPLE_IN_SNAPSHOT) rooms[c.room].fx.push(['ritual', c.seat]);
+      if (hasWish) {
+        bump('wish');
+        send(c.ws, { t: 'wallet', wallet: shop.wallet(c.visitor) });
+        rooms[c.room].fx.push(['ritual', c.seat, wi]);
+      } else if (c.seat <= PEOPLE_IN_SNAPSHOT) rooms[c.room].fx.push(['ritual', c.seat]);
       return;
     }
     default:

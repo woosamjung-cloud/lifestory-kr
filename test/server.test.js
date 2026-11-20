@@ -1,15 +1,18 @@
-import { test, before, after } from 'node:test';
+import { test, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import WebSocket from 'ws';
 
 const PORT = 3900 + Math.floor(Math.random() * 90);
 let proc;
+// 실행할 때마다 새 저장 폴더 (지난 실행의 동전·함성 기록이 섞이지 않게)
+const DATA_DIR = fs.mkdtempSync('/tmp/haedoti-test-');
 
 before(async () => {
   proc = spawn(process.execPath, ['server.js'], {
-    env: { ...process.env, PORT: String(PORT), SEATS: '2', MAX_PER_IP: '4', DATA_DIR: `/tmp/haedoti-test-${PORT}` },
-    stdio: 'ignore',
+    env: { ...process.env, PORT: String(PORT), SEATS: '2', MAX_PER_IP: '4', DATA_DIR },
+    stdio: ['ignore', 'ignore', process.env.TEST_SERVER_LOG ? fs.openSync(process.env.TEST_SERVER_LOG, 'a') : 'ignore'],
   });
   for (let i = 0; i < 50; i++) {
     try {
@@ -20,7 +23,21 @@ before(async () => {
     }
   }
 });
-after(() => proc.kill());
+after(async () => {
+  // 서버가 종료하면서 파일을 다 쓴 뒤에 폴더 삭제
+  const exited = new Promise((r) => proc.once('exit', r));
+  proc.kill();
+  await exited;
+  fs.rmSync(DATA_DIR, { recursive: true, force: true });
+});
+// 앞 테스트의 연결이 서버에서 완전히 정리된 뒤 다음 테스트 시작 (IP당 접속 제한에 걸리지 않게)
+afterEach(async () => {
+  for (let i = 0; i < 40; i++) {
+    const st = await (await fetch(`http://localhost:${PORT}/api/status`)).json();
+    if (st.online === 0) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+});
 
 function client() {
   const ws = new WebSocket(`ws://localhost:${PORT}/ws`);
@@ -153,6 +170,44 @@ test('동전 소원은 동전을 쓰고 모두에게 전달, 아이템이 없으
   assert.equal(last(a, 'need').item, 'fireworks');
   const fx = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list);
   assert.ok(fx.some(([k, , i]) => k === 'wish' && i === 0));
+  a.close();
+  b.close();
+});
+
+test('동전 소원 풍등: 동전을 쓰면 소원 번호가 함께 전달, 머리색·반려동물 코드 압축', async () => {
+  const visitor = 'shoptester03';
+  const o = await post('/api/shop/order', { visitor, product: 'coins10' });
+  await post('/api/shop/confirm', { orderId: o.body.orderId, paymentKey: 'test', amount: 1000 });
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'hello', visitor }));
+  a.send(JSON.stringify({ t: 'join', room: 'east', char: 'scarf', color: 3, hair: 4, pet: 2, visitor }));
+  b.send(JSON.stringify({ t: 'join', room: 'east', char: 'hood', color: 1 }));
+  await wait(1200);
+  a.send(JSON.stringify({ t: 'ritual', i: 2 }));
+  await wait(900);
+  assert.equal(last(a, 'wallet').wallet.coins, 10);
+  const fx = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list);
+  assert.ok(fx.some(([k, , i]) => k === 'ritual' && i === 2));
+  const room = last(b, 'room');
+  const mine = room.people.find(([, code]) => code >= 384);
+  assert.equal(mine[1], 2 * 384 + 4 * 64 + 2 * 8 + 3); // 고양이, 빨강 머리, 목도리, 옷색 3
+  a.close();
+  b.close();
+});
+
+test('응원 한마디: 정해진 문구만, 10초에 한 번만 전달', async () => {
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'join', room: 'west', char: 'coat', color: 0 }));
+  b.send(JSON.stringify({ t: 'join', room: 'west', char: 'hood', color: 1 }));
+  await wait(600);
+  a.send(JSON.stringify({ t: 'say', i: 1 }));
+  a.send(JSON.stringify({ t: 'say', i: 2 })); // 연타 → 무시
+  a.send(JSON.stringify({ t: 'say', i: 999 })); // 없는 문구 → 무시
+  a.send(JSON.stringify({ t: 'say', text: '자유 글' })); // 자유 글 → 무시
+  await wait(800);
+  const says = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list).filter(([k]) => k === 'say');
+  assert.equal(says.length, 1);
+  assert.equal(says[0][2], 1);
   a.close();
   b.close();
 });

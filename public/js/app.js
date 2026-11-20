@@ -11,7 +11,7 @@ import {
   solarPosition,
 } from './sun.js';
 import { Scene } from './scene.js';
-import { CHAR_LIST, BLANKETS, renderPortrait } from './characters.js';
+import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait } from './characters.js';
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare } from './cards.js';
 import { Ambience } from './ambience.js';
@@ -63,7 +63,7 @@ const store = {
 
 const state = {
   screen: 'home',
-  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0) },
+  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0) },
   placeMode: 'auto', // auto | east | west
   event: null,
   netStatus: 'connecting',
@@ -99,7 +99,7 @@ const net = new Net({
     if (m.people.length || !m.seated) {
       scene.people = m.people
         .filter(([seat]) => seat !== state.seat)
-        .map(([seat, code, flags = 0]) => ({ seat, flags, char: CHAR_LIST[Math.floor(code / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
+        .map(([seat, code, flags = 0]) => ({ seat, flags, pet: Math.floor(code / 384), hair: Math.floor((code % 384) / 64), char: CHAR_LIST[Math.floor((code % 64) / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
     }
     updateOnlineLabels();
   },
@@ -137,6 +137,10 @@ const net = new Net({
         scene.fireworksFrom(slot ? slot.x : scene.W * (0.2 + Math.random() * 0.6));
         continue;
       }
+      if (kind === 'say') {
+        if (shopInfo && shopInfo.sayings[extra]) showSay(shopInfo.sayings[extra], false);
+        continue;
+      }
       if (kind === 'wish') {
         const text = shopInfo && shopInfo.wishes[extra];
         if (text) scene.wishFrom(slot || scene.slots[Math.floor(Math.random() * Math.min(40, scene.slots.length))], text);
@@ -144,7 +148,7 @@ const net = new Net({
       }
       if (!slot) continue;
       if (kind === 'cheer') scene.cheerAt(slot);
-      else if (kind === 'ritual') scene.ritualAt(slot);
+      else if (kind === 'ritual') scene.ritualAt(slot, false, extra != null && shopInfo ? shopInfo.wishes[extra] : null);
       else if (kind === 'flash') scene.flashAt(slot);
     }
   },
@@ -205,7 +209,7 @@ function applyEvent(ev, { animate = false } = {}) {
   if (placeChanged) {
     state.room = null;
     scene.people = [];
-    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color);
+    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet);
     if (animate && state.screen === 'ride') playTrain(ev);
   }
   renderEventTexts();
@@ -378,6 +382,36 @@ function buildPicker() {
     });
     row.append(b);
   });
+  const hrow = $('hair-row');
+  hrow.innerHTML = '';
+  HAIRS.forEach(([name, col], i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'swatch hair-swatch';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-label', `머리 색 ${name}`);
+    b.title = name;
+    b.style.background = col;
+    b.addEventListener('click', () => {
+      state.profile.hair = i;
+      refreshPicker();
+    });
+    hrow.append(b);
+  });
+  const prow = $('pet-row');
+  prow.innerHTML = '';
+  PETS.forEach(([name, ico], i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pet-opt';
+    b.setAttribute('role', 'radio');
+    b.textContent = ico ? `${ico} ${name}` : name;
+    b.addEventListener('click', () => {
+      state.profile.pet = i;
+      refreshPicker();
+    });
+    prow.append(b);
+  });
   $('nick').value = state.profile.name;
   refreshPicker();
 }
@@ -386,9 +420,11 @@ function refreshPicker() {
   document.querySelectorAll('.char-opt').forEach((b) => {
     const on = b.dataset.char === state.profile.char;
     b.setAttribute('aria-checked', String(on));
-    renderPortrait(b.querySelector('canvas'), b.dataset.char, state.profile.color);
+    renderPortrait(b.querySelector('canvas'), b.dataset.char, state.profile.color, state.profile.hair);
   });
-  document.querySelectorAll('.swatch').forEach((b, i) => b.setAttribute('aria-checked', String(i === state.profile.color)));
+  document.querySelectorAll('#color-row .swatch').forEach((b, i) => b.setAttribute('aria-checked', String(i === state.profile.color)));
+  document.querySelectorAll('#hair-row .swatch').forEach((b, i) => b.setAttribute('aria-checked', String(i === state.profile.hair)));
+  document.querySelectorAll('.pet-opt').forEach((b, i) => b.setAttribute('aria-checked', String(i === state.profile.pet)));
 }
 
 function show(screen) {
@@ -419,10 +455,12 @@ $('board-form').addEventListener('submit', async (e) => {
   store.set('name', state.profile.name);
   store.set('char', state.profile.char);
   store.set('color', state.profile.color);
+  store.set('hair', state.profile.hair);
+  store.set('pet', state.profile.pet);
 
   // 승차권에 실제 좌석 번호를 넣기 위해 먼저 자리를 잡습니다.
   state.joined = true;
-  net.join(state.event.place, state.profile.char, state.profile.color);
+  net.join(state.event.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet);
   await waitForSeat(1500);
 
   ticketCanvas = await makeTicket({
@@ -475,17 +513,55 @@ $('act-cheer').addEventListener('click', () => {
   if (navigator.vibrate) navigator.vibrate(20);
 });
 
+let publicWish = null; // 동전으로 공개할 소원 문구 번호
 $('act-ritual').addEventListener('click', () => {
   $('ritual-text').value = state.wish;
+  publicWish = null;
+  // 상점이 열려 있으면 동전으로 공개 소원 달기
+  const box = $('public-wish');
+  box.hidden = !shopInfo || shopInfo.mode === 'off' || state.netStatus !== 'online';
+  if (!box.hidden) {
+    $('pw-coins').textContent = myWallet.coins;
+    const chips = $('pw-chips');
+    chips.innerHTML = '';
+    shopInfo.wishes.forEach((text, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pw-chip';
+      b.textContent = text;
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => {
+        publicWish = publicWish === i ? null : i;
+        chips.querySelectorAll('.pw-chip').forEach((c, k) => c.setAttribute('aria-pressed', String(k === publicWish)));
+        $('ritual-send').textContent = publicWish != null ? '🪙 동전 1개로 띄우기' : '띄워 보내기';
+      });
+      chips.append(b);
+    });
+  }
+  $('ritual-send').textContent = '띄워 보내기';
   $('ritual').showModal();
 });
 $('ritual-form').addEventListener('submit', (e) => {
   const send = e.submitter && e.submitter.value === 'send';
   if (!send) return;
+  if (publicWish != null && myWallet.coins < 1) {
+    e.preventDefault();
+    $('ritual').close();
+    openShop('소원 동전이 부족해요. 충전해 주세요');
+    return;
+  }
   state.wish = $('ritual-text').value.trim().slice(0, 40);
-  scene.ritualAt(scene.mySlot, true);
-  net.ritual();
-  toast(state.event.place === 'east' ? '🏮 소원 풍등이 하늘로 올라가요' : '⛵ 종이배가 바다로 떠나요');
+  const text = publicWish != null ? shopInfo.wishes[publicWish] : null;
+  scene.ritualAt(scene.mySlot, true, text);
+  if (text) {
+    myWallet.coins -= 1;
+    setWallet(myWallet);
+    if (scene.onCoin) scene.onCoin();
+  }
+  net.ritual(publicWish);
+  const place = state.event.place;
+  const lantern = PLACES[place].kind === 'sunrise';
+  toast(text ? `${lantern ? '🏮' : '⛵'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 소원 풍등이 하늘로 올라가요' : '⛵ 종이배가 바다로 떠나요');
 });
 
 $('act-card').addEventListener('click', async () => {
@@ -777,6 +853,44 @@ $('restore-btn').addEventListener('click', async () => {
 scene.onBoom = () => ambience.boom();
 scene.onCoin = () => ambience.plop();
 loadShop();
+
+// ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------
+let lastSay = 0;
+function showSay(text, me) {
+  const log = $('saylog');
+  const el = document.createElement('div');
+  el.className = 'say' + (me ? ' me' : '');
+  el.textContent = text;
+  log.prepend(el);
+  while (log.children.length > 5) log.lastChild.remove(); // 한꺼번에 많이 오면 오래된 것부터 정리
+  setTimeout(() => el.remove(), 7200);
+}
+$('open-say').addEventListener('click', () => {
+  const pick = $('saypick');
+  if (!pick.hidden) return (pick.hidden = true);
+  if (!shopInfo) return toast('잠시 후 다시 눌러 주세요');
+  pick.innerHTML = '';
+  shopInfo.sayings.forEach((text, i) => {
+    const b = document.createElement('button');
+    b.textContent = text;
+    b.addEventListener('click', () => {
+      pick.hidden = true;
+      const wait = 10000 - (Date.now() - lastSay);
+      if (wait > 0) return toast(`한마디는 10초에 한 번 할 수 있어요 (${Math.ceil(wait / 1000)}초 뒤)`);
+      if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 할 수 있어요');
+      lastSay = Date.now();
+      showSay(text, true);
+      net.say(i);
+    });
+    pick.append(b);
+  });
+  pick.hidden = false;
+});
+// 바깥을 누르면 문구 고르기 닫기
+document.addEventListener('click', (e) => {
+  const pick = $('saypick');
+  if (!pick.hidden && !pick.contains(e.target) && e.target.closest('#open-say') === null) pick.hidden = true;
+});
 
 // ---------- 배경음 (파도·바람·모닥불) ----------
 function soundButton() {

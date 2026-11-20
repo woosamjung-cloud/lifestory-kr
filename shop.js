@@ -41,6 +41,22 @@ export const WISHES = [
   '🙏 모두 행복하길',
 ];
 
+// 응원 한마디 (자유 채팅 대신 고르는 문구 - 욕설·광고·개인정보 걱정 없음, 무료)
+export const SAYINGS = [
+  '안녕하세요 👋',
+  '와, 예쁘다 😍',
+  '해 뜬다! ☀️',
+  '새해 복 많이 받으세요 🙏',
+  '오늘도 수고했어요',
+  '다들 화이팅! 💪',
+  '소원 꼭 이뤄지길 🍀',
+  '불멍 최고 🔥',
+  '춥다 🥶 이불 덮어요',
+  '함께라서 좋아요 💛',
+  '별이 예뻐요 ✨',
+  '잘 자요 🌙',
+];
+
 export function shopMode() {
   const m = (process.env.SHOP_MODE || 'test').toLowerCase();
   if (m === 'live' && !(process.env.TOSS_CLIENT_KEY && process.env.TOSS_SECRET_KEY)) return 'test';
@@ -204,6 +220,7 @@ export function shopPublicInfo() {
     clientKey: shopMode() === 'live' ? process.env.TOSS_CLIENT_KEY : null,
     products: Object.fromEntries(Object.entries(PRODUCTS).map(([k, p]) => [k, { name: p.name, price: p.price, icon: p.icon, desc: p.desc }])),
     wishes: WISHES,
+    sayings: SAYINGS,
     itemDays: ITEM_DAYS,
   };
 }

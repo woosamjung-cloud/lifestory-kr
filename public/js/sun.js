@@ -25,7 +25,64 @@ export const PLACES = {
     eventName: '해넘이',
     ritual: '종이배',
   },
+  // ---------- 해외 명소 (비행기로 이동) ----------
+  haleakala: {
+    key: 'haleakala',
+    name: '할레아칼라',
+    country: '미국 하와이',
+    flag: '🇺🇸',
+    lat: 20.7097,
+    lon: -156.2533,
+    tz: 'Pacific/Honolulu',
+    kind: 'sunrise',
+    eventName: '해돋이',
+    ritual: '소원 풍등',
+    scenery: 'clouds',
+    abroad: true,
+  },
+  angkor: {
+    key: 'angkor',
+    name: '앙코르와트',
+    country: '캄보디아',
+    flag: '🇰🇭',
+    lat: 13.4125,
+    lon: 103.867,
+    tz: 'Asia/Phnom_Penh',
+    kind: 'sunrise',
+    eventName: '해돋이',
+    ritual: '소원 풍등',
+    scenery: 'angkor',
+    abroad: true,
+  },
+  santorini: {
+    key: 'santorini',
+    name: '산토리니 이아',
+    country: '그리스',
+    flag: '🇬🇷',
+    lat: 36.4618,
+    lon: 25.3753,
+    tz: 'Europe/Athens',
+    kind: 'sunset',
+    eventName: '해넘이',
+    ritual: '종이배',
+    scenery: 'santorini',
+    abroad: true,
+  },
 };
+PLACES.east.scenery = 'beach';
+PLACES.west.scenery = 'deck';
+export const PLACE_KEYS = Object.keys(PLACES);
+
+// 현지 시각 "06:12" (해외 명소는 그 나라 시간, 국내는 한국 시간)
+export function formatLocalHM(date, placeKey) {
+  const p = PLACES[placeKey];
+  if (!p || !p.tz) return formatHM(date);
+  try {
+    return new Intl.DateTimeFormat('ko-KR', { timeZone: p.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+  } catch {
+    return formatHM(date);
+  }
+}
 
 // 해가 수평선에 걸리는 고도 (대기 굴절 + 해 반지름 보정)
 export const HORIZON_ELEVATION = -0.833;
