@@ -10,6 +10,6 @@ services:
     healthCheckPath: /healthz
     envVars:
       - key: SEATS
-        value: "500"
+        value: "2000"
       - key: NODE_VERSION
         value: "22"

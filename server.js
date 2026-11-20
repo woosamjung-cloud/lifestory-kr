@@ -16,9 +16,10 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'counts.json');
 
 const PORT = Number(process.env.PORT || 3000);
-const SEATS = Math.max(1, Number(process.env.SEATS || 500)); // 장소(방)마다 좌석 수
+const SEATS = Math.max(1, Number(process.env.SEATS || 1000)); // 장소(방)마다 좌석 수
 const MAX_CLIENTS = Number(process.env.MAX_CLIENTS || 20000); // 서버 전체 접속 상한
-const PEOPLE_IN_SNAPSHOT = 160; // 화면에 그릴 만큼만 보냅니다.
+const MAX_PER_IP = Number(process.env.MAX_PER_IP || 30); // 한 IP에서 동시 접속 상한 (회사·학교 와이파이 고려)
+const PEOPLE_IN_SNAPSHOT = 150; // 화면에 그릴 수 있는 앞쪽 좌석만 보냅니다.
 const CHARS = ['otter', 'penguin', 'rabbit', 'bear', 'cat'];
 const ROOMS = ['east', 'west'];
 const WITNESS_BEFORE_MS = 30 * 60 * 1000; // 이벤트 30분 전부터
@@ -64,6 +65,13 @@ const rooms = Object.fromEntries(
 
 let nextId = 1;
 const clients = new Set();
+const perIp = new Map();
+
+function clientIp(req) {
+  // Render 등 프록시 뒤에서는 x-forwarded-for 의 첫 번째 주소가 실제 접속자입니다.
+  const fwd = req.headers['x-forwarded-for'];
+  return (fwd ? String(fwd).split(',')[0] : req.socket.remoteAddress || '').trim();
+}
 
 function send(ws, msg) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
@@ -139,12 +147,16 @@ function joinRoom(c, roomKey) {
   room.dirty = true;
 }
 
-function roomSnapshot(room) {
+// people: [좌석번호, 캐릭터번호*8+담요색] 목록 (화면에 보이는 앞쪽 좌석만)
+function roomSnapshot(room, withPeople = true) {
   const ev = currentEventOf(room.key);
   const people = [];
-  for (let i = 0; i < room.seats.length && people.length < PEOPLE_IN_SNAPSHOT; i++) {
-    const c = room.seats[i];
-    if (c) people.push([c.id, i, c.char, c.color]);
+  if (withPeople) {
+    const end = Math.min(room.seats.length, PEOPLE_IN_SNAPSHOT + 1);
+    for (let i = 0; i < end; i++) {
+      const c = room.seats[i];
+      if (c) people.push([i, CHARS.indexOf(c.char) * 8 + c.color]);
+    }
   }
   const seated = room.members.size - room.queue.length;
   return {
@@ -167,7 +179,7 @@ setInterval(() => {
     if (!room.fx.length) continue;
     const msg = JSON.stringify({ t: 'fx', list: room.fx.splice(0, 40) });
     room.fx.length = 0;
-    for (const c of room.members) if (c.ws.readyState === c.ws.OPEN) c.ws.send(msg);
+    for (const c of room.members) if (c.seat != null && c.ws.readyState === c.ws.OPEN) c.ws.send(msg);
   }
 }, 250).unref();
 
@@ -175,10 +187,16 @@ let tick = 0;
 setInterval(() => {
   tick++;
   for (const room of Object.values(rooms)) {
-    if (!room.dirty && tick % 5 !== 0) continue;
+    const busy = room.members.size > 200;
+    if (busy ? tick % 2 !== 0 : !room.dirty && tick % 5 !== 0) continue;
     room.dirty = false;
-    const msg = JSON.stringify(roomSnapshot(room));
-    for (const c of room.members) if (c.ws.readyState === c.ws.OPEN) c.ws.send(msg);
+    const full = JSON.stringify(roomSnapshot(room, true));
+    const lite = tick % 4 === 0 ? JSON.stringify(roomSnapshot(room, false)) : null;
+    for (const c of room.members) {
+      if (c.ws.readyState !== c.ws.OPEN) continue;
+      if (c.seat != null) c.ws.send(full);
+      else if (lite || !busy) c.ws.send(lite || full);
+    }
     // 이벤트 시간대에 들어오면 이미 앉아 있던 사람도 "함께 본 사람"으로 셉니다.
     if (tick % 15 === 0) for (const c of room.members) if (c.seat != null) markWitness(room, c);
   }
@@ -208,7 +226,7 @@ function handle(c, msg) {
         counts.cheers[ev.key] = (counts.cheers[ev.key] || 0) + 1;
         countsDirty = true;
       }
-      room.fx.push(['cheer', c.seat]);
+      if (c.seat <= PEOPLE_IN_SNAPSHOT) room.fx.push(['cheer', c.seat]);
       room.dirty = true;
       return;
     }
@@ -216,7 +234,7 @@ function handle(c, msg) {
       // 풍등(정동진) / 종이배(정서진). 적은 글은 서버로 보내지 않습니다.
       if (c.seat == null || now - c.lastRitual < 8000) return;
       c.lastRitual = now;
-      rooms[c.room].fx.push(['ritual', c.seat]);
+      if (c.seat <= PEOPLE_IN_SNAPSHOT) rooms[c.room].fx.push(['ritual', c.seat]);
       return;
     }
     default:
@@ -264,6 +282,11 @@ const server = http.createServer((req, res) => {
     return;
   }
   fs.readFile(filePath, (err, data) => {
+    if (!err && filePath.endsWith('index.html')) {
+      const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0];
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').replace(/[^a-zA-Z0-9.:-]/g, '');
+      if (host) data = Buffer.from(String(data).replace('content="og.png"', `content="${proto}://${host}/og.png"`));
+    }
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('찾을 수 없습니다');
@@ -280,12 +303,14 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 2048 });
 
-wss.on('connection', (ws) => {
-  if (clients.size >= MAX_CLIENTS) {
+wss.on('connection', (ws, req) => {
+  const ip = clientIp(req);
+  if (clients.size >= MAX_CLIENTS || (perIp.get(ip) || 0) >= MAX_PER_IP) {
     send(ws, { t: 'full' });
     ws.close();
     return;
   }
+  perIp.set(ip, (perIp.get(ip) || 0) + 1);
   const c = {
     id: nextId++,
     ws,
@@ -317,6 +342,9 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     leaveRoom(c);
     clients.delete(c);
+    const n = (perIp.get(ip) || 1) - 1;
+    if (n <= 0) perIp.delete(ip);
+    else perIp.set(ip, n);
   });
 });
 

@@ -47,3 +47,8 @@ test('일출 직후 30분은 아직 정동진 장면 유지', () => {
   const ev = currentEvent(new Date(sunrise.getTime() + 30 * 60000));
   assert.equal(ev.place, 'east');
 });
+
+test('크리스마스 특별 운행 표시', () => {
+  assert.equal(currentEvent(new Date('2026-12-24T15:00:00+09:00')).special, '크리스마스 이브 해넘이');
+  assert.equal(currentEvent(new Date('2026-12-25T06:00:00+09:00')).special, '크리스마스 아침 해돋이');
+});

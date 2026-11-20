@@ -147,6 +147,8 @@ function specialLabel(placeKey, time) {
   const p = kstParts(time);
   if (placeKey === 'east' && p.m === 1 && p.d === 1) return `${p.y}년 새해 첫 해돋이`;
   if (placeKey === 'west' && p.m === 12 && p.d === 31) return `${p.y}년 마지막 해넘이`;
+  if (placeKey === 'west' && p.m === 12 && p.d === 24) return '크리스마스 이브 해넘이';
+  if (placeKey === 'east' && p.m === 12 && p.d === 25) return '크리스마스 아침 해돋이';
   return null;
 }
 

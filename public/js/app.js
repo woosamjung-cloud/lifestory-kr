@@ -77,7 +77,11 @@ const net = new Net({
   onRoom(m) {
     if (!state.event || m.room !== state.event.place) return;
     state.room = m;
-    scene.people = m.people.filter((p) => p[0] !== net.myId).map(([id, seat, char, color]) => ({ id, seat, char, color }));
+    if (m.people.length || !m.seated) {
+      scene.people = m.people
+        .filter(([seat]) => seat !== state.seat)
+        .map(([seat, code]) => ({ seat, char: CHAR_LIST[Math.floor(code / 8)]?.key || 'otter', color: code % 8 }));
+    }
     updateOnlineLabels();
   },
   onSeat(seat) {
@@ -212,7 +216,14 @@ function updateOnlineLabels() {
 // ---------- 메인 루프 ----------
 let lastTextUpdate = 0;
 let lastEventCheck = 0;
+let lastDraw = 0;
+const FRAME_MS = 1000 / 30; // 배터리를 아끼려고 초당 30장만 그립니다
 function frame(ts) {
+  if (ts - lastDraw < FRAME_MS - 2) {
+    requestAnimationFrame(frame);
+    return;
+  }
+  lastDraw = ts;
   const now = realNow();
   if (ts - lastEventCheck > 5000 && !state.preview) {
     lastEventCheck = ts;
