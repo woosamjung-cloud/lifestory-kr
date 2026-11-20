@@ -106,9 +106,18 @@
       <button class="btn tiny" id="preview-stop">실시간으로</button>
     </div>
 
+    <div class="itembar" id="itembar" aria-label="내 아이템">
+      <button class="item-btn" data-item="candle" hidden title="촛불 켜고 끄기">🕯️</button>
+      <button class="item-btn" data-item="flash" hidden title="후레쉬 흔들기">🔦</button>
+      <button class="item-btn" data-item="fireworks" hidden title="폭죽 쏘기">🎆</button>
+      <button class="item-btn" data-item="bigfire" hidden title="큰 캠프파이어 켜고 끄기">🔥</button>
+      <button class="item-btn shop-btn" id="open-shop" title="상점">🎁 <span>상점</span></button>
+    </div>
+
     <nav class="actions" aria-label="할 수 있는 일">
       <button class="act" id="act-cheer"><span class="act-ico">🙌</span><span>와!</span></button>
       <button class="act" id="act-ritual"><span class="act-ico" id="ritual-ico">🏮</span><span id="ritual-name">소원 풍등</span></button>
+      <button class="act" id="act-wish"><span class="act-ico">🪙</span><span>동전 소원</span></button>
       <button class="act" id="act-card"><span class="act-ico">📸</span><span>인증 카드</span></button>
       <button class="act" id="act-menu" aria-haspopup="dialog"><span class="act-ico">☰</span><span>더보기</span></button>
     </nav>
@@ -124,6 +133,7 @@
       <button class="seg-btn" data-place="west">정서진 해넘이</button>
     </div>
     <button class="btn wide" id="preview-start">⏩ 해돋이 장면 60초 미리보기</button>
+    <button class="btn wide" id="menu-shop">🎁 상점 · 내 아이템</button>
     <button class="btn wide" id="show-help">이용 안내</button>
     <button class="btn wide ghost" id="menu-close">닫기</button>
   </dialog>
@@ -140,6 +150,39 @@
         <button class="btn primary" id="ritual-send" value="send">띄워 보내기</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- 동전 소원 -->
+  <dialog id="wishdlg" class="modal">
+    <h3>동전 던지며 소원 빌기</h3>
+    <p class="muted small">동전 하나를 바다에 던지면 고른 소원이 <b>함께 보는 모든 사람</b>의 하늘에 떠올라요.</p>
+    <div class="coin-line">내 동전 <b id="wish-coins">0</b>개</div>
+    <div class="wish-grid" id="wish-grid"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="wish-close">닫기</button>
+      <button class="btn" id="wish-buy">🪙 동전 충전</button>
+    </div>
+  </dialog>
+
+  <!-- 상점 -->
+  <dialog id="shopdlg" class="modal shop-modal">
+    <h3>상점</h3>
+    <p class="test-banner" id="shop-test" hidden>🧪 지금은 <b>테스트 결제</b>예요. 실제로 돈이 나가지 않아요.</p>
+    <div class="coin-line">내 동전 <b id="shop-coins">0</b>개</div>
+    <div class="product-list" id="product-list"></div>
+    <details class="restore-box">
+      <summary>다른 기기로 옮기기 · 구매 복구</summary>
+      <p class="muted small">회원가입 없이 이 기기에 구매 내역이 저장돼요. 휴대폰을 바꾸거나 다른 기기에서 쓰려면 복구 코드를 적어 두세요.</p>
+      <div class="btn-row"><button class="btn" id="show-code">내 복구 코드 보기</button></div>
+      <p class="code-out" id="code-out" hidden></p>
+      <div class="restore-row">
+        <input id="restore-input" maxlength="11" placeholder="복구 코드 입력 (예: ABCDE-FGHJK)" autocomplete="off">
+        <button class="btn" id="restore-btn">불러오기</button>
+      </div>
+    </details>
+    <p class="fineprint">아이템은 결제 즉시 지급되어 30일 동안 쓸 수 있어요. 다시 사면 기간이 30일 늘어나요. 환불은 결제 후 7일 이내, 지난 일수만큼 빼고 해 드려요.<br>
+      <a href="terms.html" target="_blank">이용약관</a> · <a href="refund.html" target="_blank">환불 규정</a> · <a href="privacy.html" target="_blank">개인정보처리방침</a></p>
+    <button class="btn wide ghost" id="shop-close">닫기</button>
   </dialog>
 
   <!-- 인증 카드 -->

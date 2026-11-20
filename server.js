@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { nextEventAt, dateKey } from './public/js/sun.js';
 import { startWeather, weatherStatus } from './weather.js';
+import * as shop from './shop.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -45,7 +46,7 @@ function today() {
 }
 function dayStats(key = today()) {
   if (!counts.daily[key]) {
-    counts.daily[key] = { visitors: 0, peak: 0, ticket: 0, card: 0, save: 0, preview: 0, cheer: 0, ritual: 0 };
+    counts.daily[key] = { visitors: 0, peak: 0, ticket: 0, card: 0, save: 0, preview: 0, cheer: 0, ritual: 0, item: 0, wish: 0 };
     // 오래된 날짜(60일 넘은 것) 정리
     const keys = Object.keys(counts.daily).sort();
     while (keys.length > 60) delete counts.daily[keys.shift()];
@@ -54,7 +55,8 @@ function dayStats(key = today()) {
   return counts.daily[key];
 }
 function bump(field, n = 1) {
-  dayStats()[field] += n;
+  const d = dayStats();
+  d[field] = (d[field] || 0) + n;
   countsDirty = true;
 }
 function countVisitor(visitor) {
@@ -198,7 +200,11 @@ function roomSnapshot(room, withPeople = true) {
     const end = Math.min(room.seats.length, PEOPLE_IN_SNAPSHOT + 1);
     for (let i = 0; i < end; i++) {
       const c = room.seats[i];
-      if (c) people.push([i, CHARS.indexOf(c.char) * 8 + c.color]);
+      if (c) {
+        // 지금 켜 둔 아이템 표시: 촛불 1, 후레쉬 2, 큰 캠프파이어 4
+        const flags = (c.show.candle && shop.hasItem(c.visitor, 'candle') ? 1 : 0) | (c.show.bigfire && shop.hasItem(c.visitor, 'bigfire') ? 4 : 0);
+        people.push(flags ? [i, CHARS.indexOf(c.char) * 8 + c.color, flags] : [i, CHARS.indexOf(c.char) * 8 + c.color]);
+      }
     }
   }
   const seated = room.members.size - room.queue.length;
@@ -288,6 +294,42 @@ function handle(c, msg) {
       room.dirty = true;
       return;
     }
+    case 'use': {
+      // 유료 아이템 사용: 폭죽·후레쉬는 순간 효과, 촛불·큰 캠프파이어는 켜고 끄기
+      const item = msg.item;
+      if (!shop.ITEM_KEYS.includes(item) || c.seat == null) return;
+      if (!shop.hasItem(c.visitor, item)) {
+        send(c.ws, { t: 'need', item });
+        return;
+      }
+      const room = rooms[c.room];
+      if (item === 'candle' || item === 'bigfire') {
+        c.show[item] = msg.on !== false;
+        room.dirty = true;
+        return;
+      }
+      const gap = item === 'fireworks' ? 15000 : 2500;
+      if (now - (c.lastUse[item] || 0) < gap) return;
+      c.lastUse[item] = now;
+      bump('item');
+      if (c.seat <= PEOPLE_IN_SNAPSHOT || item === 'fireworks') room.fx.push([item, c.seat]);
+      return;
+    }
+    case 'wish': {
+      // 동전 1개를 던지고 정해진 소원 문구를 모두에게 띄움
+      const i = Number(msg.i);
+      if (c.seat == null || !Number.isInteger(i) || i < 0 || i >= shop.WISHES.length) return;
+      if (now - c.lastWish < 3000) return;
+      if (!shop.spendCoin(c.visitor)) {
+        send(c.ws, { t: 'need', item: 'coins' });
+        return;
+      }
+      c.lastWish = now;
+      bump('wish');
+      rooms[c.room].fx.push(['wish', c.seat, i]);
+      send(c.ws, { t: 'wallet', wallet: shop.wallet(c.visitor) });
+      return;
+    }
     case 'ritual': {
       // 풍등(정동진) / 종이배(정서진). 적은 글은 서버로 보내지 않습니다.
       if (c.seat == null || now - c.lastRitual < 8000) return;
@@ -313,8 +355,59 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+// POST 본문(JSON) 읽기 (최대 4KB)
+function readJson(req) {
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', (ch) => {
+      data += ch;
+      if (data.length > 4096) req.destroy();
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(data || '{}'));
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+function json(res, code, body) {
+  res.writeHead(code, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(body));
+}
+const postHits = new Map(); // IP별 분당 요청 수 제한
+setInterval(() => postHits.clear(), 60000).unref();
+
+async function handleShop(req, res, url) {
+  const route = url.pathname.slice('/api/shop'.length) || '/';
+  if (req.method === 'GET' && route === '/') {
+    const visitor = url.searchParams.get('visitor');
+    return json(res, 200, { ...shop.shopPublicInfo(), wallet: shop.wallet(visitor) });
+  }
+  if (req.method !== 'POST') return json(res, 405, { error: 'POST만 가능해요' });
+  const ip = clientIp(req);
+  const hits = (postHits.get(ip) || 0) + 1;
+  postHits.set(ip, hits);
+  if (hits > 40) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
+  if (shop.shopMode() === 'off') return json(res, 403, { error: '상점이 닫혀 있어요' });
+  const body = await readJson(req);
+  let r;
+  if (route === '/order') r = shop.createOrder(body.visitor, body.product);
+  else if (route === '/confirm') r = await shop.confirmOrder(body);
+  else if (route === '/code') r = shop.recoveryCode(body.visitor);
+  else if (route === '/restore') r = shop.restore(body.code);
+  else return json(res, 404, { error: '없는 주소예요' });
+  return json(res, r.error ? 400 : 200, r);
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (url.pathname.startsWith('/api/shop')) {
+    handleShop(req, res, url).catch(() => json(res, 500, { error: '서버 오류' }));
+    return;
+  }
   if (url.pathname === '/api/status') {
     const body = Object.fromEntries(
       Object.values(rooms).map((r) => {
@@ -345,7 +438,7 @@ const server = http.createServer((req, res) => {
       }),
     );
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ now: new Date().toISOString(), online: clients.size, seats: SEATS, live, total, days: days.map((k) => ({ date: k, ...counts.daily[k] })) }));
+    res.end(JSON.stringify({ now: new Date().toISOString(), online: clients.size, seats: SEATS, live, total, shop: shop.shopStats(), days: days.map((k) => ({ date: k, ...counts.daily[k] })) }));
     return;
   }
   if (url.pathname === '/healthz') {
@@ -407,6 +500,9 @@ wss.on('connection', (ws, req) => {
     alive: true,
     helloed: false,
     stats: {},
+    show: { candle: true, bigfire: true },
+    lastUse: {},
+    lastWish: 0,
   };
   clients.add(c);
   notePeak();
@@ -448,12 +544,14 @@ setInterval(() => {
 function shutdown() {
   countsDirty = true;
   saveCounts();
+  shop.saveShop(true);
   process.exit(0);
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 startWeather();
+shop.initShop(DATA_DIR);
 
 server.listen(PORT, () => {
   console.log(`방구석 해돋이호 운행 시작: http://localhost:${PORT}  (방마다 좌석 ${SEATS}석)`);

@@ -70,6 +70,10 @@ export class Scene {
     this.celebrateAt = 0;
     const rnd = seeded(7);
     this.night = new NightSky();
+    this.selfItems = { candle: false, bigfire: false }; // 내가 켜 둔 유료 아이템
+    this.bursts = []; // 폭죽
+    this.flashes = new Map(); // 후레쉬 흔들기
+    this.wishFx = []; // 동전 소원
     this.weather = null; // { sky, pty, temp, label } 기상청 실제 날씨
     this.clouds = Array.from({ length: 6 }, (_, i) => ({ x: rnd(), y: 0.12 + rnd() * 0.25, w: 0.12 + rnd() * 0.16, v: 0.002 + rnd() * 0.004, k: i }));
     this.cloudsMore = [...this.clouds, ...Array.from({ length: 7 }, (_, i) => ({ x: rnd(), y: 0.08 + rnd() * 0.55, w: 0.14 + rnd() * 0.18, v: 0.002 + rnd() * 0.004, k: i + 6 }))];
@@ -464,6 +468,10 @@ export class Scene {
         dpr: this.dpr,
         bright: critterBright,
       });
+      const candle = p.me ? this.selfItems.candle : p.flags & 1;
+      if (candle) this.drawCandle(ctx, sl.x - sl.s * 0.62, sl.y, sl.s, nowMs);
+      const fl = this.flashes.get(sl);
+      if (fl) this.drawFlash(ctx, sl, nowMs, fl);
     }
     ctx.restore();
     // 불빛이 가까운 사람들을 따뜻하게 비춤
@@ -487,6 +495,10 @@ export class Scene {
 
     // 효과들
     this.renderEffects(nowMs, sun);
+
+    // 폭죽·동전 소원
+    this.drawBursts(ctx, nowMs);
+    this.drawWishes(ctx, nowMs);
 
     // 비·눈 (실제 날씨)
     if (wx) this.night.drawPrecip(ctx, this, wx.pty, nowMs);
@@ -542,7 +554,7 @@ export class Scene {
   // ---------- 불멍 화로 ----------
   fireSpot() {
     const sl = this.mySlot;
-    const fs = Math.min(sl.s * 1.5, this.W * 0.16);
+    const fs = Math.min(sl.s * 1.5, this.W * 0.16) * (this.selfItems.bigfire ? 1.35 : 1);
     return { x: Math.min(sl.x + this.W * 0.22, this.W - fs * 0.8), y: sl.y - sl.s * 0.1, s: fs };
   }
 
@@ -638,15 +650,25 @@ export class Scene {
       [-0.06, 0.65, 0.1, 3.7],
       [0.08, 0.5, 0.09, 5.2],
     ];
+    if (this.selfItems.bigfire) {
+      // 큰 캠프파이어: 색이 바뀌는 불꽃 갈래 추가
+      tongues.push([-0.24, 0.5, 0.1, 6.3], [0.24, 0.48, 0.1, 7.9], [0.04, 1.0, 0.13, 9.1]);
+    }
     for (const [ox, hh, ww, k] of tongues) {
       const h = s * hh * (0.75 + 0.25 * Math.sin(t / (150 + k * 30) + k) + 0.1 * Math.sin(t / 53 + k * 3));
       const w = s * ww;
       const sway = Math.sin(t / 310 + k) * s * 0.06 + Math.sin(t / 89 + k * 2) * s * 0.025;
       const bx = x + ox * s;
       const g = ctx.createLinearGradient(bx, base, bx, base - h);
-      g.addColorStop(0, 'rgba(255,170,60,0.85)');
-      g.addColorStop(0.45, 'rgba(255,110,30,0.55)');
-      g.addColorStop(1, 'rgba(230,60,20,0)');
+      if (this.selfItems.bigfire && k > 6) {
+        const hue = (t / 40 + k * 60) % 360;
+        g.addColorStop(0, `hsla(${hue},90%,65%,0.75)`);
+        g.addColorStop(1, `hsla(${hue},90%,55%,0)`);
+      } else {
+        g.addColorStop(0, 'rgba(255,170,60,0.85)');
+        g.addColorStop(0.45, 'rgba(255,110,30,0.55)');
+        g.addColorStop(1, 'rgba(230,60,20,0)');
+      }
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(bx - w, base);
@@ -671,7 +693,7 @@ export class Scene {
     if (!this.embers) this.embers = [];
     const dt = this._fireT ? Math.min(0.1, (t - this._fireT) / 1000) : 0;
     this._fireT = t;
-    if (Math.random() < dt * 9) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
+    if (Math.random() < dt * (this.selfItems.bigfire ? 22 : 9)) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
     this.embers = this.embers.filter((e) => {
       e.life += dt;
       if (e.life > e.max) return false;
@@ -683,6 +705,178 @@ export class Scene {
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
       ctx.fill();
+      return true;
+    });
+    ctx.restore();
+  }
+
+  // ---------- 유료 아이템 ----------
+  drawCandle(ctx, x, y, s, t) {
+    const h = s * 0.32;
+    const w = s * 0.09;
+    ctx.save();
+    ctx.fillStyle = '#f3e9d6';
+    ctx.fillRect(x - w / 2, y - h, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(x + w * 0.15, y - h, w * 0.35, h);
+    const fl = this.flicker(t, x);
+    const fy = y - h - s * 0.08;
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, fy, 0, x, fy, s * 0.55 * fl);
+    g.addColorStop(0, 'rgba(255,190,100,0.45)');
+    g.addColorStop(1, 'rgba(255,160,60,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - s * 0.6, fy - s * 0.6, s * 1.2, s * 1.2);
+    ctx.fillStyle = `rgba(255,220,140,${0.9 * fl})`;
+    ctx.beginPath();
+    ctx.ellipse(x + Math.sin(t / 180 + x) * s * 0.01, fy, s * 0.03, s * 0.08 * fl, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  flashAt(slot) {
+    if (slot) this.flashes.set(slot, performance.now());
+  }
+
+  drawFlash(ctx, sl, t, t0) {
+    const age = (t - t0) / 1000;
+    if (age > 6) {
+      this.flashes.delete(sl);
+      return;
+    }
+    const a = age < 0.3 ? age / 0.3 : age > 5.4 ? (6 - age) / 0.6 : 1;
+    const sway = Math.sin(age * 4.2) * sl.s * 0.35;
+    const x = sl.x + sway;
+    const y = sl.y - sl.s * 1.35;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y, 0, x, y, sl.s * 1.1);
+    g.addColorStop(0, `rgba(255,255,235,${0.8 * a})`);
+    g.addColorStop(0.2, `rgba(255,245,210,${0.35 * a})`);
+    g.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - sl.s * 1.1, y - sl.s * 1.1, sl.s * 2.2, sl.s * 2.2);
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(2, sl.s * 0.05), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  fireworksFrom(x) {
+    const now = performance.now();
+    for (let k = 0; k < 3; k++) {
+      this.bursts.push({
+        x0: x,
+        x: this.W * (0.15 + Math.random() * 0.7),
+        y: this.horizonY * (0.15 + Math.random() * 0.45),
+        t0: now + k * 650,
+        hue: Math.floor(Math.random() * 360),
+        n: 46 + Math.floor(Math.random() * 20),
+      });
+    }
+    if (this.bursts.length > 30) this.bursts.splice(0, this.bursts.length - 30);
+    if (this.onBoom) setTimeout(() => this.onBoom(), 900);
+  }
+
+  drawBursts(ctx, t) {
+    if (!this.bursts.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    this.bursts = this.bursts.filter((b) => {
+      const age = (t - b.t0) / 1000;
+      if (age < 0) return true;
+      if (age > 3.4) return false;
+      const rise = 0.8;
+      if (age < rise) {
+        // 쏘아 올리는 꼬리
+        const p = age / rise;
+        const x = b.x0 + (b.x - b.x0) * p;
+        const y = this.shoreY + (b.y - this.shoreY) * (1 - (1 - p) ** 2);
+        ctx.fillStyle = `hsla(${b.hue},80%,75%,0.9)`;
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        return true;
+      }
+      const e = age - rise;
+      const R = this.H * 0.16 * (1 - Math.exp(-e * 2.2));
+      const a = Math.max(0, 1 - e / 2.6);
+      for (let i = 0; i < b.n; i++) {
+        const ang = (i / b.n) * Math.PI * 2;
+        const x = b.x + Math.cos(ang) * R;
+        const y = b.y + Math.sin(ang) * R + e * e * 14; // 중력으로 처짐
+        ctx.fillStyle = `hsla(${(b.hue + (i % 3) * 25) % 360},90%,${65 + (i % 2) * 15}%,${a})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.8 + (i % 3) * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (e < 0.25) {
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, this.H * 0.12);
+        g.addColorStop(0, `hsla(${b.hue},90%,80%,${0.35 * (1 - e / 0.25)})`);
+        g.addColorStop(1, `hsla(${b.hue},90%,70%,0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(b.x - this.H * 0.12, b.y - this.H * 0.12, this.H * 0.24, this.H * 0.24);
+      }
+      return true;
+    });
+    ctx.restore();
+  }
+
+  // 동전을 바다로 던지고, 소원 문구가 하늘로 떠오름
+  wishFrom(slot, text, isSelf = false) {
+    if (!slot) return;
+    const tx = slot.x + (Math.random() - 0.5) * this.W * 0.3;
+    this.wishFx.push({ x0: slot.x, y0: slot.y - slot.s * 1.1, tx, ty: this.horizonY + (this.shoreY - this.horizonY) * (0.35 + Math.random() * 0.4), t0: performance.now(), text, self: isSelf });
+    if (this.wishFx.length > 25) this.wishFx.shift();
+    if (this.onCoin) setTimeout(() => this.onCoin(), 750);
+  }
+
+  drawWishes(ctx, t) {
+    if (!this.wishFx.length) return;
+    ctx.save();
+    this.wishFx = this.wishFx.filter((w) => {
+      const age = (t - w.t0) / 1000;
+      if (age > 9) return false;
+      const fly = 0.75;
+      if (age < fly) {
+        // 포물선을 그리며 날아가는 동전
+        const p = age / fly;
+        const x = w.x0 + (w.tx - w.x0) * p;
+        const y = w.y0 + (w.ty - w.y0) * p - Math.sin(p * Math.PI) * this.H * 0.12;
+        ctx.fillStyle = '#e8c15a';
+        ctx.strokeStyle = '#a3802b';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 4, 4 * Math.abs(Math.cos(age * 18)) + 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        return true;
+      }
+      const e = age - fly;
+      // 퐁당: 퍼지는 물결
+      if (e < 2.2) {
+        for (let k = 0; k < 3; k++) {
+          const r = (e * 26 + k * 9) * (1 + k * 0.2);
+          const a = Math.max(0, 0.6 - e / 2.2 - k * 0.12);
+          ctx.strokeStyle = `rgba(255,255,255,${a})`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.ellipse(w.tx, w.ty, r, r * 0.28, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      // 소원 문구가 하늘로 천천히 떠오름
+      const tp = Math.min(1, e / 7);
+      const a = e < 0.6 ? e / 0.6 : tp > 0.75 ? (1 - tp) / 0.25 : 1;
+      const y = w.ty - this.H * 0.08 - tp * this.horizonY * 0.55;
+      ctx.font = `${w.self ? 700 : 400} ${Math.max(14, this.H * 0.02)}px "Gowun Batang", serif`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(255,200,120,0.9)';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = `rgba(255,250,235,${a})`;
+      ctx.fillText(w.text, w.tx, y);
+      ctx.shadowBlur = 0;
       return true;
     });
     ctx.restore();

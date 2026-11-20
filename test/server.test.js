@@ -102,3 +102,57 @@ test('하루 통계: 방문 기기 중복 제거, 종류별 상한, 잘못된 �
   a.close();
   b.close();
 });
+
+const post = (path, body) =>
+  fetch(`http://localhost:${PORT}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+
+test('상점: 테스트 결제로 아이템·동전 지급, 금액 위조 거부, 복구 코드', async () => {
+  const visitor = 'shoptester01';
+  const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=${visitor}`)).json();
+  assert.equal(info.mode, 'test');
+  assert.equal(info.wallet.coins, 0);
+  // 금액을 바꿔서 확인 요청하면 거부
+  const o1 = await post('/api/shop/order', { visitor, product: 'fireworks' });
+  assert.equal(o1.body.amount, 2000);
+  const bad = await post('/api/shop/confirm', { orderId: o1.body.orderId, paymentKey: 'x', amount: 10 });
+  assert.equal(bad.status, 400);
+  // 정상 확인
+  const ok = await post('/api/shop/confirm', { orderId: o1.body.orderId, paymentKey: 'test', amount: 2000 });
+  assert.equal(ok.status, 200);
+  assert.ok(ok.body.wallet.items.fireworks > Date.now() + 29 * 86400e3);
+  // 같은 주문을 두 번 확인해도 한 번만 지급
+  const again = await post('/api/shop/confirm', { orderId: o1.body.orderId, paymentKey: 'test', amount: 2000 });
+  assert.equal(again.body.already, true);
+  // 동전
+  const o2 = await post('/api/shop/order', { visitor, product: 'coins10' });
+  const c2 = await post('/api/shop/confirm', { orderId: o2.body.orderId, paymentKey: 'test', amount: 1000 });
+  assert.equal(c2.body.wallet.coins, 11);
+  // 없는 상품
+  assert.equal((await post('/api/shop/order', { visitor, product: 'free' })).status, 400);
+  // 복구 코드
+  const code = (await post('/api/shop/code', { visitor })).body.code;
+  assert.match(code, /^[A-Z0-9]{5}-[A-Z0-9]{5}$/);
+  const rest = await post('/api/shop/restore', { code: code.toLowerCase() });
+  assert.equal(rest.body.visitor, visitor);
+  assert.equal(rest.body.wallet.coins, 11);
+});
+
+test('동전 소원은 동전을 쓰고 모두에게 전달, 아이템이 없으면 사용 불가', async () => {
+  const visitor = 'shoptester02';
+  const o = await post('/api/shop/order', { visitor, product: 'coins10' });
+  await post('/api/shop/confirm', { orderId: o.body.orderId, paymentKey: 'test', amount: 1000 });
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'hello', visitor }));
+  a.send(JSON.stringify({ t: 'join', room: 'west', char: 'scarf', color: 1, visitor }));
+  b.send(JSON.stringify({ t: 'join', room: 'west', char: 'hood', color: 2 }));
+  await wait(600);
+  a.send(JSON.stringify({ t: 'wish', i: 0 }));
+  a.send(JSON.stringify({ t: 'use', item: 'fireworks' })); // 폭죽은 산 적 없음
+  await wait(800);
+  assert.equal(last(a, 'wallet').wallet.coins, 10);
+  assert.equal(last(a, 'need').item, 'fireworks');
+  const fx = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list);
+  assert.ok(fx.some(([k, , i]) => k === 'wish' && i === 0));
+  a.close();
+  b.close();
+});

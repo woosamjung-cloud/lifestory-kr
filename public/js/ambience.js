@@ -147,6 +147,61 @@ export class Ambience {
     this.timers.push(setTimeout(() => this.scheduleCrackle(), 60 + Math.random() * 520));
   }
 
+  // 동전이 물에 떨어지는 '퐁당'
+  plop() {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(900, t);
+    o.frequency.exponentialRampToValueAtTime(260, t + 0.18);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.35);
+  }
+
+  // 멀리서 터지는 폭죽 '펑'
+  boom() {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource();
+    s.buffer = this.noise;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(900, t);
+    lp.frequency.exponentialRampToValueAtTime(120, t + 0.8);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.9, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    s.connect(lp).connect(g).connect(this.master);
+    s.start(t, Math.random() * 4, 1.3);
+    // 뒤따르는 반짝이는 타닥 소리
+    for (let k = 0; k < 10; k++) setTimeout(() => this.on && this.scheduleOneCrackle(0.25), 300 + k * 70 + Math.random() * 120);
+  }
+
+  scheduleOneCrackle(amp = 0.5) {
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource();
+    s.buffer = this.noise;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 3000 + Math.random() * 3000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(amp, t + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
+    s.connect(hp).connect(g).connect(this.master);
+    s.start(t, Math.random() * 5, 0.04);
+  }
+
   async start() {
     if (!this.ctx && !this.build()) return false;
     if (this.ctx.state === 'suspended') await this.ctx.resume();

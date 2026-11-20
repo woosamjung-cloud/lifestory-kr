@@ -53,6 +53,7 @@
     <div class="tile"><div class="k">동시 접속</div><div class="v" id="online">-</div><div class="h" id="seats"></div></div>
     <div class="tile east"><div class="k">정동진 해돋이</div><div class="v" id="east-seated">-</div><div class="h" id="east-meta"></div></div>
     <div class="tile west"><div class="k">정서진 해넘이</div><div class="v" id="west-seated">-</div><div class="h" id="west-meta"></div></div>
+    <div class="tile"><div class="k">누적 매출 (실결제)</div><div class="v" id="sales">-</div><div class="h" id="sales-meta"></div></div>
   </div>
 
   <h2>오늘</h2>
@@ -77,7 +78,7 @@
   const fmt = (n) => (n ?? 0).toLocaleString('ko-KR');
   const $ = (id) => document.getElementById(id);
   const FIELDS = [
-    ['visitors', '방문 기기'], ['peak', '최대 동시 접속'], ['ticket', '승차권 발급'], ['card', '인증 카드'],
+    ['visitors', '방문 기기'], ['peak', '최대 동시 접속'], ['wish', '동전 소원'], ['item', '아이템 사용'], ['ticket', '승차권 발급'], ['card', '인증 카드'],
     ['save', '저장·공유'], ['cheer', '와! 함성'], ['ritual', '풍등·종이배'], ['preview', '미리보기'],
   ];
   function tiles(el, obj) {
@@ -110,6 +111,10 @@
       }
       tiles($('today'), s.days[0] && s.days[0].date === new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) ? s.days[0] : {});
       tiles($('total'), s.total);
+      if (s.shop) {
+        $('sales').textContent = fmt(s.shop.sales) + '원';
+        $('sales-meta').textContent = `결제 ${fmt(s.shop.orders)}건 · 구매 기기 ${fmt(s.shop.accounts)}대 (테스트 결제 제외)`;
+      }
       const tb = $('days');
       tb.innerHTML = s.days.length ? '' : '<tr><td colspan="8" class="empty">아직 기록이 없어요</td></tr>';
       for (const d of s.days) {

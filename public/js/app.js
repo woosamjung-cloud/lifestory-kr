@@ -99,7 +99,7 @@ const net = new Net({
     if (m.people.length || !m.seated) {
       scene.people = m.people
         .filter(([seat]) => seat !== state.seat)
-        .map(([seat, code]) => ({ seat, char: CHAR_LIST[Math.floor(code / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
+        .map(([seat, code, flags = 0]) => ({ seat, flags, char: CHAR_LIST[Math.floor(code / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
     }
     updateOnlineLabels();
   },
@@ -109,6 +109,8 @@ const net = new Net({
     scene.selfSeat = seat;
     scene.selfStanding = false;
     $('queue').hidden = true;
+    // 켜 둔 아이템 상태를 서버에 알림 (다른 사람 화면에 촛불이 보이도록)
+    if (typeof owned === 'function') for (const k of ['candle', 'bigfire']) if (owned(k)) net.use(k, itemShow[k]);
     if (state.screen === 'ride') toast('자리에 앉았어요. 함께 해를 기다려요 ☺️');
   },
   onQueue(pos) {
@@ -119,14 +121,31 @@ const net = new Net({
     $('queue-pos').textContent = pos.toLocaleString('ko-KR');
     $('queue').hidden = state.screen !== 'ride';
   },
+  onWallet(w) {
+    setWallet(w);
+  },
+  onNeed(item) {
+    openShop(item === 'coins' ? '소원 동전이 부족해요. 충전해 주세요' : '이 아이템은 기간이 끝났어요');
+  },
   onFx(list) {
-    for (const [kind, seat] of list) {
+    for (const [kind, seat, extra] of list) {
       const isMe = seat === state.seat;
       if (isMe) continue; // 내 효과는 누르는 순간 바로 그립니다
       const slot = scene.slotForSeat(seat);
+      // 폭죽과 소원은 보이지 않는 자리에서 보내도 하늘에는 보임
+      if (kind === 'fireworks') {
+        scene.fireworksFrom(slot ? slot.x : scene.W * (0.2 + Math.random() * 0.6));
+        continue;
+      }
+      if (kind === 'wish') {
+        const text = shopInfo && shopInfo.wishes[extra];
+        if (text) scene.wishFrom(slot || scene.slots[Math.floor(Math.random() * Math.min(40, scene.slots.length))], text);
+        continue;
+      }
       if (!slot) continue;
       if (kind === 'cheer') scene.cheerAt(slot);
       else if (kind === 'ritual') scene.ritualAt(slot);
+      else if (kind === 'flash') scene.flashAt(slot);
     }
   },
 });
@@ -536,6 +555,228 @@ $('show-help').addEventListener('click', () => {
   $('help').showModal();
 });
 $('help-close').addEventListener('click', () => $('help').close());
+
+// ---------- 상점 · 아이템 · 동전 소원 ----------
+let shopInfo = null;
+let myWallet = { coins: 0, items: {} };
+const itemShow = { candle: store.get('show.candle', true), bigfire: store.get('show.bigfire', true) };
+const cooldown = {};
+
+function owned(item) {
+  return (myWallet.items[item] || 0) > Date.now();
+}
+
+function setWallet(w) {
+  if (!w) return;
+  myWallet = w;
+  scene.selfItems.candle = owned('candle') && itemShow.candle;
+  scene.selfItems.bigfire = owned('bigfire') && itemShow.bigfire;
+  document.querySelectorAll('.item-btn[data-item]').forEach((b) => {
+    const k = b.dataset.item;
+    b.hidden = !owned(k);
+    if (k === 'candle' || k === 'bigfire') b.setAttribute('aria-pressed', String(itemShow[k]));
+  });
+  $('wish-coins').textContent = myWallet.coins;
+  $('shop-coins').textContent = myWallet.coins;
+  if (shopInfo && $('shopdlg').open) renderProducts();
+}
+
+async function loadShop() {
+  try {
+    const r = await fetch(`api/shop?visitor=${encodeURIComponent(net.visitor || '')}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    shopInfo = await r.json();
+    $('open-shop').hidden = shopInfo.mode === 'off';
+    $('menu-shop').hidden = shopInfo.mode === 'off';
+    $('act-wish').hidden = shopInfo.mode === 'off';
+    setWallet(shopInfo.wallet);
+    renderWishes();
+  } catch {
+    // 서버 없음 (정적 호스팅): 상점 숨김
+    $('open-shop').hidden = true;
+    $('menu-shop').hidden = true;
+    $('act-wish').hidden = true;
+  }
+}
+
+function fmtDate(ms) {
+  const d = new Date(ms + 9 * 3600e3);
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
+}
+
+function renderProducts() {
+  const list = $('product-list');
+  list.innerHTML = '';
+  $('shop-test').hidden = shopInfo.mode !== 'test';
+  for (const [key, p] of Object.entries(shopInfo.products)) {
+    const row = document.createElement('div');
+    row.className = 'product';
+    const until = owned(key) ? `<div class="p-own">✓ ${fmtDate(myWallet.items[key])}까지 사용 가능</div>` : '';
+    row.innerHTML = `<div class="p-ico">${p.icon}</div><div><div class="p-name"></div><div class="p-desc"></div>${until}</div>`;
+    row.querySelector('.p-name').textContent = p.name;
+    row.querySelector('.p-desc').textContent = p.desc;
+    const b = document.createElement('button');
+    b.className = 'btn primary';
+    b.textContent = `${p.price.toLocaleString('ko-KR')}원`;
+    b.addEventListener('click', () => buy(key, b));
+    row.append(b);
+    list.append(row);
+  }
+}
+
+function openShop(msg) {
+  if (!shopInfo || shopInfo.mode === 'off') return;
+  renderProducts();
+  if ($('wishdlg').open) $('wishdlg').close();
+  if (!$('shopdlg').open) $('shopdlg').showModal();
+  if (msg) toast(msg);
+}
+
+async function buy(product, btn) {
+  btn.disabled = true;
+  try {
+    const r = await fetch('api/shop/order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visitor: net.visitor, product }) });
+    const order = await r.json();
+    if (!r.ok) throw new Error(order.error || '주문 실패');
+    if (shopInfo.mode === 'live') {
+      // 토스페이먼츠 결제창 (결제 후 이 페이지로 돌아와 확인)
+      await loadScript('https://js.tosspayments.com/v2/standard');
+      const tp = window.TossPayments(shopInfo.clientKey);
+      const payment = tp.payment({ customerKey: order.customerKey });
+      store.set('pendingOrder', order.orderId);
+      await payment.requestPayment({
+        method: 'CARD',
+        amount: { currency: 'KRW', value: order.amount },
+        orderId: order.orderId,
+        orderName: order.orderName,
+        successUrl: `${location.origin}${location.pathname}?pay=success`,
+        failUrl: `${location.origin}${location.pathname}?pay=fail`,
+      });
+      return;
+    }
+    await confirmPayment({ orderId: order.orderId, paymentKey: 'test', amount: order.amount });
+  } catch (err) {
+    if (err && err.code !== 'USER_CANCEL') toast(err.message || '결제에 실패했어요');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function confirmPayment(q) {
+  const r = await fetch('api/shop/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(q) });
+  const res = await r.json();
+  if (!r.ok) throw new Error(res.error || '결제 확인 실패');
+  setWallet(res.wallet);
+  toast(res.test ? '🧪 테스트 구매 완료! 아이템이 생겼어요' : '🎉 구매 완료! 아이템이 생겼어요');
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = resolve;
+    el.onerror = () => reject(new Error('결제창을 불러오지 못했어요'));
+    document.head.append(el);
+  });
+}
+
+// 결제창에서 돌아왔을 때
+if (params.get('pay') === 'success' && params.get('paymentKey')) {
+  confirmPayment({ orderId: params.get('orderId'), paymentKey: params.get('paymentKey'), amount: Number(params.get('amount')) })
+    .catch((e) => toast(e.message))
+    .finally(() => history.replaceState(null, '', location.pathname));
+} else if (params.get('pay') === 'fail') {
+  setTimeout(() => toast(params.get('message') || '결제를 취소했어요'), 500);
+  history.replaceState(null, '', location.pathname);
+}
+
+function renderWishes() {
+  const grid = $('wish-grid');
+  grid.innerHTML = '';
+  (shopInfo?.wishes || []).forEach((text, i) => {
+    const b = document.createElement('button');
+    b.className = 'wish-opt';
+    b.textContent = text;
+    b.addEventListener('click', () => throwCoin(i));
+    grid.append(b);
+  });
+}
+
+function throwCoin(i) {
+  if (myWallet.coins < 1) {
+    openShop('소원 동전이 부족해요. 충전해 주세요');
+    return;
+  }
+  if (state.seat == null && state.netStatus === 'online') {
+    toast('자리에 앉은 뒤에 던질 수 있어요');
+    return;
+  }
+  if (state.netStatus !== 'online') {
+    toast('함께 보기 서버에 연결된 뒤에 던질 수 있어요');
+    return;
+  }
+  myWallet.coins -= 1; // 화면에 먼저 반영, 서버 응답으로 다시 맞춤
+  setWallet(myWallet);
+  scene.wishFrom(scene.mySlot, shopInfo.wishes[i], true);
+  net.wish(i);
+  $('wishdlg').close();
+}
+
+$('act-wish').addEventListener('click', () => {
+  if (!shopInfo) return;
+  $('wish-coins').textContent = myWallet.coins;
+  $('wishdlg').showModal();
+});
+$('wish-close').addEventListener('click', () => $('wishdlg').close());
+$('wish-buy').addEventListener('click', () => openShop());
+$('open-shop').addEventListener('click', () => openShop());
+$('menu-shop').addEventListener('click', () => {
+  $('menu').close();
+  openShop();
+});
+$('shop-close').addEventListener('click', () => $('shopdlg').close());
+
+document.querySelectorAll('.item-btn[data-item]').forEach((b) =>
+  b.addEventListener('click', () => {
+    const k = b.dataset.item;
+    if (!owned(k)) return openShop();
+    if (k === 'candle' || k === 'bigfire') {
+      itemShow[k] = !itemShow[k];
+      store.set('show.' + k, itemShow[k]);
+      net.use(k, itemShow[k]);
+      setWallet(myWallet);
+      return;
+    }
+    const gap = k === 'fireworks' ? 15000 : 2500;
+    if (Date.now() - (cooldown[k] || 0) < gap) return toast(k === 'fireworks' ? '폭죽은 15초에 한 번 쏠 수 있어요' : '잠시 후 다시 흔들 수 있어요');
+    cooldown[k] = Date.now();
+    b.classList.add('cooling');
+    setTimeout(() => b.classList.remove('cooling'), gap);
+    if (k === 'fireworks') scene.fireworksFrom(scene.mySlot.x);
+    else scene.flashAt(scene.mySlot);
+    net.use(k);
+  }),
+);
+
+$('show-code').addEventListener('click', async () => {
+  const r = await fetch('api/shop/code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visitor: net.visitor }) });
+  const res = await r.json();
+  $('code-out').hidden = false;
+  $('code-out').textContent = res.code || res.error;
+});
+$('restore-btn').addEventListener('click', async () => {
+  const r = await fetch('api/shop/restore', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: $('restore-input').value }) });
+  const res = await r.json();
+  if (!r.ok) return toast(res.error || '복구 실패');
+  net.adoptVisitor(res.visitor);
+  setWallet(res.wallet);
+  toast('구매 내역을 불러왔어요');
+});
+
+scene.onBoom = () => ambience.boom();
+scene.onCoin = () => ambience.plop();
+loadShop();
 
 // ---------- 배경음 (파도·바람·모닥불) ----------
 function soundButton() {

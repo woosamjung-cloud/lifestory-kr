@@ -69,6 +69,8 @@ export class Net {
       else if (m.t === 'queue') this.h.onQueue(m.pos);
       else if (m.t === 'fx') this.h.onFx(m.list);
       else if (m.t === 'full') this.h.onStatus('full');
+      else if (m.t === 'wallet' && this.h.onWallet) this.h.onWallet(m.wallet);
+      else if (m.t === 'need' && this.h.onNeed) this.h.onNeed(m.item);
     };
     ws.onclose = () => {
       clearTimeout(giveUp);
@@ -96,6 +98,25 @@ export class Net {
 
   stat(k) {
     this.send({ t: 'stat', k });
+  }
+
+  use(item, on) {
+    this.send({ t: 'use', item, on });
+  }
+
+  wish(i) {
+    this.send({ t: 'wish', i });
+  }
+
+  // 복구 코드로 다른 기기의 구매 내역을 가져오면 기기 번호를 바꿉니다.
+  adoptVisitor(v) {
+    try {
+      localStorage.setItem('haedoti.visitor', v);
+    } catch {
+      /* 저장 불가 */
+    }
+    this.visitor = v;
+    if (this.ws) this.ws.close();
   }
 
   cheer() {
