@@ -84,3 +84,21 @@ test('public 밖의 파일은 읽을 수 없음', async () => {
   const r = await fetch(`http://localhost:${PORT}/..%2fserver.js`);
   assert.notEqual(r.status, 200);
 });
+
+test('하루 통계: 방문 기기 중복 제거, 종류별 상한, 잘못된 종류 무시', async () => {
+  const a = await client();
+  a.send(JSON.stringify({ t: 'hello', visitor: 'statvisitor01' }));
+  for (let i = 0; i < 8; i++) a.send(JSON.stringify({ t: 'stat', k: 'ticket' }));
+  a.send(JSON.stringify({ t: 'stat', k: 'hack' }));
+  const b = await client();
+  b.send(JSON.stringify({ t: 'hello', visitor: 'statvisitor01' })); // 같은 기기
+  await wait(300);
+  const s = await (await fetch(`http://localhost:${PORT}/api/stats`)).json();
+  const d = s.days[0];
+  assert.equal(d.ticket, 5);
+  assert.equal(d.visitors, 1);
+  assert.equal(d.hack, undefined);
+  assert.ok(d.peak >= 2);
+  a.close();
+  b.close();
+});

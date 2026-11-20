@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { nextEventAt } from './public/js/sun.js';
+import { nextEventAt, dateKey } from './public/js/sun.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -26,14 +26,56 @@ const WITNESS_BEFORE_MS = 30 * 60 * 1000; // 이벤트 30분 전부터
 const WITNESS_AFTER_MS = 20 * 60 * 1000; // 이벤트 20분 후까지 자리에 있으면 "함께 본 사람"
 
 // ---------- 집계 저장 (함성 수, 함께 본 사람 수) ----------
-let counts = { cheers: {}, witnesses: {} };
+let counts = { cheers: {}, witnesses: {}, daily: {} };
 try {
-  counts = { cheers: {}, witnesses: {}, ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) };
+  counts = { cheers: {}, witnesses: {}, daily: {}, ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) };
 } catch {
   /* 처음 실행이면 파일이 없습니다 */
 }
 const witnessSets = new Map(); // eventKey -> Set(visitorId)
 let countsDirty = false;
+
+// ---------- 하루 통계 (개인정보 없이 숫자만) ----------
+// visitors: 하루 동안 접속한 기기 수 (기기마다 만든 무작위 번호로 중복 제거, 번호 자체는 저장하지 않음)
+const STAT_KINDS = ['ticket', 'card', 'save', 'preview'];
+const dailyVisitors = new Map(); // dateKey -> Set(visitorId)  (메모리에만, 하루 지나면 지움)
+function today() {
+  return dateKey(new Date());
+}
+function dayStats(key = today()) {
+  if (!counts.daily[key]) {
+    counts.daily[key] = { visitors: 0, peak: 0, ticket: 0, card: 0, save: 0, preview: 0, cheer: 0, ritual: 0 };
+    // 오래된 날짜(60일 넘은 것) 정리
+    const keys = Object.keys(counts.daily).sort();
+    while (keys.length > 60) delete counts.daily[keys.shift()];
+    for (const k of dailyVisitors.keys()) if (k !== key) dailyVisitors.delete(k);
+  }
+  return counts.daily[key];
+}
+function bump(field, n = 1) {
+  dayStats()[field] += n;
+  countsDirty = true;
+}
+function countVisitor(visitor) {
+  const key = today();
+  let set = dailyVisitors.get(key);
+  if (!set) {
+    set = new Set();
+    dailyVisitors.set(key, set);
+  }
+  if (set.has(visitor)) return;
+  set.add(visitor);
+  const d = dayStats(key);
+  d.visitors = Math.max(d.visitors, set.size);
+  countsDirty = true;
+}
+function notePeak() {
+  const d = dayStats();
+  if (clients.size > d.peak) {
+    d.peak = clients.size;
+    countsDirty = true;
+  }
+}
 
 function saveCounts() {
   if (!countsDirty) return;
@@ -214,6 +256,20 @@ function handle(c, msg) {
       joinRoom(c, msg.room);
       return;
     }
+    case 'hello': {
+      if (c.helloed) return;
+      c.helloed = true;
+      if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
+      countVisitor(c.visitor);
+      return;
+    }
+    case 'stat': {
+      // 승차권 발급·인증 카드 만들기 등. 한 연결에서 종류별로 최대 5번까지만 셉니다.
+      if (!STAT_KINDS.includes(msg.k)) return;
+      c.stats[msg.k] = (c.stats[msg.k] || 0) + 1;
+      if (c.stats[msg.k] <= 5) bump(msg.k);
+      return;
+    }
     case 'leave':
       leaveRoom(c);
       return;
@@ -225,6 +281,7 @@ function handle(c, msg) {
       if (ev) {
         counts.cheers[ev.key] = (counts.cheers[ev.key] || 0) + 1;
         countsDirty = true;
+        bump('cheer');
       }
       if (c.seat <= PEOPLE_IN_SNAPSHOT) room.fx.push(['cheer', c.seat]);
       room.dirty = true;
@@ -234,6 +291,7 @@ function handle(c, msg) {
       // 풍등(정동진) / 종이배(정서진). 적은 글은 서버로 보내지 않습니다.
       if (c.seat == null || now - c.lastRitual < 8000) return;
       c.lastRitual = now;
+      bump('ritual');
       if (c.seat <= PEOPLE_IN_SNAPSHOT) rooms[c.room].fx.push(['ritual', c.seat]);
       return;
     }
@@ -265,6 +323,23 @@ const server = http.createServer((req, res) => {
     );
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
     res.end(JSON.stringify({ online: clients.size, seats: SEATS, rooms: body }));
+    return;
+  }
+  if (url.pathname === '/api/stats') {
+    const days = Object.keys(counts.daily).sort().reverse().slice(0, 30);
+    const total = { visitors: 0, ticket: 0, card: 0, save: 0, preview: 0, cheer: 0, ritual: 0, peak: 0 };
+    for (const k of Object.keys(counts.daily)) {
+      const d = counts.daily[k];
+      for (const f of Object.keys(total)) total[f] = f === 'peak' ? Math.max(total.peak, d.peak || 0) : total[f] + (d[f] || 0);
+    }
+    const live = Object.fromEntries(
+      Object.values(rooms).map((r) => {
+        const sn = roomSnapshot(r, false);
+        return [r.key, { seated: sn.seated, waiting: sn.waiting, eventKey: sn.eventKey, cheers: sn.cheers, witnesses: sn.witnesses }];
+      }),
+    );
+    res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ now: new Date().toISOString(), online: clients.size, seats: SEATS, live, total, days: days.map((k) => ({ date: k, ...counts.daily[k] })) }));
     return;
   }
   if (url.pathname === '/healthz') {
@@ -323,8 +398,11 @@ wss.on('connection', (ws, req) => {
     lastCheer: 0,
     lastRitual: 0,
     alive: true,
+    helloed: false,
+    stats: {},
   };
   clients.add(c);
+  notePeak();
   send(ws, { t: 'welcome', id: c.id, seats: SEATS });
 
   ws.on('pong', () => {

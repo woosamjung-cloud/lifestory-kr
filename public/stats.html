@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>해돋이호 현황판</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fbf6ee; --card: #ffffff; --ink: #3b2a20; --muted: #8a7363; --line: #eadfce;
+      --accent: #d9534b; --east: #e8574f; --west: #3b6fd8; --ok: #2f9e6a;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --bg: #16120f; --card: #221a17; --ink: #f6ecdc; --muted: #c4b19f; --line: #3a2e28; }
+    }
+    :root[data-theme="dark"] { --bg: #16120f; --card: #221a17; --ink: #f6ecdc; --muted: #c4b19f; --line: #3a2e28; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+    main { max-width: 960px; margin: 0 auto; padding: 20px 16px 40px; }
+    h1 { font-family: "Jua", sans-serif; font-weight: 400; font-size: 30px; margin: 0; }
+    .sub { color: var(--muted); font-size: 14px; margin: 4px 0 18px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); display: inline-block; }
+    .dot.off { background: var(--accent); }
+    h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); font-weight: 400; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .tile { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+    .tile .k { font-size: 13px; color: var(--muted); }
+    .tile .v { font-family: "Jua", sans-serif; font-size: 30px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .tile .h { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+    .tile.east { border-top: 4px solid var(--east); }
+    .tile.west { border-top: 4px solid var(--west); }
+    .table-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
+    th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-weight: 400; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    .note { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-top: 16px; }
+    .empty { padding: 18px; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🌅 해돋이호 현황판</h1>
+  <div class="sub"><span class="dot" id="dot"></span><span id="updated">불러오는 중…</span><span>· 10초마다 새로고침</span></div>
+
+  <h2>지금</h2>
+  <div class="grid">
+    <div class="tile"><div class="k">동시 접속</div><div class="v" id="online">-</div><div class="h" id="seats"></div></div>
+    <div class="tile east"><div class="k">정동진 해돋이</div><div class="v" id="east-seated">-</div><div class="h" id="east-meta"></div></div>
+    <div class="tile west"><div class="k">정서진 해넘이</div><div class="v" id="west-seated">-</div><div class="h" id="west-meta"></div></div>
+  </div>
+
+  <h2>오늘</h2>
+  <div class="grid" id="today"></div>
+
+  <h2>누적</h2>
+  <div class="grid" id="total"></div>
+
+  <h2>날짜별 (최근 30일)</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>날짜</th><th>방문 기기</th><th>최대 동시</th><th>승차권</th><th>인증 카드</th><th>저장·공유</th><th>와!</th><th>풍등·종이배</th></tr></thead>
+    <tbody id="days"></tbody>
+  </table></div>
+
+  <p class="note">
+    개인정보는 모으지 않습니다. 숫자만 셉니다. 방문 기기 수는 기기마다 만든 무작위 번호로 하루 중복만 없앱니다.<br>
+    서버가 다시 시작되면(무료 요금제의 잠자기·재배포 포함) 기록이 초기화될 수 있습니다.<br>
+    정동진·정서진 칸의 "와!"와 "함께 본 사람"은 지금 진행 중인(또는 다음) 해돋이·해넘이 기준입니다.
+  </p>
+</main>
+<script>
+  const fmt = (n) => (n ?? 0).toLocaleString('ko-KR');
+  const $ = (id) => document.getElementById(id);
+  const FIELDS = [
+    ['visitors', '방문 기기'], ['peak', '최대 동시 접속'], ['ticket', '승차권 발급'], ['card', '인증 카드'],
+    ['save', '저장·공유'], ['cheer', '와! 함성'], ['ritual', '풍등·종이배'], ['preview', '미리보기'],
+  ];
+  function tiles(el, obj) {
+    el.innerHTML = '';
+    for (const [k, label] of FIELDS) {
+      const d = document.createElement('div');
+      d.className = 'tile';
+      d.innerHTML = `<div class="k">${label}</div><div class="v">${fmt(obj?.[k])}</div>`;
+      el.append(d);
+    }
+  }
+  function eventLabel(key) {
+    if (!key) return '';
+    const [y, m, d] = key.split('-');
+    return `${Number(m)}/${Number(d)}`;
+  }
+  async function load() {
+    try {
+      const r = await fetch('api/stats', { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      const s = await r.json();
+      $('dot').classList.remove('off');
+      $('updated').textContent = '마지막 갱신 ' + new Date(s.now).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' });
+      $('online').textContent = fmt(s.online);
+      $('seats').textContent = `장소마다 ${fmt(s.seats)}석`;
+      for (const k of ['east', 'west']) {
+        const l = s.live[k];
+        $(k + '-seated').textContent = fmt(l.seated);
+        $(k + '-meta').textContent = `대기 ${fmt(l.waiting)} · ${eventLabel(l.eventKey)} 와! ${fmt(l.cheers)} · 함께 본 사람 ${fmt(l.witnesses)}`;
+      }
+      tiles($('today'), s.days[0] && s.days[0].date === new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) ? s.days[0] : {});
+      tiles($('total'), s.total);
+      const tb = $('days');
+      tb.innerHTML = s.days.length ? '' : '<tr><td colspan="8" class="empty">아직 기록이 없어요</td></tr>';
+      for (const d of s.days) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${d.date}</td>` + ['visitors', 'peak', 'ticket', 'card', 'save', 'cheer', 'ritual'].map((f) => `<td>${fmt(d[f])}</td>`).join('');
+        tb.append(tr);
+      }
+    } catch (e) {
+      $('dot').classList.add('off');
+      $('updated').textContent = '서버에 연결할 수 없어요 (잠시 후 다시 시도)';
+    }
+  }
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>

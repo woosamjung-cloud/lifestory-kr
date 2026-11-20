@@ -53,6 +53,7 @@ export class Net {
       this.connected = true;
       this.retry = 0;
       this.h.onStatus('online');
+      this.send({ t: 'hello', visitor: this.visitor });
       if (this.want) this.send({ t: 'join', ...this.want, visitor: this.visitor });
     };
     ws.onmessage = (e) => {
@@ -91,6 +92,10 @@ export class Net {
   join(room, char, color) {
     this.want = { room, char, color };
     this.send({ t: 'join', ...this.want, visitor: this.visitor });
+  }
+
+  stat(k) {
+    this.send({ t: 'stat', k });
   }
 
   cheer() {
