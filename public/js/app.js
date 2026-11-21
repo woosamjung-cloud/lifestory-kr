@@ -1073,12 +1073,22 @@ canvasEl.addEventListener('pointerup', (e) => {
     lastMoveAt = now;
     scene.walkSelf(pos[0], pos[1]);
     net.move(pos[0], pos[1]);
+    // 처음 일어섰을 때 한 번만: 아래로 쓸면 앉는다고 안내
+    if (!store.get('sitHint', false)) {
+      store.set('sitHint', true);
+      setTimeout(() => {
+        if (!scene.selfUp) return;
+        scene.sitHintUntil = performance.now() + 8000;
+        toast('👇 서 있을 땐 화면을 아래로 쓸어내리면 그 자리에 앉아요');
+      }, 1600);
+    }
     return;
   }
   // 아래로 쓸기 → 그 자리에 앉기
   if (dy > 40 && Math.abs(dy) > Math.abs(dx) * 0.6) {
     if (scene.selfUp) {
       scene.selfUp = false;
+      scene.sitHintUntil = 0;
       net.sit();
     }
     return;

@@ -629,3 +629,7 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
   .home-form .field-label:first-child { margin-top: 0; }
   .home-form .btn.big { margin-top: 14px; }
 }
+
+/* 동전 충전: 다른 버튼과 확실히 구분되는 금빛 */
+.btn.coin-btn { background: linear-gradient(135deg, #ffe08a, #f2b544); color: #5a3508; border-color: #e0a12f; font-weight: 700; box-shadow: 0 3px 10px rgba(226, 165, 59, 0.35); }
+.btn.coin-btn:hover { filter: brightness(1.05); }

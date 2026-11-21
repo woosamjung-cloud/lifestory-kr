@@ -889,6 +889,7 @@ export class Scene {
 
     // 장작·물수제비·하트
     this.drawThrows(ctx, nowMs);
+    this.drawSitHint(ctx, nowMs);
     this.drawHearts(ctx, nowMs);
 
     // 폭죽·동전 소원
@@ -1517,6 +1518,34 @@ export class Scene {
     }
     if (!this.throws) this.throws = [];
     this.throws.push({ kind: 'stone', x0: from.x, y0: from.y - from.s * 0.9, pts, n: bounces, t0: performance.now(), self: isSelf });
+  }
+
+  // 처음 일어섰을 때: 머리 위에서 아래로 은은하게 내려오는 화살표 (앉으면 사라짐)
+  drawSitHint(ctx, t) {
+    if (!this.sitHintUntil || !this.selfUp || t > this.sitHintUntil) return;
+    const sl = this.mySlot;
+    if (!sl || sl.walking) return;
+    const left = (this.sitHintUntil - t) / 1000;
+    const fadeAll = clamp(left / 1.2) * clamp((8 - left) / 0.8);
+    const s = Math.max(sl.s, 30); // 멀리 있어도 잘 보이게 최소 크기
+    const x = sl.x;
+    const top = sl.y - sl.s * 2.6 - s * 1.5; // '나' 표시 위쪽
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(2, s * 0.07);
+    for (let i = 0; i < 3; i++) {
+      const ph = ((t / 1400 + i / 3) % 1);
+      const y = top + ph * s * 0.9;
+      const a = Math.sin(ph * Math.PI) * 0.85 * fadeAll;
+      ctx.strokeStyle = `rgba(255,240,215,${a})`;
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.18, y);
+      ctx.lineTo(x, y + s * 0.14);
+      ctx.lineTo(x + s * 0.18, y);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   drawThrows(ctx, t) {
