@@ -1548,3 +1548,20 @@ requestAnimationFrame(frame);
 // 개발·시험용
 window.__haedoti = { state, scene, net, solarPosition, EVENT_AFTERGLOW_MS, setClock, ambience };
 window.__showSay = showSay;
+
+// 첫 화면 제목을 한 줄에 꽉 차게: 넘치면 글자 크기를 줄이고, 남으면 원래 크기까지 키움
+function fitHomeTitle() {
+  const el = $('home-title');
+  if (!el || !el.offsetParent) return;
+  el.style.fontSize = '';
+  const max = parseFloat(getComputedStyle(el).fontSize);
+  let size = max;
+  for (let i = 0; i < 30 && el.scrollWidth > el.clientWidth + 1 && size > 24; i++) {
+    size -= 2;
+    el.style.fontSize = `${size}px`;
+  }
+}
+fitHomeTitle();
+addEventListener('resize', fitHomeTitle);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHomeTitle);
+if (document.fonts) document.fonts.addEventListener?.('loadingdone', fitHomeTitle);
