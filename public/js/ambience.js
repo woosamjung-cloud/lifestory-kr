@@ -127,6 +127,61 @@ export class Ambience {
   }
 
   // 타닥: 아주 짧은 고역 잡음 조각
+  // 불 크기(0.35~1.2)에 따라 타닥 소리의 크기와 빈도
+  setFire(level) {
+    this.fireLevel = level;
+    if (this.crackleBus) this.crackleBus.gain.setTargetAtTime(0.18 + 0.4 * level, this.ctx.currentTime, 1.5);
+  }
+
+  // 장작 넣기: 툭 떨어지는 소리 → 화르륵 불길 → 2~3초간 타닥타닥
+  woodIn() {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // 툭 (나무가 숯불 위에 떨어지는 둔탁한 소리)
+    const s = ctx.createBufferSource();
+    s.buffer = this.noise;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 320;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    s.connect(lp).connect(g).connect(this.master);
+    s.start(t, Math.random() * 4, 0.25);
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(140, t);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.15);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.3, t + 0.005);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(og).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.2);
+    // 화르륵 (불길이 살아나는 바람 소리)
+    const w = ctx.createBufferSource();
+    w.buffer = this.noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 0.8;
+    bp.frequency.setValueAtTime(400, t + 0.1);
+    bp.frequency.exponentialRampToValueAtTime(1400, t + 0.9);
+    const wg = ctx.createGain();
+    wg.gain.setValueAtTime(0.0001, t + 0.1);
+    wg.gain.exponentialRampToValueAtTime(0.35, t + 0.6);
+    wg.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    w.connect(bp).connect(wg).connect(this.master);
+    w.start(t + 0.1, Math.random() * 3, 1.8);
+    // 타닥타닥 (점점 잦아들며 2~3초)
+    for (let k = 0; k < 22; k++) {
+      const d = 150 + k * 110 + Math.random() * 120;
+      this.timers.push(setTimeout(() => this.on && this.scheduleOneCrackle(0.9 - k * 0.03), d));
+    }
+  }
+
   scheduleCrackle() {
     if (!this.on) return;
     const ctx = this.ctx;
@@ -148,7 +203,7 @@ export class Ambience {
       s.connect(hp).connect(g).connect(this.crackleBus);
       s.start(at, Math.random() * 5, dur + 0.02);
     }
-    this.timers.push(setTimeout(() => this.scheduleCrackle(), 60 + Math.random() * 520));
+    this.timers.push(setTimeout(() => this.scheduleCrackle(), (60 + Math.random() * 520) / Math.max(0.4, this.fireLevel || 0.8)));
   }
 
   // 동전이 물에 떨어지는 '퐁당'

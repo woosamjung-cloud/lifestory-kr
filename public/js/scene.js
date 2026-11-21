@@ -883,6 +883,7 @@ export class Scene {
     ctx.restore();
     // 불빛이 가까운 사람들을 따뜻하게 비춤
     this.drawFireLight(ctx, fire, nowMs, fireNight);
+    this.drawFuelHint(ctx, fire, nowMs);
 
     // 내 이름표
     if (this.self && !this.selfStanding) {
@@ -977,8 +978,40 @@ export class Scene {
     return 0.82 + 0.1 * Math.sin(t / 97 + k) + 0.06 * Math.sin(t / 41 + k * 2.3) + 0.04 * Math.sin(t / 23 + k * 5.1);
   }
 
+  // 불 크기 배율: 장작이 많을수록 크게 (0.35~1.2)
+  fuelK() {
+    const f = this.fuel == null ? 0.8 : this.fuel;
+    return 0.35 + 0.65 * Math.min(1, f) + 0.2 * Math.max(0, f - 1);
+  }
+
+  // 장작 한 개 넣기
+  addFuel(amount = 0.35) {
+    this.fuel = Math.min(1.4, (this.fuel == null ? 0.8 : this.fuel) + amount);
+  }
+
+  // 불이 약해지면 모닥불 옆에 '🪵 장작' 표시가 천천히 깜빡임
+  drawFuelHint(ctx, f, t) {
+    if (this.fuel == null || this.fuel > 0.3 || this.selfStanding) return;
+    const a = (0.45 + 0.35 * Math.sin(t / 900)) * clamp((0.3 - this.fuel) / 0.1);
+    const txt = '🪵 장작';
+    ctx.save();
+    ctx.font = `700 ${Math.max(11, f.s * 0.2)}px "Gowun Batang", serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(txt).width + 14;
+    const x = f.x;
+    const y = f.y - f.s * 1.05;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(255,246,230,0.9)';
+    roundRect(ctx, x - w / 2, y - 10, w, 20, 10);
+    ctx.fill();
+    ctx.fillStyle = '#6b3b10';
+    ctx.fillText(txt, x, y + 1);
+    ctx.restore();
+  }
+
   drawFireGlow(ctx, f, t, night) {
-    const fl = this.flicker(t);
+    const fl = this.flicker(t) * (0.55 + 0.45 * this.fuelK());
     const R = f.s * (2 + night * 1.8) * fl;
     const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
     g.addColorStop(0, `rgba(255,160,70,${(0.12 + 0.38 * night) * fl})`);
@@ -992,7 +1025,7 @@ export class Scene {
 
   drawFireLight(ctx, f, t, night) {
     if (night < 0.15) return;
-    const fl = this.flicker(t, 1);
+    const fl = this.flicker(t, 1) * (0.55 + 0.45 * this.fuelK());
     const R = f.s * 2.6 * fl;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -1070,7 +1103,7 @@ export class Scene {
       tongues.push([-0.24, 0.5, 0.1, 6.3], [0.24, 0.48, 0.1, 7.9], [0.04, 1.0, 0.13, 9.1]);
     }
     for (const [ox, hh, ww, k] of tongues) {
-      const h = s * hh * (0.75 + 0.25 * Math.sin(t / (150 + k * 30) + k) + 0.1 * Math.sin(t / 53 + k * 3)) * (1 + (this.fireBoost || 0));
+      const h = s * hh * (0.75 + 0.25 * Math.sin(t / (150 + k * 30) + k) + 0.1 * Math.sin(t / 53 + k * 3)) * (1 + (this.fireBoost || 0)) * this.fuelK();
       const w = s * ww;
       const sway = Math.sin(t / 310 + k) * s * 0.06 + Math.sin(t / 89 + k * 2) * s * 0.025;
       const bx = x + ox * s;
@@ -1109,7 +1142,10 @@ export class Scene {
     const dt = this._fireT ? Math.min(0.1, (t - this._fireT) / 1000) : 0;
     this._fireT = t;
     this.fireBoost = Math.max(0, (this.fireBoost || 0) - dt * 0.35);
-    if (Math.random() < dt * (this.selfItems.bigfire ? 22 : 9) * (1 + (this.fireBoost || 0) * 4)) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
+    // 장작(연료): 가득 찬 불이 약 4분에 걸쳐 서서히 줄고, 꺼지지는 않고 작은 불씨로 남음
+    if (this.fuel == null) this.fuel = 0.8;
+    this.fuel = Math.max(0.12, this.fuel - dt / 240);
+    if (Math.random() < dt * (this.selfItems.bigfire ? 22 : 9) * this.fuelK() * (1 + (this.fireBoost || 0) * 4)) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
     this.embers = this.embers.filter((e) => {
       e.life += dt;
       if (e.life > e.max) return false;
@@ -1618,7 +1654,8 @@ export class Scene {
         if (!th.landed) {
           th.landed = true;
           this.fireBoost = Math.min(1.2, (this.fireBoost || 0) + (th.self ? 0.7 : 0.35));
-          if (this.onWood) this.onWood();
+          if (th.self) this.addFuel(0.35);
+          if (this.onWood) this.onWood(th.self);
         }
         return false;
       }

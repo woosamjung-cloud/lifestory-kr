@@ -1207,7 +1207,27 @@ function addWood() {
   net.wood();
 }
 
-scene.onWood = () => ambience.on && ambience.boom && ambience.scheduleOneCrackle && [0, 60, 130, 220].forEach((d) => setTimeout(() => ambience.on && ambience.scheduleOneCrackle(0.6), d));
+// 장작이 불에 닿는 순간: 내 장작이면 툭·화르륵·타닥타닥, 다른 사람 장작은 작게 타닥
+scene.onWood = (self) => {
+  if (!ambience.on) return;
+  if (self) return ambience.woodIn();
+  [0, 60, 130, 220].forEach((d) => setTimeout(() => ambience.on && ambience.scheduleOneCrackle(0.5), d));
+};
+// 불 크기 저장 (다시 들어와도 지난 시간만큼 줄어든 상태로 이어짐)
+{
+  const saved = store.get('fuel', null);
+  if (saved && typeof saved.f === 'number') scene.fuel = Math.max(0.12, Math.min(1.4, saved.f - (Date.now() - saved.at) / 240000));
+  let warned = false;
+  setInterval(() => {
+    store.set('fuel', { f: scene.fuel, at: Date.now() });
+    ambience.setFire && ambience.setFire(scene.fuelK());
+    if (!warned && state.screen === 'ride' && scene.fuel < 0.3 && !store.get('fuelHint', false)) {
+      warned = true;
+      store.set('fuelHint', true);
+      toast('🔥 불이 약해졌어요. 모닥불을 눌러 장작을 넣어 주세요');
+    }
+  }, 5000);
+}
 scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick());
 
 // ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------
