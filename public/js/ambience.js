@@ -187,6 +187,82 @@ export class Ambience {
     o.stop(t + 0.1);
   }
 
+  // 기차: 역 안내 차임(딩-동-댕) → 철컥철컥 지나가는 바퀴 소리 + 멀리서 부드러운 기적
+  // (실제 철도 안내음을 흉내 내지 않은, 직접 만든 소리)
+  train(seconds = 3.2) {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.05;
+    // 차임: 맑은 종소리 세 음
+    [[659.25, 0], [523.25, 0.42], [783.99, 0.84]].forEach(([f, dt]) => {
+      for (const [mul, a] of [[1, 0.09], [2.01, 0.025], [3.02, 0.01]]) {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = f * mul;
+        g.gain.setValueAtTime(0.0001, t0 + dt);
+        g.gain.exponentialRampToValueAtTime(a, t0 + dt + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 1.6);
+        o.connect(g).connect(this.master);
+        o.start(t0 + dt);
+        o.stop(t0 + dt + 1.7);
+      }
+    });
+    // 바퀴: 이음매를 지날 때마다 '철-컥' (두 번씩), 다가왔다 멀어지게
+    const tw = t0 + 1.2;
+    const beat = 0.36;
+    const n = Math.floor(seconds / beat);
+    for (let i = 0; i < n; i++) {
+      const env = Math.sin((i / (n - 1)) * Math.PI) ** 1.5; // 가까워졌다 멀어짐
+      for (const off of [0, 0.11]) {
+        const t = tw + i * beat + off;
+        const s = ctx.createBufferSource();
+        s.buffer = this.noise;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = off ? 1400 : 900;
+        bp.Q.value = 2.5;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.0001 + 0.32 * env, t + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+        s.connect(bp).connect(g).connect(this.master);
+        s.start(t, Math.random() * 4, 0.12);
+      }
+    }
+    // 레일 위를 구르는 낮은 웅웅거림
+    const r = ctx.createBufferSource();
+    r.buffer = this.noise;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 260;
+    const rg = ctx.createGain();
+    rg.gain.setValueAtTime(0.0001, tw);
+    rg.gain.exponentialRampToValueAtTime(0.25, tw + seconds * 0.45);
+    rg.gain.exponentialRampToValueAtTime(0.0001, tw + seconds);
+    r.connect(lp).connect(rg).connect(this.master);
+    r.start(tw, Math.random() * 2, seconds + 0.1);
+    // 멀리서 들리는 부드러운 기적 (짧게 한 번)
+    const tv = tw + 0.3;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, tv);
+    g.gain.exponentialRampToValueAtTime(0.03, tv + 0.15);
+    g.gain.setValueAtTime(0.03, tv + 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, tv + 1.2);
+    const wlp = ctx.createBiquadFilter();
+    wlp.type = 'lowpass';
+    wlp.frequency.value = 1500;
+    for (const f of [440, 554.37]) {
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      o.connect(wlp);
+      o.start(tv);
+      o.stop(tv + 1.3);
+    }
+    wlp.connect(g).connect(this.master);
+  }
+
   // 멀리서 터지는 폭죽 '펑'
   boom() {
     if (!this.on) return;

@@ -16,6 +16,7 @@ import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare, downloadCanvas, shareImage } from './cards.js';
 import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
 import { Ambience } from './ambience.js';
+import { Music } from './music.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -83,6 +84,7 @@ state.profile.color = Math.abs(Number(state.profile.color) || 0) % 8;
 
 const scene = new Scene($('scene'));
 const ambience = new Ambience();
+const music = new Music();
 
 // ---------- 서버 ----------
 const net = new Net({
@@ -574,6 +576,8 @@ function playTrain(ev) {
   $('train-text').textContent = `${place.name}행 ${ev.kind === 'sunrise' ? '해돋이호' : '해넘이호'}가 출발합니다`;
   const ov = $('train');
   ov.hidden = false;
+  // 기차 소리 (소리가 켜져 있을 때만, 탑승 직후엔 소리가 켜질 때까지 잠깐 기다림)
+  setTimeout(() => ambience.train(), 250);
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   setTimeout(() => {
     ov.hidden = true;
@@ -1349,7 +1353,35 @@ $('toggle-sound').addEventListener('click', async () => {
   }
   soundButton();
 });
-document.addEventListener('visibilitychange', () => ambience.setHidden(document.hidden));
+document.addEventListener('visibilitychange', () => {
+  ambience.setHidden(document.hidden);
+  music.setHidden(document.hidden);
+});
+
+// ---------- 음악 (기본은 꺼짐, 시간대에 맞는 분위기) ----------
+function musicMood() {
+  const sun = scene.sunInfo();
+  if (sun.elevation < -7) return 'night';
+  return state.event && PLACES[state.event.place].kind === 'sunset' ? 'sunset' : 'sunrise';
+}
+function musicButton() {
+  $('toggle-music').setAttribute('aria-pressed', String(music.on));
+  $('toggle-music').title = music.on ? '음악 끄기' : '음악 켜기';
+}
+$('toggle-music').addEventListener('click', async () => {
+  if (music.on) {
+    music.stop();
+    store.set('music', false);
+    toast('🎵 음악을 껐어요');
+  } else {
+    music.setMood(musicMood());
+    await music.start();
+    store.set('music', true);
+    toast('🎵 잔잔한 음악을 틀었어요');
+  }
+  musicButton();
+});
+setInterval(() => music.on && music.setMood(musicMood()), 15000);
 setInterval(soundButton, 1000);
 
 // ---------- 별자리 보기 (기본은 끔, 기기에 기억) ----------
