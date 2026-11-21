@@ -144,6 +144,14 @@ test('상점: 테스트 결제로 아이템·동전 지급, 금액 위조 거부
   const o2 = await post('/api/shop/order', { visitor, product: 'coins10' });
   const c2 = await post('/api/shop/confirm', { orderId: o2.body.orderId, paymentKey: 'test', amount: 1000 });
   assert.equal(c2.body.wallet.coins, 11);
+  // 큰 묶음은 내 동전에 쌓이고, 상품 정보에 정가·할인 근거가 있음
+  const o3 = await post('/api/shop/order', { visitor, product: 'coins130' });
+  assert.equal(o3.body.amount, 10000);
+  const c3 = await post('/api/shop/confirm', { orderId: o3.body.orderId, paymentKey: 'test', amount: 10000 });
+  assert.equal(c3.body.wallet.coins, 141);
+  const tiers = Object.values(info.products).filter((p) => p.group === 'coins').sort((x, y) => x.price - y.price);
+  assert.ok(tiers.length >= 4);
+  for (let i = 1; i < tiers.length; i++) assert.ok(tiers[i].price / tiers[i].coins <= tiers[i - 1].price / tiers[i - 1].coins, '많이 살수록 개당 가격이 같거나 싸야 함');
   // 없는 상품
   assert.equal((await post('/api/shop/order', { visitor, product: 'free' })).status, 400);
   // 복구 코드
@@ -151,7 +159,7 @@ test('상점: 테스트 결제로 아이템·동전 지급, 금액 위조 거부
   assert.match(code, /^[A-Z0-9]{5}-[A-Z0-9]{5}$/);
   const rest = await post('/api/shop/restore', { code: code.toLowerCase() });
   assert.equal(rest.body.visitor, visitor);
-  assert.equal(rest.body.wallet.coins, 11);
+  assert.equal(rest.body.wallet.coins, 141);
 });
 
 test('동전 소원은 동전을 쓰고 모두에게 전달, 아이템이 없으면 사용 불가', async () => {
@@ -203,11 +211,34 @@ test('응원 한마디: 정해진 문구만, 10초에 한 번만 전달', async 
   a.send(JSON.stringify({ t: 'say', i: 1 }));
   a.send(JSON.stringify({ t: 'say', i: 2 })); // 연타 → 무시
   a.send(JSON.stringify({ t: 'say', i: 999 })); // 없는 문구 → 무시
-  a.send(JSON.stringify({ t: 'say', text: '자유 글' })); // 자유 글 → 무시
+  a.send(JSON.stringify({ t: 'say', text: '자유 글' })); // 10초 안에 또 → 무시
   await wait(800);
   const says = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list).filter(([k]) => k === 'say');
   assert.equal(says.length, 1);
   assert.equal(says[0][2], 1);
+  a.close();
+  b.close();
+});
+
+test('직접 쓴 한마디: 15자·필터 통과 시 전달, 10분에 한 번, 남은 시간 안내', async () => {
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'hello', visitor: 'customsay01' }));
+  a.send(JSON.stringify({ t: 'join', room: 'east', char: 'coat', color: 0, visitor: 'customsay01' }));
+  b.send(JSON.stringify({ t: 'join', room: 'east', char: 'hood', color: 1 }));
+  await wait(600);
+  a.send(JSON.stringify({ t: 'say', text: '010-1234-5678' })); // 연락처 → 거절
+  await wait(300);
+  assert.ok(last(a, 'sayno').error);
+  a.send(JSON.stringify({ t: 'say', text: '노을 정말 예쁘다' }));
+  await wait(600);
+  assert.ok(last(a, 'sayok').next > Date.now() + 9 * 60e3);
+  const says = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list).filter(([k]) => k === 'say');
+  assert.equal(says.length, 1);
+  assert.equal(says[0][2], -1);
+  assert.equal(says[0][4], '노을 정말 예쁘다');
+  a.send(JSON.stringify({ t: 'say', text: '열여섯글자가넘는아주긴한마디입니다요' }));
+  await wait(300);
+  assert.ok(last(a, 'sayno'));
   a.close();
   b.close();
 });

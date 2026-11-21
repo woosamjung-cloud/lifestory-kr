@@ -3,6 +3,7 @@
 // - WebSocket(/ws)으로 좌석, 대기열, "와!" 함성, 풍등·유리병 편지 효과를 실시간으로 나눕니다.
 // 실행: npm install && npm start  (기본 주소 http://localhost:3000)
 
+import { cleanCustom, CUSTOM_GAP_MS } from './saycheck.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -113,6 +114,13 @@ const rooms = Object.fromEntries(
 let nextId = 1;
 const clients = new Set();
 const perIp = new Map();
+const customSayAt = new Map(); // visitor → 마지막으로 직접 쓴 한마디 시각
+const customSayIp = new Map(); // ip → 최근 1시간 직접 쓴 한마디 시각들
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, t] of customSayAt) if (now - t > CUSTOM_GAP_MS) customSayAt.delete(k);
+  for (const [k, l] of customSayIp) if (!l.some((t) => now - t < 3600e3)) customSayIp.delete(k);
+}, 600e3).unref();
 
 function clientIp(req) {
   // Render 등 프록시 뒤에서는 x-forwarded-for 의 첫 번째 주소가 실제 접속자입니다.
@@ -397,6 +405,25 @@ function handle(c, msg) {
       return;
     }
     case 'say': {
+      // 직접 쓴 한마디: 15자 이내, 기기당 10분에 한 번(같은 IP는 1시간에 20번까지), 욕설·연락처·링크 거름
+      if (msg.text != null) {
+        if (c.seat == null) return;
+        if (now - (c.lastSay || 0) < 10000) return send(c.ws, { t: 'sayno', error: '한마디는 10초에 한 번 할 수 있어요' });
+        const lastAt = customSayAt.get(c.visitor) || 0;
+        if (now - lastAt < CUSTOM_GAP_MS) return send(c.ws, { t: 'sayno', wait: CUSTOM_GAP_MS - (now - lastAt) });
+        const ipHits = (customSayIp.get(c.ip) || []).filter((t) => now - t < 3600e3);
+        if (ipHits.length >= 20) return send(c.ws, { t: 'sayno', error: '잠시 후 다시 보내 주세요' });
+        const r = cleanCustom(msg.text);
+        if (r.error) return send(c.ws, { t: 'sayno', error: r.error });
+        customSayAt.set(c.visitor, now);
+        ipHits.push(now);
+        customSayIp.set(c.ip, ipHits);
+        c.lastSay = now;
+        bump('say');
+        send(c.ws, { t: 'sayok', next: now + CUSTOM_GAP_MS });
+        rooms[c.room].fx.push(['say', c.seat, -1, shop.sayWeight(c.visitor), r.text]);
+        return;
+      }
       // 응원 한마디: 정해진 문구만, 10초에 한 번
       const i = Number(msg.i);
       if (c.seat == null || !Number.isInteger(i) || i < 0 || i >= shop.SAYINGS.length) return;
@@ -576,6 +603,7 @@ wss.on('connection', (ws, req) => {
   const c = {
     id: nextId++,
     ws,
+    ip,
     visitor: 'anon' + Math.random().toString(36).slice(2, 12),
     room: null,
     seat: null,

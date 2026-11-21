@@ -187,10 +187,40 @@
 
   <!-- 상점 -->
   <dialog id="shopdlg" class="modal shop-modal">
-    <h3>상점</h3>
+    <div class="shop-head">
+      <button class="shop-back" id="shop-back" hidden aria-label="상점 처음으로">‹</button>
+      <h3 id="shop-title">상점</h3>
+      <div class="coin-chip">🪙 <b id="shop-coins">0</b></div>
+    </div>
     <p class="test-banner" id="shop-test" hidden>🧪 지금은 <b>테스트 결제</b>예요. 실제로 돈이 나가지 않아요.</p>
-    <div class="coin-line">내 동전 <b id="shop-coins">0</b>개</div>
-    <div class="product-list" id="product-list"></div>
+
+    <!-- 처음: 큰 두 갈래 -->
+    <div class="shop-view" id="shop-main">
+      <button class="shop-door coins" id="door-coins">
+        <span class="door-ico">🪙</span>
+        <span class="door-name">소원 동전 충전</span>
+        <span class="door-sub">많이 살수록 덤이 커져요 · 최대 <b id="door-max">23</b>% 할인</span>
+        <span class="door-own">내 동전 <b id="door-coins-n">0</b>개</span>
+      </button>
+      <button class="shop-door items" id="door-items">
+        <span class="door-ico">🎁</span>
+        <span class="door-name">아이템</span>
+        <span class="door-sub">촛불 · 후레쉬 · 폭죽 · 큰 캠프파이어</span>
+        <span class="door-own" id="door-items-n">가진 아이템 0개</span>
+      </button>
+    </div>
+
+    <!-- 소원 동전 -->
+    <div class="shop-view" id="shop-coins-view" hidden>
+      <p class="muted small">동전 1개로 소원을 모두의 하늘에 띄울 수 있어요. 산 동전은 <b>내 동전</b>에 바로 쌓여요.</p>
+      <div class="coin-tiers" id="coin-tiers"></div>
+    </div>
+
+    <!-- 아이템 -->
+    <div class="shop-view" id="shop-items-view" hidden>
+      <div class="item-grid" id="item-grid"></div>
+      <div class="item-detail" id="item-detail" hidden></div>
+    </div>
     <details class="restore-box">
       <summary>다른 기기로 옮기기 · 구매 복구</summary>
       <p class="muted small">회원가입 없이 이 기기에 구매 내역이 저장돼요. 휴대폰을 바꾸거나 다른 기기에서 쓰려면 복구 코드를 적어 두세요.</p>

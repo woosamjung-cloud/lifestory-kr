@@ -15,14 +15,18 @@ import crypto from 'node:crypto';
 const DAY = 86400000;
 
 // 판매 상품 (가격은 서버에서만 정함 - 화면에서 바꿔도 소용없음)
+export const COIN_PRICE = 100; // 소원 동전 1개 정가
 export const PRODUCTS = {
-  candle: { name: '촛불 (30일)', price: 1000, grants: { items: ['candle'] }, icon: '🕯️', desc: '내 자리 앞에 촛불이 일렁여요' },
-  flash: { name: '후레쉬 (30일)', price: 1000, grants: { items: ['flash'] }, icon: '🔦', desc: '손전등으로 밤바다를 은은하게 비춰요' },
-  fireworks: { name: '폭죽 (30일)', price: 2000, grants: { items: ['fireworks'] }, icon: '🎆', desc: '하늘에 불꽃놀이, 모든 사람 화면에 보여요' },
-  bigfire: { name: '큰 캠프파이어 (30일)', price: 2900, grants: { items: ['bigfire'] }, icon: '🔥', desc: '더 크고 화려한 색 불꽃' },
-  package: { name: '연말 패키지 (30일)', price: 4900, grants: { items: ['candle', 'flash', 'fireworks', 'bigfire'], coins: 5 }, icon: '🎁', desc: '네 가지 아이템 + 동전 5개' },
-  coins10: { name: '소원 동전 11개', price: 1000, grants: { coins: 11 }, icon: '🪙', desc: '동전 10개 + 덤 1개' },
-  coins33: { name: '소원 동전 35개', price: 3000, grants: { coins: 35 }, icon: '🪙', desc: '동전 30개 + 덤 5개' },
+  candle: { group: 'items', name: '촛불', price: 1000, grants: { items: ['candle'] }, icon: '🕯️', desc: '내 자리 앞에 촛불이 일렁여요. 켜고 끌 수 있어요.' },
+  flash: { group: 'items', name: '후레쉬', price: 1000, grants: { items: ['flash'] }, icon: '🔦', desc: '손전등으로 밤바다를 은은하게 비춰요.' },
+  fireworks: { group: 'items', name: '폭죽', price: 2000, grants: { items: ['fireworks'] }, icon: '🎆', desc: '하늘에 불꽃놀이! 함께 보는 모든 사람 화면에 보여요.' },
+  bigfire: { group: 'items', name: '큰 캠프파이어', price: 2900, grants: { items: ['bigfire'] }, icon: '🔥', desc: '내 모닥불이 더 크고 화려한 색으로 타올라요.' },
+  package: { group: 'items', name: '모두 담은 꾸러미', price: 4900, grants: { items: ['candle', 'flash', 'fireworks', 'bigfire'], coins: 5 }, icon: '🎁', desc: '네 가지 아이템을 한 번에 + 소원 동전 5개 덤.' },
+  coins5: { group: 'coins', name: '소원 동전 5개', price: 500, grants: { coins: 5 }, icon: '🪙', desc: '가볍게 한두 번' },
+  coins10: { group: 'coins', name: '소원 동전 11개', price: 1000, grants: { coins: 11 }, icon: '🪙', desc: '10개 + 덤 1개' },
+  coins33: { group: 'coins', name: '소원 동전 35개', price: 3000, grants: { coins: 35 }, icon: '🪙', desc: '30개 + 덤 5개' },
+  coins60: { group: 'coins', name: '소원 동전 60개', price: 5000, grants: { coins: 60 }, icon: '🪙', desc: '50개 + 덤 10개' },
+  coins130: { group: 'coins', name: '소원 동전 130개', price: 10000, grants: { coins: 130 }, icon: '🪙', desc: '100개 + 덤 30개' },
 };
 export const ITEM_KEYS = ['candle', 'flash', 'fireworks', 'bigfire'];
 export const ITEM_DAYS = 30;
@@ -253,7 +257,7 @@ export function shopPublicInfo() {
   return {
     mode: shopMode(),
     clientKey: shopMode() === 'live' ? process.env.TOSS_CLIENT_KEY : null,
-    products: Object.fromEntries(Object.entries(PRODUCTS).map(([k, p]) => [k, { name: p.name, price: p.price, icon: p.icon, desc: p.desc }])),
+    products: Object.fromEntries(Object.entries(PRODUCTS).map(([k, p]) => [k, { group: p.group, name: p.name, price: p.price, icon: p.icon, desc: p.desc, coins: p.grants.coins || 0, items: p.grants.items || [], list: p.group === 'coins' ? p.grants.coins * COIN_PRICE : 0 }])),
     wishes: WISHES,
     sayings: SAYINGS,
     itemDays: ITEM_DAYS,

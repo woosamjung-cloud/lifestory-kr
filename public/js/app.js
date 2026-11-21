@@ -135,12 +135,27 @@ const net = new Net({
   onWallet(w) {
     setWallet(w);
   },
+  onSayResult(m) {
+    if (m.t === 'sayok') {
+      customNext = m.next ? Date.now() + (m.next - Date.now()) : Date.now() + CUSTOM_GAP;
+      store.set('customNext', customNext);
+      return;
+    }
+    // 거절되면 화면에 띄운 내 말 지우고 이유 안내
+    document.querySelectorAll('.say.me.pending').forEach((el) => el.remove());
+    if (m.wait) {
+      customNext = Date.now() + m.wait;
+      store.set('customNext', customNext);
+    } else customNext = 0;
+    toast(m.error ? `💬 ${m.error}` : `💬 직접 쓴 한마디는 10분에 한 번이에요 (${fmtWait(customNext - Date.now())} 남음)`);
+    renderCustomRow();
+  },
   onGotHeart(m) {
     setWallet(m.wallet);
     toast(`❤️ 하트를 선물 받았어요 (모두 ${m.total.toLocaleString('ko-KR')}개)`);
   },
   onNeed(item) {
-    openShop(item === 'coins' ? '소원 동전이 부족해요. 충전해 주세요' : '이 아이템은 기간이 끝났어요');
+    item === 'coins' ? openShop('소원 동전이 부족해요. 충전해 주세요', 'coins') : openShop('이 아이템은 기간이 끝났어요', 'items', item);
   },
   onFx(list) {
     for (const [kind, seat, extra] of list) {
@@ -161,7 +176,9 @@ const net = new Net({
         continue;
       }
       if (kind === 'say') {
-        if (shopInfo && shopInfo.sayings[extra]) showSay(shopInfo.sayings[extra], false, list.find((f) => f[0] === 'say' && f[1] === seat)?.[3] || 1);
+        const f = list.find((x) => x[0] === 'say' && x[1] === seat && x[2] === extra);
+        const text = extra === -1 ? f && f[4] : shopInfo && shopInfo.sayings[extra];
+        if (text && seat !== state.seat) showSay(text, false, (f && f[3]) || 1);
         continue;
       }
       if (kind === 'wish') {
@@ -607,7 +624,7 @@ $('ritual-form').addEventListener('submit', (e) => {
   if (publicWish != null && myWallet.coins < 1) {
     e.preventDefault();
     $('ritual').close();
-    openShop('소원 동전이 부족해요. 충전해 주세요');
+    openShop('소원 동전이 부족해요. 충전해 주세요', 'coins');
     return;
   }
   state.wish = $('ritual-text').value.trim().slice(0, 40);
@@ -746,33 +763,124 @@ function fmtDate(ms) {
   return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
 }
 
+// 상점: 처음엔 큰 두 갈래(소원 동전 / 아이템), 들어가면 고르고 사기
+let shopView = 'main';
+let shopPick = null;
+const won = (n) => `${n.toLocaleString('ko-KR')}원`;
+const ITEM_ORDER = ['candle', 'flash', 'fireworks', 'bigfire', 'package'];
+
+function setShopView(v, pick = null) {
+  shopView = v;
+  shopPick = pick;
+  renderProducts();
+}
+
 function renderProducts() {
-  const list = $('product-list');
-  list.innerHTML = '';
+  const P = shopInfo.products;
+  if (!P) return;
   $('shop-test').hidden = shopInfo.mode !== 'test';
-  for (const [key, p] of Object.entries(shopInfo.products)) {
-    const row = document.createElement('div');
-    row.className = 'product';
-    const until = owned(key) ? `<div class="p-own">✓ ${fmtDate(myWallet.items[key])}까지 사용 가능</div>` : '';
-    row.innerHTML = `<div class="p-ico">${p.icon}</div><div><div class="p-name"></div><div class="p-desc"></div>${until}</div>`;
-    row.querySelector('.p-name').textContent = p.name;
-    row.querySelector('.p-desc').textContent = p.desc;
-    const b = document.createElement('button');
-    b.className = 'btn primary';
-    b.textContent = `${p.price.toLocaleString('ko-KR')}원`;
-    b.addEventListener('click', () => buy(key, b));
-    row.append(b);
-    list.append(row);
+  $('shop-coins').textContent = myWallet.coins;
+  $('shop-main').hidden = shopView !== 'main';
+  $('shop-coins-view').hidden = shopView !== 'coins';
+  $('shop-items-view').hidden = shopView !== 'items';
+  $('shop-back').hidden = shopView === 'main';
+  $('shopdlg').classList.toggle('sub', shopView !== 'main');
+  $('shop-title').textContent = shopView === 'coins' ? '소원 동전 충전' : shopView === 'items' ? '아이템' : '상점';
+
+  const coinKeys = Object.keys(P).filter((k) => P[k].group === 'coins').sort((a, b) => P[a].price - P[b].price);
+  const off = (p) => (p.list ? Math.round((1 - p.price / p.list) * 100) : 0);
+  if (shopView === 'main') {
+    $('door-coins-n').textContent = myWallet.coins;
+    $('door-max').textContent = Math.max(0, ...coinKeys.map((k) => off(P[k])));
+    const have = ITEM_ORDER.filter((k) => k !== 'package' && owned(k)).length;
+    $('door-items-n').textContent = have ? `가진 아이템 ${have}개` : '아직 가진 아이템이 없어요';
+  }
+
+  if (shopView === 'coins') {
+    const box = $('coin-tiers');
+    box.innerHTML = '';
+    const best = coinKeys.reduce((m, k) => (off(P[k]) > off(P[m]) ? k : m), coinKeys[0]);
+    for (const k of coinKeys) {
+      const p = P[k];
+      const row = document.createElement('div');
+      row.className = 'tier' + (k === best ? ' best' : '');
+      const d = off(p);
+      row.innerHTML = `<div class="t-coins">🪙 <b></b>개</div><div class="t-info"><span class="t-desc"></span><span class="t-unit"></span></div><div class="t-buy"><span class="t-off"></span><s class="t-list"></s></div>`;
+      row.querySelector('.t-coins b').textContent = p.coins;
+      row.querySelector('.t-desc').textContent = p.desc;
+      row.querySelector('.t-unit').textContent = `개당 ${Math.round(p.price / p.coins)}원`;
+      row.querySelector('.t-off').textContent = d > 0 ? `${d}% 할인` : '';
+      row.querySelector('.t-off').hidden = d <= 0;
+      row.querySelector('.t-list').textContent = d > 0 ? won(p.list) : '';
+      const b = document.createElement('button');
+      b.className = 'btn primary';
+      b.textContent = won(p.price);
+      b.addEventListener('click', () => buy(k, b));
+      row.querySelector('.t-buy').append(b);
+      if (k === best) {
+        const tag = document.createElement('span');
+        tag.className = 't-tag';
+        tag.textContent = '가장 이득';
+        row.append(tag);
+      }
+      box.append(row);
+    }
+  }
+
+  if (shopView === 'items') {
+    const grid = $('item-grid');
+    const det = $('item-detail');
+    grid.innerHTML = '';
+    for (const k of ITEM_ORDER) {
+      const p = P[k];
+      if (!p) continue;
+      const own = k !== 'package' && owned(k);
+      const b = document.createElement('button');
+      b.className = 'item-card' + (shopPick === k ? ' on' : '') + (own ? ' own' : '') + (k === 'package' ? ' wide' : '');
+      b.innerHTML = `<span class="ic-ico">${p.icon}</span><span class="ic-name"></span><span class="ic-price"></span>`;
+      b.querySelector('.ic-name').textContent = p.name;
+      b.querySelector('.ic-price').textContent = own ? '✓ 사용 중' : won(p.price);
+      b.addEventListener('click', () => setShopView('items', shopPick === k ? null : k));
+      grid.append(b);
+    }
+    det.hidden = !shopPick;
+    if (shopPick) {
+      const p = P[shopPick];
+      const own = shopPick !== 'package' && owned(shopPick);
+      const sum = shopPick === 'package' ? p.items.reduce((t, k) => t + P[k].price, 0) : 0;
+      det.innerHTML = `<div class="id-top"><span class="id-ico">${p.icon}</span><div><div class="id-name"></div><div class="id-desc"></div></div></div><ul class="id-facts"></ul>`;
+      det.querySelector('.id-name').textContent = p.name;
+      det.querySelector('.id-desc').textContent = p.desc;
+      const facts = [`${shopInfo.itemDays || 30}일 동안 사용 · 다시 사면 기간이 늘어나요`];
+      if (own) facts.unshift(`✓ ${fmtDate(myWallet.items[shopPick])}까지 사용 중`);
+      if (sum) facts.push(`따로 사면 ${won(sum)} → ${Math.round((1 - p.price / sum) * 100)}% 할인`);
+      for (const f of facts) {
+        const li = document.createElement('li');
+        li.textContent = f;
+        det.querySelector('.id-facts').append(li);
+      }
+      const b = document.createElement('button');
+      b.className = 'btn primary wide';
+      b.textContent = `${won(p.price)} ${own ? '· 기간 늘리기' : '· 구매하기'}`;
+      b.addEventListener('click', () => buy(shopPick, b));
+      det.append(b);
+      requestAnimationFrame(() => det.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    }
   }
 }
 
-function openShop(msg) {
+// view: 'main' | 'coins' | 'items', pick: 아이템 키
+function openShop(msg, view = 'main', pick = null) {
   if (!shopInfo || shopInfo.mode === 'off') return;
-  renderProducts();
+  setShopView(view, pick);
   if ($('wishdlg').open) $('wishdlg').close();
   if (!$('shopdlg').open) $('shopdlg').showModal();
   if (msg) toast(msg);
 }
+
+$('door-coins').addEventListener('click', () => setShopView('coins'));
+$('door-items').addEventListener('click', () => setShopView('items'));
+$('shop-back').addEventListener('click', () => setShopView('main'));
 
 async function buy(product, btn) {
   btn.disabled = true;
@@ -808,8 +916,19 @@ async function confirmPayment(q) {
   const r = await fetch('api/shop/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(q) });
   const res = await r.json();
   if (!r.ok) throw new Error(res.error || '결제 확인 실패');
+  const before = myWallet.coins;
   setWallet(res.wallet);
-  toast(res.test ? '🧪 테스트 구매 완료! 아이템이 생겼어요' : '🎉 구매 완료! 아이템이 생겼어요');
+  const got = res.wallet.coins - before;
+  const head = res.test ? '🧪 테스트 구매 완료!' : '🎉 구매 완료!';
+  if (got > 0 && shopView === 'coins') {
+    toast(`${head} 🪙 동전 ${got}개가 들어왔어요 · 내 동전 ${res.wallet.coins}개`);
+    const chip = document.querySelector('.coin-chip');
+    if (chip) {
+      chip.classList.remove('pop');
+      void chip.offsetWidth;
+      chip.classList.add('pop');
+    }
+  } else toast(`${head} 아이템이 생겼어요${got > 0 ? ` · 동전 ${got}개 덤` : ''}`);
 }
 
 function loadScript(src) {
@@ -847,7 +966,7 @@ function renderWishes() {
 
 function throwCoin(i) {
   if (myWallet.coins < 1) {
-    openShop('소원 동전이 부족해요. 충전해 주세요');
+    openShop('소원 동전이 부족해요. 충전해 주세요', 'coins');
     return;
   }
   if (state.seat == null && state.netStatus === 'online') {
@@ -871,7 +990,7 @@ $('act-wish').addEventListener('click', () => {
   $('wishdlg').showModal();
 });
 $('wish-close').addEventListener('click', () => $('wishdlg').close());
-$('wish-buy').addEventListener('click', () => openShop());
+$('wish-buy').addEventListener('click', () => openShop(null, 'coins'));
 $('open-shop').addEventListener('click', () => openShop());
 $('menu-shop').addEventListener('click', () => {
   $('menu').close();
@@ -882,7 +1001,7 @@ $('shop-close').addEventListener('click', () => $('shopdlg').close());
 document.querySelectorAll('.item-btn[data-item]').forEach((b) =>
   b.addEventListener('click', () => {
     const k = b.dataset.item;
-    if (!owned(k)) return openShop();
+    if (!owned(k)) return openShop(null, 'items', k);
     if (k === 'candle' || k === 'bigfire') {
       itemShow[k] = !itemShow[k];
       store.set('show.' + k, itemShow[k]);
@@ -1036,28 +1155,112 @@ function showSay(text, me, w = 1) {
   log.append(el);
   while (log.children.length > 7) log.firstChild.remove(); // 한꺼번에 많이 오면 오래된 것부터 정리
   setTimeout(() => el.remove(), dur * 1000 + 200);
+  return el;
+}
+// ---------- 한마디: 고르기 · 랜덤 · 직접 쓰기(15자, 10분에 한 번) ----------
+const CUSTOM_GAP = 10 * 60 * 1000;
+let customNext = store.get('customNext', 0);
+let customTimer = null;
+function fmtWait(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+function canSay() {
+  const wait = 10000 - (Date.now() - lastSay);
+  if (wait > 0) return toast(`한마디는 10초에 한 번 할 수 있어요 (${Math.ceil(wait / 1000)}초 뒤)`), false;
+  if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 할 수 있어요'), false;
+  return true;
+}
+function sayPreset(i) {
+  $('saypick').hidden = true;
+  if (!canSay()) return;
+  lastSay = Date.now();
+  showSay(shopInfo.sayings[i], true, myWeight());
+  net.say(i);
+}
+function renderCustomRow() {
+  const row = $('saypick').querySelector('.say-custom');
+  if (!row) return;
+  const left = customNext - Date.now();
+  const input = row.querySelector('input');
+  const btn = row.querySelector('button');
+  const note = row.querySelector('.say-note');
+  const locked = left > 0;
+  input.disabled = locked;
+  btn.disabled = locked;
+  note.textContent = locked ? `⏳ 다음 한마디까지 ${fmtWait(left)}` : `직접 쓰기 · ${[...input.value].length}/15자 · 10분에 한 번`;
+  note.classList.toggle('wait', locked);
+  clearTimeout(customTimer);
+  if (locked && !$('saypick').hidden) customTimer = setTimeout(renderCustomRow, 1000);
+}
+function placeSayPick() {
+  const pick = $('saypick');
+  // PC: 한마디 버튼 바로 위에 붙여서
+  if (innerWidth >= 900) {
+    const r = $('open-say').getBoundingClientRect();
+    pick.classList.add('anchored');
+    pick.style.left = 'auto';
+    pick.style.right = `${Math.max(12, innerWidth - r.right)}px`;
+    pick.style.bottom = `${innerHeight - r.top + 10}px`;
+  } else {
+    pick.classList.remove('anchored');
+    pick.style.left = pick.style.right = pick.style.bottom = '';
+  }
 }
 $('open-say').addEventListener('click', () => {
   const pick = $('saypick');
   if (!pick.hidden) return (pick.hidden = true);
   if (!shopInfo) return toast('잠시 후 다시 눌러 주세요');
   pick.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'say-grid';
   shopInfo.sayings.forEach((text, i) => {
     const b = document.createElement('button');
     b.textContent = text;
-    b.addEventListener('click', () => {
-      pick.hidden = true;
-      const wait = 10000 - (Date.now() - lastSay);
-      if (wait > 0) return toast(`한마디는 10초에 한 번 할 수 있어요 (${Math.ceil(wait / 1000)}초 뒤)`);
-      if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 할 수 있어요');
-      lastSay = Date.now();
-      showSay(text, true, myWeight());
-      net.say(i);
-    });
-    pick.append(b);
+    b.addEventListener('click', () => sayPreset(i));
+    grid.append(b);
   });
+  pick.append(grid);
+  const rnd = document.createElement('button');
+  rnd.className = 'say-random';
+  rnd.textContent = '🎲 아무 말이나 (랜덤 한마디)';
+  rnd.addEventListener('click', () => sayPreset(Math.floor(Math.random() * shopInfo.sayings.length)));
+  pick.append(rnd);
+  const row = document.createElement('form');
+  row.className = 'say-custom';
+  row.innerHTML = '<div class="say-in"><input maxlength="15" placeholder="직접 쓰기 (15자)" enterkeyhint="send" autocomplete="off"><button class="btn primary" type="submit">보내기</button></div><div class="say-note"></div>';
+  const input = row.querySelector('input');
+  input.addEventListener('input', () => {
+    // 글자 수는 한글 기준으로 15자
+    const chars = [...input.value];
+    if (chars.length > 15) input.value = chars.slice(0, 15).join('');
+    renderCustomRow();
+  });
+  row.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = input.value.replace(/\s+/g, ' ').trim();
+    if (!text) return input.focus();
+    if (customNext > Date.now()) return renderCustomRow();
+    if (!canSay()) return;
+    lastSay = Date.now();
+    customNext = Date.now() + CUSTOM_GAP;
+    store.set('customNext', customNext);
+    const el = showSay(text, true, myWeight());
+    if (el) {
+      el.classList.add('pending');
+      setTimeout(() => el.classList.remove('pending'), 3000);
+    }
+    net.sayText(text);
+    input.value = '';
+    renderCustomRow();
+    toast(`💬 보냈어요 · 다음 직접 한마디는 10분 뒤 (${fmtWait(CUSTOM_GAP)})`);
+  });
+  pick.append(row);
+  placeSayPick();
   pick.hidden = false;
+  renderCustomRow();
 });
+addEventListener('resize', () => !$('saypick').hidden && placeSayPick());
 // 바깥을 누르면 문구 고르기 닫기
 document.addEventListener('click', (e) => {
   const pick = $('saypick');

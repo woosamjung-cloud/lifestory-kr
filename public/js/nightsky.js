@@ -29,8 +29,9 @@ function starSprite(rgb, size, spikes) {
   // 부드러운 빛무리
   const halo = g.createRadialGradient(R, R, 0, R, R, R);
   halo.addColorStop(0, `rgba(${rgb},1)`);
-  halo.addColorStop(0.12, `rgba(${rgb},0.85)`);
-  halo.addColorStop(0.3, `rgba(${rgb},0.22)`);
+  halo.addColorStop(0.12, `rgba(${rgb},0.95)`);
+  halo.addColorStop(0.32, `rgba(${rgb},0.38)`);
+  halo.addColorStop(0.6, `rgba(${rgb},0.08)`);
   halo.addColorStop(1, `rgba(${rgb},0)`);
   g.fillStyle = halo;
   g.fillRect(0, 0, R * 2, R * 2);
@@ -142,19 +143,29 @@ export class NightSky {
       for (let i = 0; i < STARS.length; i++) {
         const [ra, dec, mag, bv] = STARS[i];
         // 어두운 별은 하늘이 충분히 어두울 때만
-        if (mag > 2.8 + vis * 2.0) continue;
+        if (mag > 3.0 + vis * 2.3) continue;
         const h = equToHor(ra, dec, place.lat, lst);
         if (h.alt < 0.5) continue;
         const p = this.project(h.alt, h.az, v);
         if (p.x < -4 || p.x > v.W + 4 || p.y < -4) continue;
-        const size = Math.max(0.6, (5.2 - mag) * 0.38);
+        const size = Math.max(0.85, (5.6 - mag) * 0.5);
         // 지평선 가까이는 대기에 가려 흐려짐
         const ext = clamp(h.alt / 12, 0.25, 1);
-        const tw = 0.75 + 0.25 * Math.sin(nowMs / (380 + (i % 7) * 90) + i);
-        const a = clamp(vis * ext * tw * (mag < 2.5 ? 1.1 : 0.9));
-        const spr = starSprite(starColor(bv), Math.round(size * 4) / 4, mag < 1.6);
+        const tw = 0.8 + 0.2 * Math.sin(nowMs / (380 + (i % 7) * 90) + i);
+        // 가끔 반짝 빛나는 순간
+        const flick = Math.sin(nowMs / 1900 + i * 12.9898);
+        const spark = flick > 0.985 ? (flick - 0.985) / 0.015 : 0;
+        const a = clamp(vis * ext * tw * (mag < 2.5 ? 1.35 : 1.1) + spark * 0.5 * vis);
+        const spr = starSprite(starColor(bv), Math.round(size * (1 + spark * 0.5) * 4) / 4, mag < 2.2 || spark > 0.6);
         ctx.globalAlpha = a;
         ctx.drawImage(spr, p.x - spr.width / 2, p.y - spr.height / 2);
+        // 밝은 별은 빛을 한 번 더 겹쳐 또렷하게
+        if (mag < 1.5) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = a * 0.6;
+          ctx.drawImage(spr, p.x - spr.width / 2, p.y - spr.height / 2);
+          ctx.globalCompositeOperation = 'source-over';
+        }
         ctx.globalAlpha = 1;
       }
       ctx.restore();

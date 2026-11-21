@@ -77,6 +77,7 @@ export class Net {
       else if (m.t === 'wallet' && this.h.onWallet) this.h.onWallet(m.wallet);
       else if (m.t === 'need' && this.h.onNeed) this.h.onNeed(m.item);
       else if (m.t === 'gotheart' && this.h.onGotHeart) this.h.onGotHeart(m);
+      else if ((m.t === 'sayok' || m.t === 'sayno') && this.h.onSayResult) this.h.onSayResult(m);
     };
     ws.onclose = () => {
       clearTimeout(giveUp);
@@ -143,6 +144,10 @@ export class Net {
 
   say(i) {
     this.send({ t: 'say', i });
+  }
+
+  sayText(text) {
+    this.send({ t: 'say', text });
   }
 
   cheer() {
