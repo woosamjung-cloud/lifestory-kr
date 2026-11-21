@@ -888,11 +888,10 @@ function drawFace(ctx, x, gm, s, hairColor) {
   ctx.stroke();
 }
 
-// 옆모습 걷기 (왼쪽·오른쪽)
+// 옆모습 걷기 (왼쪽·오른쪽): 오른쪽을 보는 모습으로 그리고, 왼쪽은 거울처럼 뒤집음
 function drawWalkerSide(ctx, o) {
-  const { x, y, s, type = 'blanket', color = 0, bright = 1, still = false } = o;
+  const { x: X, y, s, type = 'blanket', color = 0, bright = 1, still = false } = o;
   const t = still ? 0 : o.t || 0;
-  const d = o.face === 'left' ? -1 : 1;
   const [base, accent] = BLANKETS[color % BLANKETS.length];
   const hairColor = o.hair != null && HAIRS[o.hair] ? HAIRS[o.hair][1] : HAIR[(color + type.length) % HAIR.length];
   const ph = t / 150;
@@ -901,8 +900,11 @@ function drawWalkerSide(ctx, o) {
   if (bright < 0.999) ctx.filter = `brightness(${bright.toFixed(2)})`;
   ctx.fillStyle = 'rgba(30,18,12,0.18)';
   ctx.beginPath();
-  ctx.ellipse(x, y + s * 0.01, s * 0.26, s * 0.045, 0, 0, Math.PI * 2);
+  ctx.ellipse(X, y + s * 0.01, s * 0.26, s * 0.045, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.translate(X, 0);
+  if (o.face === 'left') ctx.scale(-1, 1);
+  const x = 0;
   const hipY = y - s * 0.5 - bob;
   // 다리: 앞뒤로 엇갈림
   ctx.lineCap = 'round';
@@ -913,11 +915,11 @@ function drawWalkerSide(ctx, o) {
     ctx.strokeStyle = off === 0 ? '#3a3640' : '#2c2930';
     ctx.beginPath();
     ctx.moveTo(x, hipY);
-    ctx.lineTo(x + swing * d, y - lift);
+    ctx.lineTo(x + swing, y - lift);
     ctx.stroke();
     ctx.fillStyle = '#2a2628';
     ctx.beginPath();
-    ctx.ellipse(x + swing * d + d * s * 0.03, y - lift, s * 0.07, s * 0.03, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + swing + s * 0.03, y - lift, s * 0.07, s * 0.03, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   // 몸
@@ -931,57 +933,89 @@ function drawWalkerSide(ctx, o) {
   ctx.lineTo(x - s * (type === 'blanket' ? 0.22 : 0.16), hemY);
   ctx.closePath();
   ctx.fill();
-  // 팔: 앞뒤로 흔들기
+  // 팔
   ctx.strokeStyle = `color-mix(in srgb, ${base} 85%, black)`;
   ctx.lineWidth = s * 0.08;
   const asw = Math.sin(ph) * s * 0.12;
   ctx.beginPath();
   ctx.moveTo(x, shY + s * 0.08);
-  ctx.lineTo(x - asw * d, shY + s * 0.44);
+  ctx.lineTo(x - asw, shY + s * 0.44);
   ctx.stroke();
-  // 머리: 옆얼굴
+  // 머리: 오른쪽을 보는 옆얼굴
   const hr = s * 0.17;
+  const hx = x + hr * 0.08;
   const hy = shY - s * 0.17;
   ctx.fillStyle = '#ecc9b0';
   ctx.beginPath();
-  ctx.arc(x + d * hr * 0.08, hy, hr, 0, Math.PI * 2);
+  ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+  ctx.fill();
+  // 코
+  ctx.beginPath();
+  ctx.ellipse(hx + hr * 0.95, hy + hr * 0.12, hr * 0.14, hr * 0.11, 0, 0, Math.PI * 2);
   ctx.fill();
   if (type === 'hood') {
     ctx.fillStyle = base;
     ctx.beginPath();
-    ctx.arc(x - d * hr * 0.1, hy - hr * 0.05, hr * 1.12, d > 0 ? Math.PI * 0.55 : -Math.PI * 0.45, d > 0 ? Math.PI * 1.75 : Math.PI * 0.75);
+    ctx.arc(hx - hr * 0.12, hy - hr * 0.04, hr * 1.14, Math.PI * 0.45, Math.PI * 1.85);
+    ctx.quadraticCurveTo(hx + hr * 0.55, hy - hr * 0.2, hx + hr * 0.25, hy + hr * 0.9);
+    ctx.closePath();
     ctx.fill();
   } else {
+    // 머리카락: 뒤통수와 정수리, 이마 쪽 앞머리
     ctx.fillStyle = hairColor;
     ctx.beginPath();
-    ctx.arc(x - d * hr * 0.12, hy - hr * 0.1, hr * 1.02, d > 0 ? Math.PI * 0.6 : -Math.PI * 0.6, d > 0 ? Math.PI * 1.95 : Math.PI * 0.05 + Math.PI * 0.35);
+    ctx.arc(hx - hr * 0.06, hy - hr * 0.06, hr * 1.04, Math.PI * 0.62, Math.PI * 1.9);
+    ctx.quadraticCurveTo(hx + hr * 0.75, hy - hr * 0.55, hx + hr * 0.2, hy - hr * 0.25);
+    ctx.quadraticCurveTo(hx - hr * 0.1, hy + hr * 0.2, hx - hr * 0.45, hy + hr * 0.95);
+    ctx.closePath();
     ctx.fill();
-    if (type === 'blanket') ctx.fillRect(x - d * hr * 1.0 - (d > 0 ? 0 : -hr * 0.0), hy, d * hr * 0.9, s * 0.32);
-    if (type === 'coat') {
+    if (type === 'blanket') {
+      // 긴 머리: 등 뒤로 흘러내림
       ctx.beginPath();
-      ctx.arc(x - d * hr * 0.6, hy - hr * 0.9, hr * 0.4, 0, Math.PI * 2);
+      ctx.moveTo(hx - hr * 1.02, hy);
+      ctx.quadraticCurveTo(hx - hr * 1.15, hy + s * 0.25, hx - hr * 0.7, hy + s * 0.34);
+      ctx.lineTo(hx - hr * 0.15, hy + s * 0.3);
+      ctx.lineTo(hx - hr * 0.3, hy + hr * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    } else if (type === 'scarf') {
+      // 단발
+      ctx.beginPath();
+      ctx.moveTo(hx - hr * 1.02, hy);
+      ctx.lineTo(hx - hr * 0.95, hy + hr * 1.05);
+      ctx.lineTo(hx - hr * 0.2, hy + hr * 1.0);
+      ctx.lineTo(hx - hr * 0.3, hy + hr * 0.5);
+      ctx.closePath();
+      ctx.fill();
+    } else if (type === 'coat') {
+      ctx.beginPath();
+      ctx.arc(hx - hr * 0.85, hy - hr * 0.55, hr * 0.38, 0, Math.PI * 2);
       ctx.fill();
     }
   }
   if (type === 'beanie') {
     ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.arc(x, hy - hr * 0.1, hr * 1.06, Math.PI, 0);
+    ctx.arc(hx - hr * 0.05, hy - hr * 0.12, hr * 1.06, Math.PI * 0.95, Math.PI * 1.98);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(hx - hr * 0.2, hy - hr * 1.15, hr * 0.26, 0, Math.PI * 2);
     ctx.fill();
   }
   if (type === 'scarf') {
     ctx.fillStyle = accent;
     ctx.fillRect(x - s * 0.12, shY - s * 0.02, s * 0.24, s * 0.08);
-    ctx.fillRect(x - d * s * 0.14, shY, s * 0.06, s * 0.22);
+    ctx.fillRect(x - s * 0.14, shY, s * 0.06, s * 0.22); // 뒤로 늘어진 자락
   }
-  // 눈과 코
+  // 눈과 볼
   ctx.fillStyle = '#2b1d16';
   ctx.beginPath();
-  ctx.arc(x + d * hr * 0.55, hy + hr * 0.05, Math.max(0.8, hr * 0.09), 0, Math.PI * 2);
+  ctx.arc(hx + hr * 0.55, hy + hr * 0.02, Math.max(0.8, hr * 0.09), 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = 'rgba(235,130,130,0.45)';
   ctx.beginPath();
-  ctx.ellipse(x + d * hr * 0.45, hy + hr * 0.38, hr * 0.15, hr * 0.08, 0, 0, Math.PI * 2);
+  ctx.ellipse(hx + hr * 0.42, hy + hr * 0.38, hr * 0.15, hr * 0.08, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
