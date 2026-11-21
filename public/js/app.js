@@ -512,7 +512,7 @@ $('board-form').addEventListener('submit', async (e) => {
 $('save-ticket').addEventListener('click', async () => {
   if (!ticketCanvas) return;
   net.stat('save');
-  const r = await saveOrShare(ticketCanvas, 'haedoti-ticket.png', '방구석 해돋이호 승차권 🎫 잠옷 입고 같이 해 보러 가요!');
+  const r = await saveOrShare(ticketCanvas, 'haedoji-ticket.png', '방구석 해돋이호 승차권 🎫 잠옷 입고 같이 해 보러 가요!');
   if (r === 'downloaded') toast('승차권 이미지를 저장했어요');
 });
 
@@ -626,7 +626,7 @@ $('card-close').addEventListener('click', () => $('card').close());
 $('card-save').addEventListener('click', async () => {
   if (!cardCanvas) return;
   net.stat('save');
-  const r = await saveOrShare(cardCanvas, 'haedoti-card.png', '방구석 해돋이호에서 해를 봤어요 🌅');
+  const r = await saveOrShare(cardCanvas, 'haedoji-card.png', '방구석 해돋이호에서 해를 봤어요 🌅');
   if (r === 'downloaded') toast('인증 카드를 저장했어요');
 });
 
