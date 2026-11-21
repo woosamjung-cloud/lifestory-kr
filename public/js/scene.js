@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritterFast, drawPet, drawWalker, drawPettingArm } from './characters.js';
+import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS } from './characters.js';
 import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -859,7 +859,22 @@ export class Scene {
       if (p.pet) {
         const pt = this.pettingAt(sl, nowMs, hopT <= 0 && !celebrating);
         drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5), petted: pt.pet });
-        if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs });
+        if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs, petSize: (BREEDS[p.pet] || BREEDS[1]).size });
+        // 내 친구 이름 (내 화면에만)
+        if (p.me && p.petName) {
+          const sz = (BREEDS[p.pet] || BREEDS[1]).size;
+          ctx.font = `700 ${Math.max(10, sl.s * 0.15)}px "Gowun Batang", serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const lx = sl.x + sl.s * 0.62;
+          const ly = sl.y - sl.s * 0.42 * sz * 1.25 - sl.s * 0.12;
+          const tw = ctx.measureText(p.petName).width + 12;
+          ctx.fillStyle = 'rgba(255,248,236,0.85)';
+          roundRect(ctx, lx - tw / 2, ly - 9, tw, 18, 9);
+          ctx.fill();
+          ctx.fillStyle = '#5a3a28';
+          ctx.fillText(p.petName, lx, ly + 1);
+        }
       }
       const candle = p.me ? this.selfItems.candle : p.flags & 1;
       if (candle) this.drawCandle(ctx, sl.x - sl.s * 0.62, sl.y, sl.s, nowMs);

@@ -11,7 +11,7 @@ import {
   solarPosition,
 } from './sun.js';
 import { Scene } from './scene.js';
-import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait } from './characters.js';
+import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait, renderPetPortrait } from './characters.js';
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare, downloadCanvas, shareImage } from './cards.js';
 import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
@@ -65,7 +65,7 @@ const store = {
 
 const state = {
   screen: 'home',
-  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0) },
+  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0), petName: store.get('petName', '') },
   placeMode: 'auto', // auto | east | west
   event: null,
   netStatus: 'connecting',
@@ -469,18 +469,22 @@ function buildPicker() {
   });
   const prow = $('pet-row');
   prow.innerHTML = '';
-  PETS.forEach(([name, ico], i) => {
+  PETS.forEach(([name], i) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'pet-opt';
     b.setAttribute('role', 'radio');
-    b.textContent = ico ? `${ico} ${name}` : name;
+    b.innerHTML = '<canvas aria-hidden="true"></canvas><span></span>';
+    b.querySelector('span').textContent = name;
+    b.title = name;
     b.addEventListener('click', () => {
       state.profile.pet = i;
       refreshPicker();
     });
     prow.append(b);
+    requestAnimationFrame(() => renderPetPortrait(b.querySelector('canvas'), i));
   });
+  $('petname').value = state.profile.petName;
   $('nick').value = state.profile.name;
   refreshPicker();
 }
@@ -494,6 +498,7 @@ function refreshPicker() {
   document.querySelectorAll('#color-row .swatch').forEach((b, i) => b.setAttribute('aria-checked', String(i === state.profile.color)));
   document.querySelectorAll('#hair-row .swatch').forEach((b, i) => b.setAttribute('aria-checked', String(i === state.profile.hair)));
   document.querySelectorAll('.pet-opt').forEach((b, i) => b.setAttribute('aria-checked', String(i === state.profile.pet)));
+  $('petname-wrap').hidden = !state.profile.pet;
 }
 
 function show(screen) {
@@ -526,6 +531,8 @@ $('board-form').addEventListener('submit', async (e) => {
   store.set('color', state.profile.color);
   store.set('hair', state.profile.hair);
   store.set('pet', state.profile.pet);
+  state.profile.petName = $('petname').value.trim().slice(0, 8);
+  store.set('petName', state.profile.petName);
 
   // 승차권에 실제 좌석 번호를 넣기 위해 먼저 자리를 잡습니다.
   state.joined = true;

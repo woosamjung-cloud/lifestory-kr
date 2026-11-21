@@ -276,7 +276,7 @@ function handle(c, msg) {
       c.char = CHARS.includes(msg.char) ? msg.char : CHARS[0];
       c.color = Number.isInteger(msg.color) ? Math.abs(msg.color) % 8 : 0;
       c.hair = Number.isInteger(msg.hair) ? Math.abs(msg.hair) % 6 : 0;
-      c.pet = Number.isInteger(msg.pet) ? Math.abs(msg.pet) % 3 : 0;
+      c.pet = Number.isInteger(msg.pet) ? Math.abs(msg.pet) % 10 : 0; // 0 없음, 1~9 품종 (characters.js BREEDS)
       if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
       joinRoom(c, msg.room);
       return;

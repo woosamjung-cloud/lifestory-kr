@@ -71,6 +71,10 @@
 
         <span class="field-label" id="pet-label">함께 온 친구</span>
         <div class="pet-row" id="pet-row" role="radiogroup" aria-labelledby="pet-label"></div>
+        <div class="petname-wrap" id="petname-wrap" hidden>
+          <label class="field-label" for="petname">친구 이름 <span class="muted">(선택, 내 화면에만 보여요)</span></label>
+          <input id="petname" maxlength="8" placeholder="예) 콩이" autocomplete="off">
+        </div>
 
         <button type="submit" class="btn primary big" id="get-ticket">승차권 받기</button>
       </form>
