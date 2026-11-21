@@ -282,11 +282,12 @@ function renderEventTexts() {
   $('hud-special').textContent = ev.special ? `✨ ${ev.special}` : '';
   $('ritual-ico').textContent = east ? '🏮' : '🍾';
   $('ritual-name').textContent = place.ritual;
-  $('ritual-title').textContent = east ? '오늘의 다짐 풍등' : '내려놓기 유리병';
+  $('ritual-title').textContent = east ? '소원 풍등' : '내려놓기 유리병';
   $('ritual-desc').textContent = east
-    ? '오늘 하루, 새로 해 볼 한 가지를 적어 하늘로 띄워요.'
+    ? '소원을 담아서 띄워 보세요.'
     : '오늘 묵은 마음, 털어버리고 싶은 걸 적어 바다로 보내요.';
-  $('ritual-text').placeholder = east ? '예) 오늘은 먼저 웃으며 인사하기' : '예) 아까 그 말, 마음에 두지 말자';
+  $('ritual-text').placeholder = east ? '예) 우리 가족 모두 건강하길' : '예) 아까 그 말, 마음에 두지 말자';
+  $('pw-what').textContent = east ? '풍등에' : '유리병에';
   $('preview-start').textContent = east ? '⏩ 해돋이 장면 60초 미리보기' : '⏩ 해넘이 장면 60초 미리보기';
   document.querySelectorAll('.seg-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.place === state.placeMode)));
 }
@@ -638,7 +639,7 @@ $('ritual-form').addEventListener('submit', (e) => {
   net.ritual(publicWish);
   const place = state.event.place;
   const lantern = PLACES[place].kind === 'sunrise';
-  toast(text ? `${lantern ? '🏮' : '🍾'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 오늘의 다짐이 하늘로 올라가요' : '🍾 내려놓은 마음이 바다로 떠나요');
+  toast(text ? `${lantern ? '🏮' : '🍾'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 소원 풍등이 하늘로 올라가요' : '🍾 내려놓은 마음이 바다로 떠나요');
 });
 
 $('act-card').addEventListener('click', async () => {
@@ -664,7 +665,7 @@ $('card-save').addEventListener('click', async () => {
   if (!cardCanvas) return;
   net.stat('save');
   const r = await saveOrShare(cardCanvas, 'haedoji-card.png', '방구석 해돋이호에서 해를 봤어요 🌅');
-  if (r === 'downloaded') toast('인증 카드를 저장했어요');
+  if (r === 'downloaded') toast('인증 사진을 저장했어요');
 });
 
 $('act-menu').addEventListener('click', () => $('menu').showModal());

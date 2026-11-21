@@ -133,9 +133,9 @@
 
     <nav class="actions" aria-label="할 수 있는 일">
       <button class="act" id="act-cheer"><span class="act-ico">🙌</span><span>와!</span></button>
-      <button class="act" id="act-ritual"><span class="act-ico" id="ritual-ico">🏮</span><span id="ritual-name">다짐 풍등</span></button>
+      <button class="act" id="act-ritual"><span class="act-ico" id="ritual-ico">🏮</span><span id="ritual-name">소원 풍등</span></button>
       <button class="act" id="act-wish"><span class="act-ico">🪙</span><span>동전 소원</span></button>
-      <button class="act" id="act-card"><span class="act-ico">📸</span><span>인증 카드</span></button>
+      <button class="act" id="act-card"><span class="act-ico">📸</span><span>인증 사진</span></button>
       <button class="act" id="act-menu" aria-haspopup="dialog"><span class="act-ico">☰</span><span>더보기</span></button>
     </nav>
   </section>
@@ -158,12 +158,12 @@
   <!-- 소원 풍등 / 유리병 편지 -->
   <dialog id="ritual" class="modal">
     <form method="dialog" id="ritual-form">
-      <h3 id="ritual-title">오늘의 다짐 풍등</h3>
+      <h3 id="ritual-title">소원 풍등</h3>
       <p class="muted small" id="ritual-desc">해 뜨는 하늘에 소원을 띄워 보내요.</p>
       <textarea id="ritual-text" maxlength="40" rows="3" placeholder="예) 올해는 꼭 합격!"></textarea>
-      <p class="fineprint">적은 글은 서버로 보내지 않고, 내 화면과 인증 카드에만 남아요. 다른 승객에게는 불빛만 보여요.</p>
+      <p class="fineprint">작성한 글은 서버에 기록으로 남지 않아요. 내 화면과 인증 사진에만 남아요.<br>다른 분들에게 소원을 공개하고 싶으면 아래 옵션을 사용하시면 됩니다.</p>
       <div class="public-wish" id="public-wish" hidden>
-        <p class="pw-title">🪙 동전 1개로 <b>모두에게 보이는 소원</b> 달기 <span class="muted small">(선택 · 내 동전 <b id="pw-coins">0</b>개)</span></p>
+        <p class="pw-title"><b>+ 옵션</b> : <span id="pw-what">풍등에</span> 소원의 메시지를 추가해서 띄워 보세요. <span class="muted small">(🪙 동전 1개 필요 · 내 동전 <b id="pw-coins">0</b>개)</span></p>
         <div class="pw-chips" id="pw-chips"></div>
       </div>
       <div class="btn-row">
@@ -236,10 +236,10 @@
     <button class="btn wide ghost" id="shop-close">닫기</button>
   </dialog>
 
-  <!-- 인증 카드 -->
+  <!-- 인증 사진 -->
   <dialog id="card" class="modal">
-    <h3>인증 카드</h3>
-    <img id="card-img" alt="인증 카드">
+    <h3>인증 사진</h3>
+    <img id="card-img" alt="인증 사진">
     <div class="btn-row">
       <button class="btn ghost" id="card-close">닫기</button>
       <button class="btn primary" id="card-save">저장·공유</button>
@@ -253,7 +253,7 @@
       <li><b>매일 아침엔 정동진에서 하루를 열고, 저녁엔 정서진에서 하루를 닫아요.</b> 접속한 시각에 맞춰 가장 가까운 해돋이나 해넘이로 자동 안내해요.</li>
       <li>하늘과 해는 <b>실제 일출·일몰 시각</b>에 맞춰 움직여요. (지형에 따라 실제와 1~2분 차이가 날 수 있어요)</li>
       <li><b>🙌 와!</b> 를 누르면 함께 보는 사람들에게 함성이 전해져요.</li>
-      <li><b>🏮 아침엔 오늘의 다짐을 풍등에</b>, <b>🍾 저녁엔 내려놓을 것을 유리병에</b> 담아 보내요. 적은 글은 내 기기에만 남아요.</li>
+      <li><b>🏮 아침엔 소원을 풍등에</b>, <b>🍾 저녁엔 내려놓을 것을 유리병에</b> 담아 보내요. 적은 글은 내 기기에만 남아요.</li>
       <li>자리가 꽉 차면 순서대로 대기해요. 자리가 나면 바로 앉혀 드려요.</li>
       <li><b>👆 모래를 누르면</b> 그 자리로 걸어가요. 앞뒤·옆으로 걸으면 그 방향을 바라봐요.</li>
       <li><b>↓ 아래로 쓸면</b> 그 자리에 앉아요.</li>

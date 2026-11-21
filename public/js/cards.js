@@ -221,7 +221,7 @@ export async function makeProofCard({ sceneCanvas, event, name, witnesses, wish,
 
   // 소원은 해를 가리지 않도록 제목 아래에 글자로만 얹습니다.
   if (wish) {
-    const label = east ? '🏮 오늘의 다짐' : '🍾 바다에 내려놓은 것';
+    const label = east ? '🏮 나의 소원' : '🍾 바다에 내려놓은 것';
     const y0 = witnesses > 1 ? 450 : 380;
     ctx.shadowColor = 'rgba(0,0,0,0.5)';
     ctx.shadowBlur = 12;
