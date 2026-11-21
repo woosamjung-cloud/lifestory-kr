@@ -203,6 +203,12 @@ test('동전 소원 풍등: 동전을 쓰면 소원 번호가 함께 전달, 머
   b.close();
 });
 
+test('정서진 유리병 편지: 공개 문구는 그리운 이에게 보내는 말 목록', async () => {
+  const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=lettertest01`)).json();
+  assert.ok(info.letters.length >= 5);
+  assert.ok(info.letters.every((t) => !info.wishes.includes(t)));
+});
+
 test('응원 한마디: 정해진 문구만, 10초에 한 번만 전달', async () => {
   const [a, b] = await Promise.all([client(), client()]);
   a.send(JSON.stringify({ t: 'join', room: 'west', char: 'coat', color: 0 }));

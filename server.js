@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { nextEventAt, dateKey } from './public/js/sun.js';
+import { nextEventAt, dateKey, PLACES } from './public/js/sun.js';
 import { startWeather, weatherStatus } from './weather.js';
 import * as shop from './shop.js';
 
@@ -438,7 +438,8 @@ function handle(c, msg) {
       if (c.seat == null || now - c.lastRitual < 8000) return;
       // 동전 1개를 쓰면 고른 소원 문구가 풍등·유리병 편지에 적혀 모두에게 보임
       const wi = Number(msg.i);
-      const hasWish = msg.i != null && Number.isInteger(wi) && wi >= 0 && wi < shop.WISHES.length;
+      const wishList = PLACES[c.room] && PLACES[c.room].kind === 'sunset' ? shop.LETTERS : shop.WISHES; // 해넘이 쪽은 그리운 이에게 편지
+      const hasWish = msg.i != null && Number.isInteger(wi) && wi >= 0 && wi < wishList.length;
       if (hasWish && !shop.spendCoin(c.visitor)) {
         send(c.ws, { t: 'need', item: 'coins' });
         return;

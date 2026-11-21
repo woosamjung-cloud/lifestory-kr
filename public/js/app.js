@@ -188,7 +188,7 @@ const net = new Net({
       }
       if (!slot) continue;
       if (kind === 'cheer') scene.cheerAt(slot);
-      else if (kind === 'ritual') scene.ritualAt(slot, false, extra != null && shopInfo ? shopInfo.wishes[extra] : null);
+      else if (kind === 'ritual') scene.ritualAt(slot, false, extra != null && shopInfo ? ritualList()[extra] : null);
       else if (kind === 'flash') scene.flashAt(slot);
     }
   },
@@ -282,12 +282,13 @@ function renderEventTexts() {
   $('hud-special').textContent = ev.special ? `✨ ${ev.special}` : '';
   $('ritual-ico').textContent = east ? '🏮' : '🍾';
   $('ritual-name').textContent = place.ritual;
-  $('ritual-title').textContent = east ? '소원 풍등' : '내려놓기 유리병';
+  $('ritual-title').textContent = east ? '소원 풍등' : '그리운 이에게, 유리병 편지';
   $('ritual-desc').textContent = east
     ? '소원을 담아서 띄워 보세요.'
-    : '오늘 묵은 마음, 털어버리고 싶은 걸 적어 바다로 보내요.';
-  $('ritual-text').placeholder = east ? '예) 우리 가족 모두 건강하길' : '예) 아까 그 말, 마음에 두지 말자';
-  $('pw-what').textContent = east ? '풍등에' : '유리병에';
+    : '보고 싶은 사람에게 짧은 편지를 써서 유리병에 담아 노을 속으로 띄워 보내요.';
+  $('ritual-text').placeholder = east ? '예) 우리 가족 모두 건강하길' : '예) 엄마, 오늘 노을이 참 예뻐요';
+  $('pw-what').textContent = east ? '풍등에 소원의' : '유리병에 마음의';
+  $('pw-note').textContent = east ? '소원을' : '편지를';
   $('preview-start').textContent = east ? '⏩ 해돋이 장면 60초 미리보기' : '⏩ 해넘이 장면 60초 미리보기';
   document.querySelectorAll('.seg-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.place === state.placeMode)));
 }
@@ -592,6 +593,11 @@ $('act-cheer').addEventListener('click', () => {
 });
 
 let publicWish = null; // 동전으로 공개할 소원 문구 번호
+// 해돋이(풍등)는 소원, 해넘이(유리병)는 그리운 이에게 보내는 편지 문구
+function ritualList() {
+  const sunset = state.event && PLACES[state.event.place].kind === 'sunset';
+  return (sunset && shopInfo.letters) || shopInfo.wishes;
+}
 $('act-ritual').addEventListener('click', () => {
   $('ritual-text').value = state.wish;
   publicWish = null;
@@ -602,7 +608,7 @@ $('act-ritual').addEventListener('click', () => {
     $('pw-coins').textContent = myWallet.coins;
     const chips = $('pw-chips');
     chips.innerHTML = '';
-    shopInfo.wishes.forEach((text, i) => {
+    ritualList().forEach((text, i) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'pw-chip';
@@ -629,7 +635,7 @@ $('ritual-form').addEventListener('submit', (e) => {
     return;
   }
   state.wish = $('ritual-text').value.trim().slice(0, 40);
-  const text = publicWish != null ? shopInfo.wishes[publicWish] : null;
+  const text = publicWish != null ? ritualList()[publicWish] : null;
   scene.ritualAt(scene.mySlot, true, text);
   if (text) {
     myWallet.coins -= 1;
@@ -639,7 +645,7 @@ $('ritual-form').addEventListener('submit', (e) => {
   net.ritual(publicWish);
   const place = state.event.place;
   const lantern = PLACES[place].kind === 'sunrise';
-  toast(text ? `${lantern ? '🏮' : '🍾'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 소원 풍등이 하늘로 올라가요' : '🍾 내려놓은 마음이 바다로 떠나요');
+  toast(text ? (lantern ? `🏮 "${text}" 소원이 모두의 하늘에 떠올라요` : `🍾 "${text}" 편지가 모두의 바다에 떠가요`) : lantern ? '🏮 소원 풍등이 하늘로 올라가요' : '🍾 그리운 이에게 편지가 떠나요');
 });
 
 $('act-card').addEventListener('click', async () => {

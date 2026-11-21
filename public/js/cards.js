@@ -172,7 +172,7 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
 
 // 인증 카드: 지금 화면(하늘)을 배경으로
 export async function makeProofCard({ sceneCanvas, event, name, witnesses, wish, focusY }) {
-  await loadGlyphs(`정동진정서진년월일오늘의해돋이해넘이새해첫마지막를함께봤어요방구석에서본사람명나소원바다에띄워보낸것호다짐내려놓은“”·0123456789:,${name || ''}${wish || ''}`);
+  await loadGlyphs(`정동진정서진년월일오늘의해돋이해넘이새해첫마지막를함께봤어요방구석에서본사람명나소원바다에띄워보낸것호다짐내려놓은그리운이게“”·0123456789:,${name || ''}${wish || ''}`);
   const c = newCanvas();
   const ctx = c.getContext('2d');
   const place = PLACES[event.place];
@@ -221,7 +221,7 @@ export async function makeProofCard({ sceneCanvas, event, name, witnesses, wish,
 
   // 소원은 해를 가리지 않도록 제목 아래에 글자로만 얹습니다.
   if (wish) {
-    const label = east ? '🏮 나의 소원' : '🍾 바다에 내려놓은 것';
+    const label = east ? '🏮 나의 소원' : '🍾 그리운 이에게';
     const y0 = witnesses > 1 ? 450 : 380;
     ctx.shadowColor = 'rgba(0,0,0,0.5)';
     ctx.shadowBlur = 12;

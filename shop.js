@@ -45,6 +45,20 @@ export const WISHES = [
   '🙏 모두 행복하길',
 ];
 
+// 그리운 이에게 띄우는 유리병 편지에 다는 공개 문구 (정서진)
+export const LETTERS = [
+  '💌 보고 싶어요',
+  '🙏 고마웠어요',
+  '😢 미안했어요',
+  '💕 사랑해요',
+  '🌅 저는 잘 지내요',
+  '🕊️ 편히 쉬세요',
+  '🌙 꿈에서 만나요',
+  '😊 덕분에 행복했어요',
+  '🤝 꼭 다시 만나요',
+  '💛 늘 응원할게요',
+];
+
 // 응원 한마디 (자유 채팅 대신 고르는 문구 - 욕설·광고·개인정보 걱정 없음, 무료)
 export const SAYINGS = [
   '안녕하세요 👋',
@@ -259,6 +273,7 @@ export function shopPublicInfo() {
     clientKey: shopMode() === 'live' ? process.env.TOSS_CLIENT_KEY : null,
     products: Object.fromEntries(Object.entries(PRODUCTS).map(([k, p]) => [k, { group: p.group, name: p.name, price: p.price, icon: p.icon, desc: p.desc, coins: p.grants.coins || 0, items: p.grants.items || [], list: p.group === 'coins' ? p.grants.coins * COIN_PRICE : 0 }])),
     wishes: WISHES,
+    letters: LETTERS,
     sayings: SAYINGS,
     itemDays: ITEM_DAYS,
   };
