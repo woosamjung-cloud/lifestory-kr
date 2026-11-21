@@ -10,7 +10,7 @@ import {
   formatCountdown,
   solarPosition,
 } from './sun.js';
-import { Scene } from './scene.js';
+import { Scene, FUEL_SECONDS } from './scene.js';
 import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait, renderPetPortrait } from './characters.js';
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare, downloadCanvas, shareImage } from './cards.js';
@@ -1216,15 +1216,15 @@ scene.onWood = (self) => {
 // 불 크기 저장 (다시 들어와도 지난 시간만큼 줄어든 상태로 이어짐)
 {
   const saved = store.get('fuel', null);
-  if (saved && typeof saved.f === 'number') scene.fuel = Math.max(0.12, Math.min(1.4, saved.f - (Date.now() - saved.at) / 240000));
+  if (saved && typeof saved.f === 'number') scene.fuel = Math.max(0.12, Math.min(1.4, saved.f - (Date.now() - saved.at) / (FUEL_SECONDS * 1000)));
   let warned = false;
   setInterval(() => {
     store.set('fuel', { f: scene.fuel, at: Date.now() });
     ambience.setFire && ambience.setFire(scene.fuelK());
-    if (!warned && state.screen === 'ride' && scene.fuel < 0.3 && !store.get('fuelHint', false)) {
+    if (!warned && state.screen === 'ride' && (scene.fuel - 0.12) * FUEL_SECONDS < 240 && !store.get('fuelHint', false)) {
       warned = true;
       store.set('fuelHint', true);
-      toast('🔥 불이 약해졌어요. 모닥불을 눌러 장작을 넣어 주세요');
+      toast('🔥 장작이 얼마 남지 않았어요. 모닥불을 눌러 장작을 넣어 주세요');
     }
   }, 5000);
 }

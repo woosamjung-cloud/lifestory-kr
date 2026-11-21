@@ -187,6 +187,9 @@ function cloudPlan(sky, pty, month) {
   return list.map((c, i) => ({ ...c, k: i + 1, x: (i * 0.381) % 1, v: 0.002 + ((i * 0.53) % 1) * 0.004 }));
 }
 
+// 장작 1.0(가득)이 다 타는 데 걸리는 초 (장작 하나 = 0.35 ≈ 10분)
+export const FUEL_SECONDS = 30 * 60;
+
 export class Scene {
   constructor(canvas) {
     this.canvas = canvas;
@@ -991,8 +994,29 @@ export class Scene {
 
   // 불이 약해지면 모닥불 옆에 '🪵 장작' 표시가 천천히 깜빡임
   drawFuelHint(ctx, f, t) {
-    if (this.fuel == null || this.fuel > 0.3 || this.selfStanding) return;
-    const a = (0.45 + 0.35 * Math.sin(t / 900)) * clamp((0.3 - this.fuel) / 0.1);
+    if (this.fuel == null || this.selfStanding) return;
+    // 남은 시간이 4분쯤일 때만 모닥불 아래 게이지가 나타나 천천히 깜빡임 (남은 4분이 줄어드는 만큼 짧아짐)
+    const left = (this.fuel - 0.12) * FUEL_SECONDS; // 불씨만 남기까지 남은 초
+    const WARN = 240;
+    if (left > WARN) return;
+    {
+      const lvl = clamp(left / WARN);
+      const gw = Math.max(36, f.s * 0.8);
+      const gh = Math.max(4, f.s * 0.06);
+      const gx = f.x - gw / 2;
+      const gy = f.y + f.s * 0.22;
+      const appear = clamp((WARN - left) / 8); // 나타날 때 부드럽게
+      ctx.save();
+      ctx.globalAlpha = appear * (0.55 + 0.4 * (0.5 + 0.5 * Math.sin(t / 650)));
+      ctx.fillStyle = 'rgba(20,12,8,0.6)';
+      roundRect(ctx, gx - 1, gy - 1, gw + 2, gh + 2, (gh + 2) / 2);
+      ctx.fill();
+      ctx.fillStyle = lvl < 0.4 ? '#e2553b' : '#f0a33a';
+      roundRect(ctx, gx, gy, Math.max(gh, gw * lvl), gh, gh / 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    const a = (0.45 + 0.35 * Math.sin(t / 900)) * clamp((WARN - left) / 20);
     const txt = '🪵 장작';
     ctx.save();
     ctx.font = `700 ${Math.max(11, f.s * 0.2)}px "Gowun Batang", serif`;
@@ -1142,9 +1166,9 @@ export class Scene {
     const dt = this._fireT ? Math.min(0.1, (t - this._fireT) / 1000) : 0;
     this._fireT = t;
     this.fireBoost = Math.max(0, (this.fireBoost || 0) - dt * 0.35);
-    // 장작(연료): 가득 찬 불이 약 4분에 걸쳐 서서히 줄고, 꺼지지는 않고 작은 불씨로 남음
+    // 장작(연료): 가득 찬 불이 약 30분에 걸쳐 서서히 줄고, 꺼지지는 않고 작은 불씨로 남음
     if (this.fuel == null) this.fuel = 0.8;
-    this.fuel = Math.max(0.12, this.fuel - dt / 240);
+    this.fuel = Math.max(0.12, this.fuel - dt / FUEL_SECONDS);
     if (Math.random() < dt * (this.selfItems.bigfire ? 22 : 9) * this.fuelK() * (1 + (this.fireBoost || 0) * 4)) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
     this.embers = this.embers.filter((e) => {
       e.life += dt;
