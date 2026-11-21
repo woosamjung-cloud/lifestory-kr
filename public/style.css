@@ -93,7 +93,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .home-sheet { animation: rise 0.6s ease both; }
 @keyframes rise { from { transform: translateY(24px); opacity: 0; } }
 
-.eyebrow { margin: 0; color: var(--accent); font-size: 15px; letter-spacing: 0.08em; }
+.eyebrow { margin: 0 0 2px; color: var(--accent); font-family: var(--title); font-size: clamp(30px, 8vw, 38px); line-height: 1.1; letter-spacing: 0.01em; }
 h1 {
   font-family: var(--title);
   font-weight: 400;
