@@ -280,7 +280,15 @@ export class Scene {
     const e = sun.elevation;
     const [zen, hor] = skyColors(e);
     const light = clamp((e + 9) / 15);
-    const warm = clamp(1 - Math.abs(e) / 7);
+    // 노을이 가장 진한 때는 해가 막 진 직후(고도 -1° 안팎). 앞뒤로 넉넉히
+    const warm = clamp(1 - Math.abs(e + 1) / 9);
+    // 노을 농도: 날씨와 장소에 따라 (맑으면 진하고, 구름이 적당하면 구름이 물들어 더 극적, 흐리면 약함)
+    const wx0 = this.weather;
+    const cover0 = wx0 ? { 1: 0.1, 3: 0.55, 4: 0.9 }[wx0.sky] ?? 0.25 : 0.25;
+    const rain0 = wx0 && wx0.pty ? 0.4 : 1;
+    const glowK = (cover0 < 0.2 ? 1 : cover0 < 0.7 ? 1.1 : 0.25) * rain0 * (this.place === 'west' ? 1.3 : 1);
+    this.glowK = glowK;
+    const wk = warm * glowK;
 
     // 하늘
     const g = ctx.createLinearGradient(0, 0, 0, horizonY);
@@ -290,13 +298,23 @@ export class Scene {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, horizonY + 1);
 
-    // 해 주변 노을빛
-    if (warm > 0) {
+    if (wk > 0.01) {
+      // 노을 띠: 수평선부터 위로 주황 → 분홍 → 보라
+      const band = ctx.createLinearGradient(0, horizonY, 0, horizonY * 0.15);
+      band.addColorStop(0, `rgba(255,120,55,${Math.min(0.85, 0.7 * wk)})`);
+      band.addColorStop(0.18, `rgba(255,95,85,${Math.min(0.7, 0.5 * wk)})`);
+      band.addColorStop(0.42, `rgba(220,90,140,${Math.min(0.5, 0.32 * wk)})`);
+      band.addColorStop(0.75, `rgba(120,80,160,${Math.min(0.3, 0.18 * wk)})`);
+      band.addColorStop(1, 'rgba(90,70,150,0)');
+      ctx.fillStyle = band;
+      ctx.fillRect(0, 0, W, horizonY + 1);
+      // 해가 있는 쪽이 가장 뜨겁게
       const gx = clamp(sun.x, -W * 0.3, W * 1.3);
-      const rg = ctx.createRadialGradient(gx, horizonY, 0, gx, horizonY, W * 0.75);
-      rg.addColorStop(0, `rgba(255,150,80,${0.55 * warm})`);
-      rg.addColorStop(0.35, `rgba(255,110,90,${0.25 * warm})`);
-      rg.addColorStop(1, 'rgba(255,100,100,0)');
+      const rg = ctx.createRadialGradient(gx, horizonY, 0, gx, horizonY, Math.max(W, H) * 0.85);
+      rg.addColorStop(0, `rgba(255,200,110,${Math.min(0.95, 0.85 * wk)})`);
+      rg.addColorStop(0.12, `rgba(255,140,60,${Math.min(0.8, 0.6 * wk)})`);
+      rg.addColorStop(0.4, `rgba(255,90,70,${Math.min(0.45, 0.28 * wk)})`);
+      rg.addColorStop(1, 'rgba(255,80,90,0)');
       ctx.fillStyle = rg;
       ctx.fillRect(0, 0, W, horizonY + 1);
     }
@@ -308,34 +326,21 @@ export class Scene {
     this.night.draw(ctx, this, this.time, nowMs, starA, cover);
     this.night.drawOvercast(ctx, this, cover, light);
 
-    // 구름
-    const cloudBase = mix(mix('#2a3156', '#ffffff', light), hor, 0.35 * warm);
-    const cloudUnder = mix(cloudBase, [255, 140, 110], 0.6 * warm);
+    // 구름: 해 질 녘에는 아랫면이 해에 물들고 윗면은 어둡게
+    const cloudTop = mix(mix('#3a3f62', '#f4f2f0', light), [110, 80, 120], 0.55 * warm);
+    const cloudUnder = mix(mix('#4a4f70', '#ffffff', light), [255, 125, 75], Math.min(0.95, 0.9 * wk));
     // 맑음이면 구름 두 조각만, 구름많음·흐림이면 더 많이
     const cloudList = cover > 0.4 ? this.cloudsMore : cover < 0.2 ? this.clouds.slice(0, 2) : this.clouds;
     const cloudScale = cover > 0.4 ? 1.35 : 1;
     for (const c of cloudList) {
       const cx = (((c.x + (nowMs / 1000) * c.v * 0.05) % 1.3) - 0.15) * W;
       const cy = c.y * horizonY;
-      const cw = c.w * W * cloudScale;
-      ctx.fillStyle = rgb(cloudBase, 0.55 + 0.25 * light);
-      for (let i = 0; i < 4; i++) {
-        ctx.beginPath();
-        ctx.ellipse(cx + (i - 1.5) * cw * 0.28, cy - Math.sin(i * 1.7 + c.k) * cw * 0.06, cw * 0.24, cw * 0.11, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.fillStyle = rgb(cloudUnder, 0.5 * (0.3 + warm));
-      ctx.beginPath();
-      ctx.ellipse(cx, cy + cw * 0.06, cw * 0.5, cw * 0.05, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // 손그림 잉크 윤곽 (위쪽 둥근 선만)
-      ctx.strokeStyle = `rgba(74,53,44,${0.12 + 0.18 * light})`;
-      ctx.lineWidth = 1.2;
-      for (let i = 0; i < 4; i++) {
-        ctx.beginPath();
-        ctx.ellipse(cx + (i - 1.5) * cw * 0.28, cy - Math.sin(i * 1.7 + c.k) * cw * 0.06, cw * 0.24, cw * 0.11, 0, Math.PI * 1.08, Math.PI * 1.92);
-        ctx.stroke();
-      }
+      const cw = c.w * W * cloudScale * 1.6;
+      const img = this.cloudSprite(c, cloudTop, cloudUnder);
+      const ch = cw * (img.height / img.width);
+      ctx.globalAlpha = 0.6 + 0.3 * light;
+      ctx.drawImage(img, cx - cw / 2, cy - ch * 0.6, cw, ch);
+      ctx.globalAlpha = 1;
     }
 
     // 해
@@ -346,15 +351,19 @@ export class Scene {
       ctx.rect(0, 0, W, horizonY);
       ctx.clip();
       ctx.globalAlpha = 1 - clamp((cover - 0.4) * 1.3, 0, 0.75);
-      const glow = ctx.createRadialGradient(sun.x, sun.y, sunR * 0.5, sun.x, sun.y, sunR * 4);
-      glow.addColorStop(0, 'rgba(255,220,150,0.55)');
-      glow.addColorStop(1, 'rgba(255,200,120,0)');
+      const low = clamp(1 - e / 6); // 수평선에 가까울수록 1
+      const gr = sunR * (4 + 4 * low * glowK);
+      const glow = ctx.createRadialGradient(sun.x, sun.y, sunR * 0.6, sun.x, sun.y, gr);
+      glow.addColorStop(0, `rgba(255,${Math.round(210 - 60 * low)},${Math.round(140 - 60 * low)},${0.55 + 0.3 * low})`);
+      glow.addColorStop(0.35, `rgba(255,140,70,${0.25 * low * glowK})`);
+      glow.addColorStop(1, 'rgba(255,120,60,0)');
       ctx.fillStyle = glow;
-      ctx.fillRect(sun.x - sunR * 4, sun.y - sunR * 4, sunR * 8, sunR * 8);
-      const core = mix('#ff6a3a', '#fff6d8', clamp((e + 1) / 10));
+      ctx.fillRect(sun.x - gr, sun.y - gr, gr * 2, gr * 2);
+      const core = mix('#ff4a24', '#fff6d8', clamp((e + 1) / 10));
       ctx.fillStyle = rgb(core);
       ctx.beginPath();
-      ctx.arc(sun.x, sun.y, sunR, 0, Math.PI * 2);
+      // 대기 굴절로 수평선 근처의 해는 살짝 납작해 보임
+      ctx.ellipse(sun.x, sun.y, sunR, sunR * (1 - 0.12 * low), 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -394,6 +403,15 @@ export class Scene {
     sg.addColorStop(1, rgb(mix(zen, [0, 10, 30], 0.45)));
     ctx.fillStyle = sg;
     ctx.fillRect(0, horizonY, W, shoreY - horizonY + 2);
+    if (wk > 0.01) {
+      // 노을이 바다에 번짐 (수평선 쪽이 진하고 가까울수록 옅게)
+      const sr = ctx.createLinearGradient(0, horizonY, 0, shoreY);
+      sr.addColorStop(0, `rgba(255,130,80,${Math.min(0.7, 0.55 * wk)})`);
+      sr.addColorStop(0.5, `rgba(220,90,110,${Math.min(0.35, 0.22 * wk)})`);
+      sr.addColorStop(1, 'rgba(160,80,120,0)');
+      ctx.fillStyle = sr;
+      ctx.fillRect(0, horizonY, W, shoreY - horizonY + 2);
+    }
 
     // 물에 비친 햇빛 기둥
     if (e > -3) {
@@ -402,8 +420,8 @@ export class Scene {
         const t = i / 26;
         const yy = horizonY + 2 + t * (shoreY - horizonY);
         const wv = Math.sin(nowMs / 400 + i * 1.3) * 6 * (1 + t);
-        const ww = sunR * (0.6 + t * 2.2) * (0.6 + 0.4 * Math.sin(nowMs / 300 + i));
-        ctx.fillStyle = `rgba(255,${190 + 50 * clamp(e / 10)},120,${a * (0.55 - t * 0.35)})`;
+        const ww = sunR * (0.6 + t * 2.6) * (0.6 + 0.4 * Math.sin(nowMs / 300 + i)) * (1 + 0.3 * wk);
+        ctx.fillStyle = `rgba(255,${170 + 70 * clamp(e / 10)},${100 + 20 * clamp(e / 10)},${Math.min(0.9, a * (0.6 - t * 0.35) * (1 + 0.5 * wk))})`;
         ctx.fillRect(clamp(sun.x, -W, 2 * W) - ww / 2 + wv, yy, ww, 1.6 + t * 1.5);
       }
     }
@@ -1160,6 +1178,76 @@ export class Scene {
       return age < total + 2.4;
     });
     ctx.restore();
+  }
+
+  // 부드러운 붓터치 구름: 모양(흰 마스크)은 한 번만, 색은 바뀔 때만 다시 입힘
+  cloudSprite(c, top, under) {
+    if (!c.mask) {
+      const w = 420;
+      const h = 150;
+      const m = document.createElement('canvas');
+      m.width = w;
+      m.height = h;
+      const g = m.getContext('2d');
+      let r = (c.k + 1) * 9301;
+      const rnd = () => ((r = (r * 1664525 + 1013904223) >>> 0) / 4294967296);
+      const base = h * 0.72; // 구름 밑면 (평평하게)
+      const n = 34;
+      for (let i = 0; i < n; i++) {
+        const u = rnd();
+        const px = w * (0.12 + 0.76 * u);
+        const hump = Math.sin(u * Math.PI); // 가운데가 더 높게 부풀어 오름
+        const pr = h * (0.12 + 0.2 * hump * (0.6 + 0.6 * rnd()));
+        const py = base - pr * (0.4 + 0.9 * rnd() * hump);
+        const rg = g.createRadialGradient(px, py, 0, px, py, pr);
+        rg.addColorStop(0, 'rgba(255,255,255,0.55)');
+        rg.addColorStop(0.6, 'rgba(255,255,255,0.32)');
+        rg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = rg;
+        g.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+      }
+      // 길게 흩어지는 꼬리 (층운 느낌)
+      for (let i = 0; i < 6; i++) {
+        const yy = base - h * (0.02 + 0.08 * rnd());
+        const lg = g.createLinearGradient(0, 0, w, 0);
+        lg.addColorStop(0, 'rgba(255,255,255,0)');
+        lg.addColorStop(0.3 + 0.2 * rnd(), 'rgba(255,255,255,0.18)');
+        lg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = lg;
+        g.beginPath();
+        g.ellipse(w / 2 + (rnd() - 0.5) * w * 0.2, yy, w * 0.48, h * 0.035, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      // 밑면을 부드럽게 잘라 평평하게
+      g.globalCompositeOperation = 'destination-out';
+      const cut = g.createLinearGradient(0, base - h * 0.02, 0, base + h * 0.1);
+      cut.addColorStop(0, 'rgba(0,0,0,0)');
+      cut.addColorStop(1, 'rgba(0,0,0,1)');
+      g.fillStyle = cut;
+      g.fillRect(0, base - h * 0.02, w, h);
+      c.mask = m;
+      c.tints = new Map();
+    }
+    const q = (v) => v.map((x) => Math.round(x / 12) * 12).join(',');
+    const key = q(top) + '|' + q(under);
+    let img = c.tints.get(key);
+    if (!img) {
+      img = document.createElement('canvas');
+      img.width = c.mask.width;
+      img.height = c.mask.height;
+      const g = img.getContext('2d');
+      g.drawImage(c.mask, 0, 0);
+      g.globalCompositeOperation = 'source-in';
+      const vg = g.createLinearGradient(0, 0, 0, img.height * 0.75);
+      vg.addColorStop(0, rgb(top));
+      vg.addColorStop(0.55, rgb(mix(top, under, 0.5)));
+      vg.addColorStop(1, rgb(under));
+      g.fillStyle = vg;
+      g.fillRect(0, 0, img.width, img.height);
+      if (c.tints.size > 24) c.tints.clear();
+      c.tints.set(key, img);
+    }
+    return img;
   }
 
   grainPattern() {
