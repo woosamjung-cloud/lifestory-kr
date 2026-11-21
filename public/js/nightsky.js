@@ -151,12 +151,10 @@ export class NightSky {
         const size = Math.max(0.85, (5.6 - mag) * 0.5);
         // 지평선 가까이는 대기에 가려 흐려짐
         const ext = clamp(h.alt / 12, 0.25, 1);
-        const tw = 0.8 + 0.2 * Math.sin(nowMs / (380 + (i % 7) * 90) + i);
-        // 가끔 반짝 빛나는 순간
-        const flick = Math.sin(nowMs / 1900 + i * 12.9898);
-        const spark = flick > 0.985 ? (flick - 0.985) / 0.015 : 0;
-        const a = clamp(vis * ext * tw * (mag < 2.5 ? 1.35 : 1.1) + spark * 0.5 * vis);
-        const spr = starSprite(starColor(bv), Math.round(size * (1 + spark * 0.5) * 4) / 4, mag < 2.2 || spark > 0.6);
+        // 아주 은은하게 숨 쉬듯 (밝기 변화 ±6%), 대신 전체 밝기를 높게
+        const tw = 0.94 + 0.06 * Math.sin(nowMs / (1800 + (i % 7) * 400) + i);
+        const a = clamp(vis * ext * tw * (mag < 2.5 ? 1.5 : 1.25));
+        const spr = starSprite(starColor(bv), Math.round(size * 4) / 4, mag < 2.2);
         ctx.globalAlpha = a;
         ctx.drawImage(spr, p.x - spr.width / 2, p.y - spr.height / 2);
         // 밝은 별은 빛을 한 번 더 겹쳐 또렷하게
