@@ -756,12 +756,13 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
 .dt-check { font-size: 12px; color: #ffe3a0; min-height: 1em; font-weight: 700; }
 .home-intro, .home-form { min-width: 0; }
 
-/* 영어 손글씨 글꼴 자리
-   상업적 이용이 허락된 글꼴 파일을 public/fonts/ 에 넣고 아래 주석을 풀면 영어 화면에만 적용됩니다.
-   (보내주신 Continuous 글꼴은 파일 안에 '상업적 사용 금지'로 되어 있어, 제작자 허락을 받기 전까지 넣지 않았습니다)
-@font-face { font-family: 'EnHand'; src: url('fonts/continuous.ttf') format('truetype'); font-display: swap; }
-html[lang="en"] { --title: 'EnHand', 'ShinYoungbok', 'KotraHandwritingFont', "Nanum Brush Script", serif; }
-*/
+/* 영어 손글씨 글꼴: Playwrite US Trad (구글 폰트, OFL 무료·상업적 이용 가능)
+   보내주신 Continuous와 비슷한 가는 필기체. 영어 화면에서만 쓰고, 한글은 신영복체로 이어짐 */
+html[lang="en"] { --title: 'Playwrite US Trad', 'ShinYoungbok', 'KotraHandwritingFont', "Nanum Brush Script", serif; }
+html[lang="en"] h2, html[lang="en"] h3, html[lang="en"] .eyebrow, html[lang="en"] .dt-place, html[lang="en"] .booth-title, html[lang="en"] .hud-place, html[lang="en"] .hud-brand, html[lang="en"] .picket blockquote, html[lang="en"] .door-name { font-weight: 250; font-size: 0.82em; line-height: 1.35; }
+
 
 /* 탑승 화면 왼쪽 위 사이트 이름 */
 .hud-brand { font-family: var(--title); font-size: 17px; line-height: 1.1; color: rgba(255, 236, 205, 0.88); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); margin-bottom: 2px; letter-spacing: 0.02em; }
+html[lang="en"] .hud-brand { white-space: nowrap; font-size: 13px; }
+html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }

@@ -1623,10 +1623,14 @@ function fitHomeTitle() {
   if (!el || !el.offsetParent) return;
   el.style.fontSize = '';
   const max = parseFloat(getComputedStyle(el).fontSize);
-  let size = max;
-  for (let i = 0; i < 30 && el.scrollWidth > el.clientWidth + 1 && size > 24; i++) {
-    size -= 2;
+  // 넘치면 폭 비율만큼 한 번에 줄이고, 그래도 넘치면 조금씩 더
+  if (el.scrollWidth > el.clientWidth + 1) {
+    let size = Math.floor(max * (el.clientWidth / el.scrollWidth) * 0.98 * 2) / 2;
     el.style.fontSize = `${size}px`;
+    for (let i = 0; i < 10 && el.scrollWidth > el.clientWidth + 1 && size > 12; i++) {
+      size -= 1;
+      el.style.fontSize = `${size}px`;
+    }
   }
 }
 fitHomeTitle();
@@ -1654,6 +1658,10 @@ function refreshLang() {
   renderDepartures();
   renderDaily();
   fitHomeTitle();
+  // 언어별 손글씨 글꼴을 받은 뒤 제목 크기를 다시 맞춤
+  const fam = getComputedStyle(document.documentElement).getPropertyValue('--title').split(',')[0].trim();
+  if (document.fonts && fam) document.fonts.load(`40px ${fam}`, $('home-title').textContent).then(fitHomeTitle, () => {});
+  setTimeout(fitHomeTitle, 1200);
 }
 document.querySelectorAll('.lang-btn').forEach((b) =>
   b.addEventListener('click', () => {

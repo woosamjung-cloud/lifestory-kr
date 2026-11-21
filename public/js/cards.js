@@ -9,16 +9,27 @@ import { localizeCtx } from './i18n.js';
 const W = 1080;
 const H = 1350;
 const FONT = '"Gowun Batang", "AppleMyungjo", "Batang", serif';
-const TITLE = '"ShinYoungbok", "KotraHandwritingFont", "Nanum Brush Script", "Gowun Batang", serif';
+// 영어 글자는 Playwrite US Trad, 한글은 신영복체 (글꼴에 없는 글자는 다음 글꼴로 이어짐)
+const TITLE = '"Playwrite US Trad", "ShinYoungbok", "KotraHandwritingFont", "Nanum Brush Script", "Gowun Batang", serif';
 
 // 구글 웹 글꼴은 글자 묶음별로 나눠 내려받기 때문에, 캔버스에 쓸 글자를 미리 불러옵니다.
 async function loadGlyphs(text) {
   if (!document.fonts || !document.fonts.load) return;
   text += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz’·/';
   try {
-    await Promise.all([document.fonts.load('40px "ShinYoungbok"', text), document.fonts.load('40px "KotraHandwritingFont"', text), document.fonts.load(`40px "Nanum Brush Script"`, text), document.fonts.load(`40px "Gowun Batang"`, text), document.fonts.load(`700 40px "Gowun Batang"`, text)]);
+    await Promise.all([document.fonts.load('300 40px "Playwrite US Trad"', text), document.fonts.load('40px "ShinYoungbok"', text), document.fonts.load('40px "KotraHandwritingFont"', text), document.fonts.load(`40px "Nanum Brush Script"`, text), document.fonts.load(`40px "Gowun Batang"`, text), document.fonts.load(`700 40px "Gowun Batang"`, text)]);
   } catch {
     /* 글꼴을 못 불러와도 기본 글꼴로 그립니다 */
+  }
+}
+
+// 글자가 칸보다 넓으면(영어 등) 글자 크기를 줄여서 맞춤
+function fitFont(ctx, text, size, family, maxW) {
+  let s = size;
+  ctx.font = `${s}px ${family}`;
+  while (s > 18 && ctx.measureText(text).width > maxW) {
+    s -= 2;
+    ctx.font = `${s}px ${family}`;
   }
 }
 
@@ -78,12 +89,12 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.font = `64px ${TITLE}`;
+  fitFont(ctx, '방구석 해돋이호', 64, TITLE, tw * 0.58);
   ctx.fillText('방구석 해돋이호', tx + 60, ty + 64);
   ctx.font = `30px ${FONT}`;
   ctx.fillText(east ? '해돋이 열차 · 승차권' : '해넘이 열차 · 승차권', tx + 60, ty + 115);
   ctx.textAlign = 'right';
-  ctx.font = `30px ${FONT}`;
+  fitFont(ctx, '편도 · 잠옷 착용', 30, FONT, tw * 0.3);
   ctx.fillText('편도 · 잠옷 착용', tx + tw - 60, ty + 64);
 
   // 구간
@@ -93,10 +104,12 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
   ctx.fillText('출발', tx + 60, ty + 230);
   ctx.textAlign = 'right';
   ctx.fillText('도착', tx + tw - 60, ty + 230);
-  ctx.font = `92px ${TITLE}`;
+  const half = tw / 2 - 110; // 화살표 양쪽 칸 폭
+  fitFont(ctx, '내 방', 92, TITLE, half);
   ctx.textAlign = 'left';
   ctx.fillText('내 방', tx + 60, ty + 320);
   ctx.textAlign = 'right';
+  fitFont(ctx, place.name, 92, TITLE, half);
   ctx.fillText(place.name, tx + tw - 60, ty + 320);
   ctx.textAlign = 'center';
   ctx.font = `60px ${FONT}`;
