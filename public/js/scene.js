@@ -1809,7 +1809,7 @@ export class Scene {
       if (fx.kind === 'cheer') {
         if (age > 1.4) return false;
         const a = 1 - age / 1.4;
-        ctx.font = `${Math.max(16, fx.slot.s * (fx.self ? 0.55 : 0.4))}px "Nanum Brush Script", "Gowun Batang", serif`;
+        ctx.font = `${Math.max(16, fx.slot.s * (fx.self ? 0.55 : 0.4))}px "KotraHandwritingFont", "Nanum Brush Script", "Gowun Batang", serif`;
         ctx.textAlign = 'center';
         ctx.fillStyle = `rgba(255,255,255,${a})`;
         ctx.strokeStyle = `rgba(120,50,20,${a * 0.6})`;

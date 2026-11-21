@@ -7,13 +7,13 @@ import { roundRect } from './scene.js';
 const W = 1080;
 const H = 1350;
 const FONT = '"Gowun Batang", "AppleMyungjo", "Batang", serif';
-const TITLE = '"Nanum Brush Script", "Gowun Batang", serif';
+const TITLE = '"KotraHandwritingFont", "Nanum Brush Script", "Gowun Batang", serif';
 
 // 구글 웹 글꼴은 글자 묶음별로 나눠 내려받기 때문에, 캔버스에 쓸 글자를 미리 불러옵니다.
 async function loadGlyphs(text) {
   if (!document.fonts || !document.fonts.load) return;
   try {
-    await Promise.all([document.fonts.load(`40px "Nanum Brush Script"`, text), document.fonts.load(`40px "Gowun Batang"`, text), document.fonts.load(`700 40px "Gowun Batang"`, text)]);
+    await Promise.all([document.fonts.load('40px "KotraHandwritingFont"', text), document.fonts.load(`40px "Nanum Brush Script"`, text), document.fonts.load(`40px "Gowun Batang"`, text), document.fonts.load(`700 40px "Gowun Batang"`, text)]);
   } catch {
     /* 글꼴을 못 불러와도 기본 글꼴로 그립니다 */
   }

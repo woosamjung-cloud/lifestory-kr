@@ -1,3 +1,10 @@
+/* 손글씨 제목 글꼴: KOTRA 송글씨 (KOTRA 무료 공개 글꼴) */
+@font-face {
+  font-family: 'KotraHandwritingFont';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_20-10-21@1.0/KOTRA_SONGEULSSI.woff') format('woff');
+  font-weight: normal;
+  font-display: swap;
+}
 :root {
   --ink: #3b2a20;
   --muted: #8a7363;
@@ -12,7 +19,7 @@
   --on-glass: #fff8ee;
   --radius: 22px;
   --font: "Gowun Batang", "AppleMyungjo", "Batang", serif;
-  --title: "Nanum Brush Script", "Gowun Batang", serif;
+  --title: 'KotraHandwritingFont', "Nanum Brush Script", "Gowun Batang", serif;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
 }
