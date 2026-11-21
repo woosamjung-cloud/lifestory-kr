@@ -191,7 +191,7 @@ const net = new Net({
       if (!slot) continue;
       if (kind === 'cheer') {
         scene.cheerAt(slot);
-        ambience.cheer(2, 0.4); // 다른 사람의 함성은 멀리서 작게
+        ambience.cheer(1, 0.35); // 다른 사람의 와!는 작게
       }
       else if (kind === 'ritual') scene.ritualAt(slot, false, extra != null && shopInfo ? ritualList()[extra] : null);
       else if (kind === 'flash') scene.flashAt(slot);
@@ -594,7 +594,7 @@ function playTrain(ev) {
 // ---------- 탑승 중 버튼 ----------
 $('act-cheer').addEventListener('click', () => {
   scene.cheerAt(scene.mySlot, true);
-  ambience.cheer(4, 1);
+  ambience.cheer(2, 1);
   net.cheer();
   if (navigator.vibrate) navigator.vibrate(20);
 });

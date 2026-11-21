@@ -187,8 +187,8 @@ export class Ambience {
     o.stop(t + 0.1);
   }
 
-  // '와!' 귀여운 함성: 높고 동글동글한 목소리가 통 튀어 오르는 '와앗!' + 반짝이는 작은 종소리
-  cheer(voices = 3, vol = 1) {
+  // '와!' 효과음: 목소리 없이 귀여운 '뿅!' + 반짝반짝 종소리 (voices: 뿅 개수)
+  cheer(voices = 2, vol = 1) {
     if (!this.on) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
@@ -196,50 +196,40 @@ export class Ambience {
     if (this.cheerHits.length >= 4) return;
     this.cheerHits.push(now);
     const out = ctx.createGain();
-    out.gain.value = 0.35 * vol;
+    out.gain.value = 0.4 * vol;
     out.connect(this.master);
-    for (let v = 0; v < voices; v++) {
-      const t = now + 0.01 + v * 0.045 + Math.random() * 0.03;
-      const dur = 0.32 + Math.random() * 0.1;
-      const f0 = 420 + Math.random() * 260; // 높은 목소리
-      const o = ctx.createOscillator();
-      o.type = 'triangle';
-      // '와' 하고 통 튀어 오르는 억양 (낮게 시작 → 높이 → 살짝 내려옴)
-      o.frequency.setValueAtTime(f0 * 0.75, t);
-      o.frequency.exponentialRampToValueAtTime(f0 * 1.35, t + dur * 0.35);
-      o.frequency.exponentialRampToValueAtTime(f0 * 1.15, t + dur);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.5 / voices + 0.12, t + 0.03);
-      g.gain.setValueAtTime(0.5 / voices + 0.12, t + dur * 0.6);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      // '우→아' 모음 느낌 (어린 목소리처럼 높은 울림)
-      const bp = ctx.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.Q.value = 1.6;
-      bp.frequency.setValueAtTime(700, t);
-      bp.frequency.exponentialRampToValueAtTime(1500, t + 0.08);
-      const dry = ctx.createGain();
-      dry.gain.value = 0.6;
-      o.connect(bp).connect(g);
-      o.connect(dry).connect(g);
-      g.connect(out);
-      o.start(t);
-      o.stop(t + dur + 0.02);
-    }
-    // 반짝반짝 작은 종소리 (올라가는 세 음)
-    [1568, 2093, 2637].forEach((f, k) => {
-      const t = now + 0.18 + k * 0.07;
+    // 뿅: 물방울처럼 위로 통 튀는 소리
+    for (let k = 0; k < Math.min(voices, 3); k++) {
+      const t = now + 0.01 + k * 0.09;
+      const base = 520 + k * 140 + Math.random() * 40;
       const o = ctx.createOscillator();
       o.type = 'sine';
-      o.frequency.value = f;
+      o.frequency.setValueAtTime(base, t);
+      o.frequency.exponentialRampToValueAtTime(base * 2.6, t + 0.07);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.06, t + 0.005);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      g.gain.exponentialRampToValueAtTime(0.5, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
       o.connect(g).connect(out);
       o.start(t);
-      o.stop(t + 0.4);
+      o.stop(t + 0.18);
+    }
+    // 반짝반짝: 올라가는 작은 종소리
+    const t1 = now + 0.06 + Math.min(voices, 3) * 0.09;
+    [1568, 2093, 2637, 3136].forEach((f, k) => {
+      const t = t1 + k * 0.06;
+      for (const [mul, a] of [[1, 0.09], [2.76, 0.02]]) {
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f * mul;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(a, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+        o.connect(g).connect(out);
+        o.start(t);
+        o.stop(t + 0.5);
+      }
     });
   }
 
