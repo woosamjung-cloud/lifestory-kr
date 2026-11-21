@@ -564,7 +564,7 @@ export const BREEDS = [
   { name: '강아지', dog: true, fur: '#b98652', dark: '#8a5f37', ears: 'floppy', tail: 'normal', size: 1 },
   { name: '고양이', dog: false, fur: '#8a8f99', dark: '#5f646e', ears: 'pointy', tail: 'long', size: 1, stripes: true },
   { name: '푸들', dog: true, fur: '#cf8f5c', dark: '#ad6f42', ears: 'curly', tail: 'pom', size: 0.85, fluff: 0.9, legs: 1.3, wide: 0.9, topknot: true },
-  { name: '웰시코기', dog: true, fur: '#dc9248', dark: '#b8702f', ears: 'erect', earSize: 1.4, earInner: '#f3dcc4', tail: 'fluffy', size: 0.95, legs: 0.55, wide: 1.15, paw: '#f7f1e8', bib: '#f7f1e8', blaze: '#f7f1e8', whiteLegs: true, smile: true },
+  { name: '웰시코기', dog: true, fur: '#dc9248', dark: '#b8702f', ears: 'erect', earSize: 1.4, earInner: '#f3dcc4', tail: 'stub', loaf: true, size: 0.95, legs: 0.42, wide: 1.15, long: 1.4, paw: '#f7f1e8', bib: '#f7f1e8', blaze: '#f7f1e8', whiteLegs: true, smile: true },
   { name: '말티즈', dog: true, fur: '#f6f3ee', dark: '#ddd5c8', ears: 'long', tail: 'plume', size: 0.72, fluff: 0.55 },
   { name: '스피츠', dog: true, fur: '#fbfaf7', dark: '#e4dfd5', ears: 'erect', earSize: 0.8, earInner: '#f1d2c8', tail: 'curl', size: 0.9, fluff: 1.35, mane: true, smile: true },
   { name: '페르시안', dog: false, fur: '#efe1c8', dark: '#d2bd9a', ears: 'small', tail: 'fluffy', size: 1.05, fluff: 1, flat: true },
@@ -715,10 +715,24 @@ export function drawPet(ctx, o) {
   // 꼬리 (품종마다)
   ctx.lineCap = 'round';
   if (B.tail === 'stub') {
-    // 웰시코기: 짧고 통통한 엉덩이
+    // 웰시코기: 바닥에 퍼진 동그란 식빵 엉덩이 + 짧은 꼬리가 살랑
+    if (B.loaf) {
+      ctx.fillStyle = F;
+      for (const sg of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(x + sg * k * 0.17, by - k * 0.1, k * 0.2, k * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = D;
+      ctx.lineWidth = Math.max(0.7, k * 0.018);
+      ctx.beginPath();
+      ctx.moveTo(x, by - k * 0.16);
+      ctx.lineTo(x, by - k * 0.01);
+      ctx.stroke();
+    }
     ctx.fillStyle = F;
     ctx.beginPath();
-    ctx.ellipse(x + wag * k * 0.03, by - k * 0.14, k * 0.07, k * 0.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + wag * k * 0.04, by - k * (B.loaf ? 0.22 : 0.14), k * 0.065, k * 0.05, 0, 0, Math.PI * 2);
     ctx.fill();
   } else if (B.tail === 'curl') {
     curlPlume(ctx, x + k * 0.14 + wag * k * 0.03, by - k * (0.42 + hop * 0.08), k, -0.5 + wag * 0.15, F, D);
@@ -856,6 +870,34 @@ function drawPetWalk(ctx, o) {
   const wag = Math.sin(t / (dog ? 90 : 260)) * (dog ? 1 : 0.5);
   const bodyY = by - k * 0.4 + yOff;
   const drawTail = () => {
+    if (B.loaf && !facingFront) {
+      // 웰시코기 식빵 엉덩이: 통통한 두 볼기 + 하얀 털 바지 + 짧은 꼬리, 걸을 때 씰룩
+      const wig = Math.sin(ph) * k * 0.025;
+      const cy = bodyY + k * 0.04;
+      ctx.fillStyle = shadeHex(B.blaze, bright);
+      for (const sg of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(x + sg * k * 0.11 + wig, cy + k * 0.08, k * 0.12, k * 0.08, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = F;
+      for (const sg of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(x + sg * k * 0.115 + wig, cy, k * 0.135, k * 0.13, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = D;
+      ctx.lineWidth = Math.max(0.7, k * 0.018);
+      ctx.beginPath();
+      ctx.moveTo(x + wig, cy - k * 0.04);
+      ctx.lineTo(x + wig, cy + k * 0.1);
+      ctx.stroke();
+      ctx.fillStyle = F;
+      ctx.beginPath();
+      ctx.ellipse(x + wig + Math.sin(t / 120) * k * 0.015, cy - k * 0.13, k * 0.055, k * 0.045, 0, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
     if (B.tail === 'stub') {
       if (facingFront) return;
       ctx.fillStyle = F;
@@ -996,7 +1038,7 @@ function drawPetSide(ctx, o) {
   const D = shadeHex(B.dark, bright);
   const P = B.paw ? shadeHex(B.paw, bright) : null;
   const k = s * 0.42 * B.size;
-  const W = B.wide || 1;
+  const W = B.long || B.wide || 1; // 옆모습에서는 몸 길이 (웰시코기는 길쭉)
   const legs = B.legs || 1;
   const yOff = k * 0.2 * (1 - legs);
   const ph = still ? 0 : t / (dog ? 95 : 120);
