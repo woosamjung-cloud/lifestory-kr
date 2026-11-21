@@ -279,3 +279,28 @@ export async function saveOrShare(canvas, filename, shareText) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   return 'downloaded';
 }
+
+// 이미지 파일로 바로 저장
+export async function downloadCanvas(canvas, filename) {
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// 휴대폰 공유 창에 사진을 담아 열기 (카카오톡·인스타그램 등 앱 선택). 안 되면 false
+export async function shareImage(canvas, filename, text) {
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+  const file = new File([blob], filename, { type: 'image/png' });
+  if (!(navigator.canShare && navigator.canShare({ files: [file] }))) return false;
+  try {
+    await navigator.share({ files: [file], text });
+    return true;
+  } catch (err) {
+    return err && err.name === 'AbortError' ? 'cancelled' : false;
+  }
+}

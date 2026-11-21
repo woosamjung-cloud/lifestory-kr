@@ -13,7 +13,7 @@ import {
 import { Scene } from './scene.js';
 import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait } from './characters.js';
 import { Net } from './net.js';
-import { makeTicket, makeProofCard, saveOrShare } from './cards.js';
+import { makeTicket, makeProofCard, saveOrShare, downloadCanvas, shareImage } from './cards.js';
 import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
 import { Ambience } from './ambience.js';
 
@@ -666,12 +666,62 @@ $('act-card').addEventListener('click', async () => {
 });
 let cardCanvas = null;
 $('card-close').addEventListener('click', () => $('card').close());
+const CARD_FILE = 'haedoji-card.png';
+const shareUrl = () => `${location.origin}/`;
+const shareText = () => {
+  const ev = state.event;
+  const what = ev && PLACES[ev.place].kind === 'sunset' ? '노을' : '해돋이';
+  return `방구석 해돋이호에서 오늘의 ${what}를 함께 봤어요 🌅`;
+};
+async function copyLink() {
+  try {
+    await navigator.clipboard.writeText(`${shareText()} ${shareUrl()}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 $('card-save').addEventListener('click', async () => {
   if (!cardCanvas) return;
   net.stat('save');
-  const r = await saveOrShare(cardCanvas, 'haedoji-card.png', '방구석 해돋이호에서 해를 봤어요 🌅');
-  if (r === 'downloaded') toast('인증 사진을 저장했어요');
+  await downloadCanvas(cardCanvas, CARD_FILE);
+  toast('📥 인증 사진을 저장했어요');
 });
+document.querySelectorAll('#card .sns').forEach((b) =>
+  b.addEventListener('click', async () => {
+    if (!cardCanvas) return;
+    const k = b.dataset.sns;
+    net.stat('save');
+    const text = shareText();
+    const url = shareUrl();
+    const enc = encodeURIComponent;
+    // 글쓰기 화면으로 바로 가는 곳: 창은 누른 즉시 열어야 막히지 않음
+    const intents = {
+      threads: `https://www.threads.net/intent/post?text=${enc(`${text} ${url}`)}`,
+      x: `https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}`,
+    };
+    if (intents[k]) {
+      window.open(intents[k], '_blank', 'noopener');
+      if (k !== 'facebook') {
+        await downloadCanvas(cardCanvas, CARD_FILE);
+        toast('📥 사진도 저장했어요. 글쓰기 화면에서 사진을 첨부해 주세요');
+      }
+      return;
+    }
+    if (k === 'link') return toast((await copyLink()) ? '🔗 링크를 복사했어요' : '링크 복사가 안 돼요. 주소창의 주소를 복사해 주세요');
+    // 카카오톡·인스타그램·기타: 휴대폰은 공유 창(사진 포함)에서 앱 선택
+    const r = await shareImage(cardCanvas, CARD_FILE, `${text} ${url}`);
+    if (r === true || r === 'cancelled') return;
+    await downloadCanvas(cardCanvas, CARD_FILE);
+    const copied = await copyLink();
+    if (k === 'instagram') {
+      window.open('https://www.instagram.com/', '_blank', 'noopener');
+      toast('📥 사진을 저장했어요. 인스타그램에서 새 게시물로 올려 주세요');
+    } else if (k === 'kakao') toast(`📥 사진을 저장했어요${copied ? ' · 🔗 링크도 복사했어요' : ''}. 카카오톡에 보내 주세요`);
+    else toast(`📥 사진을 저장했어요${copied ? ' · 🔗 링크도 복사했어요' : ''}`);
+  }),
+);
 
 $('act-menu').addEventListener('click', () => $('menu').showModal());
 $('menu-close').addEventListener('click', () => $('menu').close());
