@@ -160,14 +160,28 @@
   </dialog>
 
   <!-- 소원 풍등 / 유리병 편지 -->
-  <dialog id="ritual" class="modal">
+  <dialog id="ritual" class="modal ritual-modal">
     <form method="dialog" id="ritual-form">
       <h3 id="ritual-title">소원 풍등</h3>
-      <p class="muted small" id="ritual-desc">해 뜨는 하늘에 소원을 띄워 보내요.</p>
-      <textarea id="ritual-text" maxlength="40" rows="3" placeholder="예) 올해는 꼭 합격!"></textarea>
-      <p class="fineprint">작성한 글은 서버에 기록으로 남지 않아요. 내 화면과 인증 사진에만 남아요.<br>다른 분들에게 <span id="pw-note">소원을</span> 공개하고 싶으면 아래 옵션을 사용하시면 됩니다.</p>
-      <div class="public-wish" id="public-wish" hidden>
-        <p class="pw-title"><b>+ 옵션</b> : <span id="pw-what">풍등에 소원의</span> 메시지를 추가해서 띄워 보세요. <span class="muted small">(🪙 동전 1개 필요 · 내 동전 <b id="pw-coins">0</b>개)</span></p>
+      <p class="rt-desc" id="ritual-desc">소원을 담아서 띄워 보세요.</p>
+
+      <div class="rt-private">
+        <div class="rt-label">🔒 나만 보는 한 줄</div>
+        <textarea id="ritual-text" maxlength="40" rows="2" placeholder="예) 우리 가족 모두 건강하길"></textarea>
+        <p class="rt-note">서버에 남지 않고, 내 화면과 인증 사진에만 남아요.</p>
+      </div>
+
+      <div class="rt-public" id="public-wish" hidden>
+        <div class="rt-pub-head">
+          <div>
+            <div class="rt-label">✨ 용기 내어 모두에게 보여주기 <span class="rt-opt">선택</span></div>
+            <p class="rt-note" id="pw-what">고른 문구가 풍등에 적혀 함께 보는 모든 분께 보여요.</p>
+          </div>
+        </div>
+        <div class="rt-coins">
+          <span class="rt-cost">🪙 동전 1개</span>
+          <span class="rt-have">내 동전 <b id="pw-coins">0</b>개</span>
+        </div>
         <div class="pw-chips" id="pw-chips"></div>
       </div>
       <div class="btn-row">

@@ -287,8 +287,7 @@ function renderEventTexts() {
     ? '소원을 담아서 띄워 보세요.'
     : '보고 싶은 사람에게 짧은 편지를 써서 유리병에 담아 노을 속으로 띄워 보내요.';
   $('ritual-text').placeholder = east ? '예) 우리 가족 모두 건강하길' : '예) 엄마, 오늘 노을이 참 예뻐요';
-  $('pw-what').textContent = east ? '풍등에 소원의' : '유리병에 마음의';
-  $('pw-note').textContent = east ? '소원을' : '편지를';
+  $('pw-what').textContent = east ? '고른 문구가 풍등에 적혀 함께 보는 모든 분께 보여요.' : '고른 문구가 유리병에 적혀 함께 보는 모든 분께 보여요.';
   $('preview-start').textContent = east ? '⏩ 해돋이 장면 60초 미리보기' : '⏩ 해넘이 장면 60초 미리보기';
   document.querySelectorAll('.seg-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.place === state.placeMode)));
 }
