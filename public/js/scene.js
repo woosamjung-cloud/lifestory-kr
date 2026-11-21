@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritterFast, drawPet, drawWalker } from './characters.js';
+import { drawCritterFast, drawPet, drawWalker, drawPettingArm } from './characters.js';
 import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -855,8 +855,12 @@ export class Scene {
         bright: critterBright,
         hair: p.hair ?? null,
       });
-      // 함께 온 강아지·고양이 (오른쪽 옆)
-      if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5) });
+      // 함께 온 강아지·고양이 (오른쪽 옆) + 가끔 머리 쓰다듬기
+      if (p.pet) {
+        const pt = this.pettingAt(sl, nowMs, hopT <= 0 && !celebrating);
+        drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5), petted: pt.pet });
+        if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs });
+      }
       const candle = p.me ? this.selfItems.candle : p.flags & 1;
       if (candle) this.drawCandle(ctx, sl.x - sl.s * 0.62, sl.y, sl.s, nowMs);
 
@@ -1518,6 +1522,31 @@ export class Scene {
     }
     if (!this.throws) this.throws = [];
     this.throws.push({ kind: 'stone', x0: from.x, y0: from.y - from.s * 0.9, pts, n: bounces, t0: performance.now(), self: isSelf });
+  }
+
+  // 가끔(20~50초마다, 사람마다 제각각) 옆의 강아지·고양이 머리를 쓰다듬음
+  // reach: 팔 뻗기, stroke: 쓰다듬기, pet: 강아지·고양이 반응(힐끔·꼬리)
+  pettingAt(sl, now, ok) {
+    if (sl.petNext == null) sl.petNext = now + 8000 + Math.random() * 30000;
+    // 와! 하며 뛰면 쓰다듬기는 멈춤
+    if (!ok && sl.petT0 != null) {
+      sl.petT0 = null;
+      sl.petNext = now + 15000 + Math.random() * 20000;
+    }
+    if (sl.petT0 == null && ok && now > sl.petNext) sl.petT0 = now;
+    if (sl.petT0 == null) return { reach: 0, stroke: 0, pet: 0 };
+    const a = (now - sl.petT0) / 1000;
+    const DUR = 3.4;
+    if (a > DUR + 1.8) {
+      sl.petT0 = null;
+      sl.petNext = now + 20000 + Math.random() * 30000;
+      return { reach: 0, stroke: 0, pet: 0 };
+    }
+    const ease = (v) => v * v * (3 - 2 * v);
+    const reach = a < 0.5 ? ease(a / 0.5) : a < DUR - 0.6 ? 1 : a < DUR ? ease((DUR - a) / 0.6) : 0;
+    const stroke = a > 0.5 && a < DUR - 0.6 ? 1 : 0;
+    const pet = a < 0.6 ? 0 : a < DUR ? Math.min(1, (a - 0.6) / 0.5) : clamp(1 - (a - DUR) / 1.8);
+    return { reach, stroke, pet };
   }
 
   // 처음 일어섰을 때: 머리 위에서 아래로 은은하게 내려오는 화살표 (앉으면 사라짐)

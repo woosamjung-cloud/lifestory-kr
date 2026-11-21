@@ -203,10 +203,12 @@ export function drawCritter(ctx, o) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
-  // 그림자
-  ctx.fillStyle = 'rgba(30,18,12,0.18)';
-  ellipse(ctx, x, y + s * 0.015, s * 0.55, s * 0.06);
-  ctx.fill();
+  // 그림자 (장면에서는 바닥에 따로 그려서 뛰어도 그림자는 바닥에 남게)
+  if (!o.noShadow) {
+    ctx.fillStyle = 'rgba(30,18,12,0.18)';
+    ellipse(ctx, x, y + s * 0.015, s * 0.55, s * 0.06);
+    ctx.fill();
+  }
 
   // 목덜미
   ctx.fillStyle = tone(SKIN, -0.08);
@@ -349,7 +351,7 @@ function getSprite(type, color, s, dpr, bright = 1, lightX = -1, hair = null) {
   const g = c.getContext('2d');
   g.scale(dpr, dpr);
   if (b < 0.999) g.filter = `brightness(${b})`;
-  drawCritter(g, { x: (sz * SPRITE_W) / 2, y: sz * (SPRITE_H - SPRITE_FOOT), s: sz, type, color, lightX, hair });
+  drawCritter(g, { x: (sz * SPRITE_W) / 2, y: sz * (SPRITE_H - SPRITE_FOOT), s: sz, type, color, lightX, hair, noShadow: true });
   sp = { canvas: c, sz };
   if (spriteCache.size > 800) spriteCache.clear();
   spriteCache.set(key, sp);
@@ -371,6 +373,11 @@ export function drawCritterFast(ctx, o) {
   const w = sp.sz * SPRITE_W * k;
   const h = sp.sz * SPRITE_H * k;
   const g = geom(x, y, s, breathe);
+
+  // 바닥 그림자: 몸이 떠도 바닥에 남고, 높이 뜰수록 작고 옅게
+  ctx.fillStyle = `rgba(30,18,12,${0.18 * (1 - hop * 0.45)})`;
+  ellipse(ctx, x, o.y + s * 0.015, s * 0.55 * (1 - hop * 0.25), s * 0.06 * (1 - hop * 0.25));
+  ctx.fill();
 
   // 만세 하는 팔 (몸 뒤에서)
   if (arms > 0) {
@@ -414,27 +421,37 @@ export function drawCritterFast(ctx, o) {
     ctx.restore();
   }
 
-  // 와! 하고 뛰어오를 때: 담요 아래로 다리와 신발이 쏙 (몸 뒤에서 먼저 그림)
+  // 와! 하고 앉은 채로 살짝 뜰 때: 담요 아래로 동그란 엉덩이(바지)와 양옆 신발 밑창이 살짝
+  // (색은 걸을 때의 바지·신발과 같게)
   if (hop > 0.05) {
-    const L = s * (0.005 + 0.065 * hop); // 살짝만
+    const dy = s * 0.07 * hop; // 아래로 드러나는 정도
+    const PANTS = tone('#3a3640', (bright - 1) * 0.6);
+    const SHOE = tone('#2a2628', (bright - 1) * 0.6);
+    const SOLE = tone('#7a6a5e', (bright - 1) * 0.6);
     ctx.save();
-    ctx.lineCap = 'round';
+    // 신발 밑창 (엉덩이 양옆, 뒤꿈치가 보이게)
     for (const sg of [-1, 1]) {
-      const fx = x + sg * s * 0.095;
-      ctx.strokeStyle = tone('#4a4e63', (bright - 1) * 0.6);
-      ctx.lineWidth = s * 0.13; // 통통한 바지
-      ctx.beginPath();
-      ctx.moveTo(fx, y - s * 0.06);
-      ctx.lineTo(fx + sg * s * 0.015, y + L);
-      ctx.stroke();
-      // 동그란 신발 (발끝이 살짝 바깥쪽)
-      ctx.fillStyle = tone('#3a2b26', (bright - 1) * 0.6);
-      ellipse(ctx, fx + sg * s * 0.025, y + L + s * 0.02, s * 0.08, s * 0.045);
+      const fx = x + sg * s * 0.19;
+      const fy = y + dy + s * 0.015;
+      ctx.fillStyle = SHOE;
+      ellipse(ctx, fx, fy, s * 0.07, s * 0.06);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ellipse(ctx, fx + sg * s * 0.015, y + L + s * 0.005, s * 0.035, s * 0.013);
+      ctx.fillStyle = SOLE;
+      ellipse(ctx, fx, fy + s * 0.014, s * 0.052, s * 0.038);
       ctx.fill();
     }
+    // 엉덩이: 바지를 입은 두 개의 둥근 볼록
+    ctx.fillStyle = PANTS;
+    for (const sg of [-1, 1]) {
+      ellipse(ctx, x + sg * s * 0.08, y + dy - s * 0.01, s * 0.105, s * 0.07);
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = Math.max(0.6, s * 0.01);
+    ctx.beginPath();
+    ctx.moveTo(x, y + dy - s * 0.04);
+    ctx.lineTo(x, y + dy + s * 0.03);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -546,7 +563,7 @@ function episode(t, seed, cycle, swingMs, restChance) {
 }
 
 export function drawPet(ctx, o) {
-  const { x, y, s, kind = 1, t = 0, bright = 1, hop = 0, walking = false } = o;
+  const { x, y, s, kind = 1, t = 0, bright = 1, hop = 0, walking = false, petted = 0 } = o;
   if (!kind) return;
   if (walking) return drawPetWalk(ctx, o);
   const dog = kind === 1;
@@ -585,7 +602,8 @@ export function drawPet(ctx, o) {
       ctx.fill();
     }
   }
-  const wag = dog ? episode(t, seed, 6000, 1100, 0.3) : episode(t, seed, 9000, 1600, 0.35);
+  // 쓰다듬어 주면 꼬리를 살랑살랑 (평소엔 가끔)
+  const wag = petted > 0.02 ? Math.sin(t / (dog ? 150 : 220)) * Math.min(1, petted * 1.4) : dog ? episode(t, seed, 6000, 1100, 0.3) : episode(t, seed, 9000, 1600, 0.35);
   // 몸 (앉은 뒷모습: 위는 좁고 엉덩이는 넓은 배 모양)
   ctx.fillStyle = F;
   ctx.beginPath();
@@ -620,7 +638,9 @@ export function drawPet(ctx, o) {
   ctx.fillStyle = F;
   const hy = by - k * 0.82;
   // 고개도 가끔 천천히 갸웃
-  const tilt = (dog ? 0.28 : 0.22) * episode(t, seed + 41, dog ? 5600 : 7400, dog ? 1300 : 1700, 0.35);
+  // 쓰다듬는 사람(왼쪽)을 힐끔 보며 고개를 기울임
+  const look = Math.min(1, petted * 1.5);
+  const tilt = (dog ? 0.28 : 0.22) * episode(t, seed + 41, dog ? 5600 : 7400, dog ? 1300 : 1700, 0.35) * (1 - look) - 0.38 * look;
   ctx.save();
   ctx.translate(x, hy + k * 0.2);
   ctx.rotate(tilt);
@@ -650,6 +670,19 @@ export function drawPet(ctx, o) {
       ctx.lineTo(x + i * k * 0.1, by - k * 0.45);
       ctx.stroke();
     }
+  }
+  // 힐끔: 고개를 돌려 옆얼굴의 행복한 눈(∩)과 볼 홍조가 살짝 보임
+  if (look > 0.3) {
+    ctx.strokeStyle = 'rgba(40,25,20,0.85)';
+    ctx.lineWidth = Math.max(0.8, k * 0.035);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(x - k * 0.15, hy + k * 0.01, k * 0.05, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(240,130,130,${0.45 * look})`;
+    ctx.beginPath();
+    ctx.ellipse(x - k * 0.17, hy + k * 0.09, k * 0.05, k * 0.03, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
   // 목줄 / 방울
@@ -1121,5 +1154,50 @@ function drawWalkerSide(ctx, o) {
   ctx.beginPath();
   ctx.ellipse(hx + hr * 0.42, hy + hr * 0.38, hr * 0.15, hr * 0.08, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+// 옆의 강아지·고양이 머리를 쓰다듬는 팔 (앉은 뒷모습, 오른팔)
+// reach: 0(팔 내림)~1(머리에 닿음), stroke: 쓰다듬는 동작 세기
+export function drawPettingArm(ctx, o) {
+  const { x, y, s, color = 0, bright = 1, reach = 0, stroke = 0, t = 0 } = o;
+  if (reach <= 0.01) return;
+  const [base] = BLANKETS[color % BLANKETS.length];
+  const g = geom(x, y, s);
+  const ax0 = x + g.sw * 0.75;
+  const ay0 = g.shY + s * 0.05;
+  // 강아지·고양이 머리 위 (drawPet: x + s*0.62, 머리 중심 y - s*0.344)
+  const rub = Math.sin(t / 230) * s * 0.045 * stroke;
+  const tx = x + s * 0.6 + rub;
+  const ty = y - s * 0.44 + Math.abs(Math.sin(t / 230)) * s * 0.012 * stroke;
+  const rx = x + s * 0.3;
+  const ry = y - s * 0.42;
+  const hx = rx + (tx - rx) * reach;
+  const hy = ry + (ty - ry) * reach;
+  // 팔꿈치는 살짝 위로 굽게
+  const ex = (ax0 + hx) / 2 + s * 0.02;
+  const ey = Math.min(ay0, hy) - s * 0.05 * reach;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = tone(base, -0.1 + (bright - 1) * 0.6);
+  ctx.lineWidth = s * 0.11;
+  ctx.beginPath();
+  ctx.moveTo(ax0, ay0);
+  ctx.quadraticCurveTo(ex, ey, hx, hy);
+  ctx.stroke();
+  // 손: 손바닥을 아래로 덮듯이
+  const skin = tone(SKIN, (bright - 1) * 0.6);
+  ctx.fillStyle = skin;
+  ellipse(ctx, hx + s * 0.02, hy + s * 0.005, s * 0.06, s * 0.035, 0.15);
+  ctx.fill();
+  ctx.strokeStyle = tone(SKIN, -0.15 + (bright - 1) * 0.6);
+  ctx.lineWidth = Math.max(0.7, s * 0.012);
+  for (let f = 0; f < 3; f++) {
+    ctx.beginPath();
+    ctx.moveTo(hx + s * (0.035 + f * 0.012), hy - s * 0.01);
+    ctx.lineTo(hx + s * (0.06 + f * 0.012), hy + s * 0.02);
+    ctx.stroke();
+  }
   ctx.restore();
 }
