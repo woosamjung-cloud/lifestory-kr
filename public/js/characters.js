@@ -474,6 +474,31 @@ export function renderPortrait(canvas, type, color, hair = null, pet = 0) {
   ctx.restore();
 }
 
+
+// 강아지 귀: 머리 위쪽에 붙어 아래로 축 늘어진 물방울 모양, 걸음·바람에 살랑
+function dogEar(ctx, hx, hy, r, side, sway, outer, inner) {
+  const ax = hx + side * r * 0.55; // 귀가 붙는 곳 (정수리 옆)
+  const ay = hy - r * 0.62;
+  const tx = hx + side * r * (1.12 + sway * 0.1); // 귀 끝
+  const ty = hy + r * (0.55 + sway * 0.05);
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.moveTo(ax - side * r * 0.2, ay + r * 0.05);
+  ctx.bezierCurveTo(ax + side * r * 0.45, ay - r * 0.15, tx + side * r * 0.22, ty - r * 0.55, tx, ty);
+  ctx.bezierCurveTo(tx - side * r * 0.12, ty + r * 0.2, hx + side * r * 0.62, ty + r * 0.05, hx + side * r * 0.72, hy + r * 0.05);
+  // 안쪽 가장자리는 머리 둥근 선을 따라 부드럽게
+  ctx.quadraticCurveTo(hx + side * r * 0.42, hy - r * 0.32, ax - side * r * 0.2, ay + r * 0.05);
+  ctx.fill();
+  if (inner) {
+    ctx.fillStyle = inner;
+    ctx.beginPath();
+    ctx.moveTo(ax + side * r * 0.05, ay + r * 0.25);
+    ctx.quadraticCurveTo(tx - side * r * 0.05, ty - r * 0.45, tx - side * r * 0.12, ty - r * 0.12);
+    ctx.quadraticCurveTo(hx + side * r * 0.82, hy + r * 0.05, ax + side * r * 0.05, ay + r * 0.25);
+    ctx.fill();
+  }
+}
+
 // ---------- 반려동물 (옆에 나란히 앉은 뒷모습, 꼬리가 살랑) ----------
 // 가끔 한 번, 어쩔 때는 두 번 천천히 움직이도록 시각마다 정해진 일정을 만듦
 function hash01(n) {
@@ -547,13 +572,8 @@ export function drawPet(ctx, o) {
   ctx.arc(x, hy, k * 0.26, 0, Math.PI * 2);
   ctx.fill();
   if (dog) {
-    // 축 처진 귀
-    ctx.fillStyle = D;
-    for (const sg of [-1, 1]) {
-      ctx.beginPath();
-      ctx.ellipse(x + sg * k * 0.24, hy + k * 0.02, k * 0.09, k * 0.18, sg * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // 축 처진 귀 (고개를 갸웃하면 같이 살랑)
+    for (const sg of [-1, 1]) dogEar(ctx, x, hy, k * 0.26, sg, tilt * sg * 2, D, null);
   } else {
     // 쫑긋한 세모 귀
     for (const sg of [-1, 1]) {
@@ -645,12 +665,8 @@ function drawPetWalk(ctx, o) {
   ctx.arc(x + Math.sin(ph * 0.5) * k * 0.02, hy, k * 0.22, 0, Math.PI * 2);
   ctx.fill();
   if (dog) {
-    ctx.fillStyle = D;
-    for (const sg of [-1, 1]) {
-      ctx.beginPath();
-      ctx.ellipse(x + sg * k * 0.2, hy + k * 0.02 + Math.sin(ph + sg) * k * 0.02, k * 0.08, k * 0.16, sg * 0.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // 걸을 때 귀가 통통 흔들림, 앞모습이면 귀 안쪽 분홍빛
+    for (const sg of [-1, 1]) dogEar(ctx, x, hy, k * 0.22, sg, Math.sin(ph * 2 + sg), D, facingFront ? '#d9a08a' : null);
   } else {
     for (const sg of [-1, 1]) {
       ctx.beginPath();
@@ -737,9 +753,18 @@ function drawPetSide(ctx, o) {
   ctx.fill();
   ctx.fillStyle = D;
   if (dog) {
+    // 옆에서 본 귀: 머리 뒤쪽 위에서 아래로 늘어지고 걸음마다 펄럭
+    const fl = Math.sin(ph * 2) * 0.12;
+    ctx.save();
+    ctx.translate(hx - d * k * 0.1, hy - k * 0.12);
+    ctx.rotate(d * (0.2 + fl));
     ctx.beginPath();
-    ctx.ellipse(hx - d * k * 0.06, hy + k * 0.02, k * 0.07, k * 0.14, d * 0.3, 0, Math.PI * 2);
+    ctx.moveTo(-k * 0.06, k * 0.01);
+    ctx.bezierCurveTo(-k * 0.12, k * 0.1, -k * 0.1, k * 0.26, -k * 0.02, k * 0.28);
+    ctx.bezierCurveTo(k * 0.06, k * 0.29, k * 0.08, k * 0.12, k * 0.06, k * 0.01);
+    ctx.quadraticCurveTo(0, -k * 0.04, -k * 0.06, k * 0.01);
     ctx.fill();
+    ctx.restore();
   } else {
     ctx.beginPath();
     ctx.moveTo(hx - d * k * 0.02, hy - k * 0.14);
