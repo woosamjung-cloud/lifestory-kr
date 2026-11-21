@@ -543,24 +543,35 @@ export function drawPet(ctx, o) {
   ctx.beginPath();
   ctx.ellipse(x, y + k * 0.02, k * 0.5, k * 0.07, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 살랑이는 꼬리
-  // 살랑살랑 꼬리 (강아지는 신나게 빠르게, 고양이는 느긋하게 크게)
   const seed = Math.round(Math.abs(x)) % 997;
   const wag = dog ? episode(t, seed, 6000, 1100, 0.3) : episode(t, seed, 9000, 1600, 0.35);
-  ctx.strokeStyle = dog ? F : D;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = k * (dog ? 0.13 : 0.1);
-  ctx.beginPath();
-  ctx.moveTo(x + k * 0.05, by - k * 0.08);
-  if (dog) ctx.quadraticCurveTo(x + k * 0.42 + wag * k * 0.12, by - k * 0.22, x + k * 0.38 + wag * k * 0.32, by - k * 0.52);
-  else ctx.bezierCurveTo(x + k * 0.55, by, x + k * 0.62 + wag * k * 0.15, by - k * 0.5, x + k * 0.32 + wag * k * 0.3, by - k * 0.66 + Math.abs(wag) * k * 0.05);
-  ctx.stroke();
-  // 몸 (앉은 뒷모습)
+  // 몸 (앉은 뒷모습: 위는 좁고 엉덩이는 넓은 배 모양)
   ctx.fillStyle = F;
   ctx.beginPath();
-  ctx.ellipse(x, by - k * 0.32, k * 0.34, k * 0.36, 0, 0, Math.PI * 2);
+  ctx.moveTo(x - k * 0.2, by - k * 0.62);
+  ctx.bezierCurveTo(x - k * 0.3, by - k * 0.45, x - k * 0.42, by - k * 0.12, x - k * 0.34, by - k * 0.02);
+  ctx.quadraticCurveTo(x, by + k * 0.03, x + k * 0.34, by - k * 0.02);
+  ctx.bezierCurveTo(x + k * 0.42, by - k * 0.12, x + k * 0.3, by - k * 0.45, x + k * 0.2, by - k * 0.62);
+  ctx.closePath();
   ctx.fill();
+  // 살짝 보이는 뒷발
+  for (const sg of [-1, 1]) {
+    ctx.fillStyle = D;
+    ctx.beginPath();
+    ctx.ellipse(x + sg * k * 0.3, by - k * 0.01, k * 0.09, k * 0.045, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 꼬리: 엉덩이 가운데에서 바닥을 따라 옆으로 말림, 가끔 끝이 살랑
+  ctx.strokeStyle = D;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = k * (dog ? 0.1 : 0.08);
+  ctx.beginPath();
+  ctx.moveTo(x, by - k * 0.08);
+  ctx.quadraticCurveTo(x + k * 0.22, by, x + k * 0.4, by - k * (0.06 + Math.max(0, wag) * 0.1));
+  ctx.quadraticCurveTo(x + k * 0.52, by - k * (0.12 + wag * 0.15), x + k * (0.48 + wag * 0.08), by - k * (0.26 + wag * 0.2));
+  ctx.stroke();
   // 머리: 까딱까딱 고개를 갸웃 (가끔 멈췄다 다시)
+  ctx.fillStyle = F;
   const hy = by - k * 0.82;
   // 고개도 가끔 천천히 갸웃
   const tilt = (dog ? 0.28 : 0.22) * episode(t, seed + 41, dog ? 5600 : 7400, dog ? 1300 : 1700, 0.35);
@@ -939,7 +950,7 @@ function drawWalkerSide(ctx, o) {
   const t = still ? 0 : o.t || 0;
   const [base, accent] = BLANKETS[color % BLANKETS.length];
   const hairColor = o.hair != null && HAIRS[o.hair] ? HAIRS[o.hair][1] : HAIR[(color + type.length) % HAIR.length];
-  const ph = t / 150;
+  const ph = t / 130;
   const bob = Math.abs(Math.sin(ph)) * s * 0.03;
   ctx.save();
   if (bright < 0.999) ctx.filter = `brightness(${bright.toFixed(2)})`;
@@ -955,11 +966,13 @@ function drawWalkerSide(ctx, o) {
   ctx.lineCap = 'round';
   ctx.lineWidth = s * 0.1;
   for (const off of [Math.PI, 0]) {
-    const swing = Math.sin(ph + off) * s * 0.14;
-    const lift = Math.max(0, Math.cos(ph + off)) * s * 0.05;
+    // 보폭을 크게, 발을 들 때는 무릎을 굽힘
+    const swing = Math.sin(ph + off) * s * 0.18;
+    const lift = Math.max(0, Math.cos(ph + off)) * s * 0.07;
     ctx.strokeStyle = off === 0 ? '#3a3640' : '#2c2930';
     ctx.beginPath();
     ctx.moveTo(x, hipY);
+    ctx.lineTo(x + swing * 0.5 + lift * 0.8, (hipY + y) / 2 - lift * 0.4);
     ctx.lineTo(x + swing, y - lift);
     ctx.stroke();
     ctx.fillStyle = '#2a2628';

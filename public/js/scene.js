@@ -557,6 +557,8 @@ export class Scene {
       // 손전등 빛은 몸 앞쪽에서 나가므로 사람보다 먼저 그림 (몸에 살짝 가려짐)
       const fl = this.flashes.get(sl);
       if (fl) this.drawFlash(ctx, sl, nowMs, fl);
+      // 사람마다 고정된 박자 차이 (위치에 묶으면 왼쪽으로 걸을 때 시간이 멈춰 보임)
+      if (sl.phase == null) sl.phase = Math.random() * 10000;
       const standing = sl.walking || (p.me ? this.selfUp : p.up);
       if (standing) {
         // 걷는 중이거나 서 있는 중 (아래로 쓸면 앉음)
@@ -564,9 +566,9 @@ export class Scene {
         const face = sl.walking ? sl.face || 'back' : 'back';
         const petX = sl.x + sl.s * (face === 'left' ? -0.55 : 0.55);
         const petFirst = face === 'front';
-        const pet = () => p.pet && drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, walking: true, still, face });
+        const pet = () => p.pet && drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, walking: true, still, face });
         if (!petFirst) pet();
-        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.x * 13, bright: critterBright, still, face });
+        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.phase, bright: critterBright, still, face });
         if (petFirst) pet();
         continue;
       }
@@ -586,7 +588,7 @@ export class Scene {
         hair: p.hair ?? null,
       });
       // 함께 온 강아지·고양이 (오른쪽 옆)
-      if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5) });
+      if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5) });
       const candle = p.me ? this.selfItems.candle : p.flags & 1;
       if (candle) this.drawCandle(ctx, sl.x - sl.s * 0.62, sl.y, sl.s, nowMs);
 
