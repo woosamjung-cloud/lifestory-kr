@@ -585,7 +585,9 @@ export function drawPet(ctx, o) {
 
 // 걷는 반려동물: 네 발로 총총 (뒷모습)
 function drawPetWalk(ctx, o) {
+  if (o.face === 'left' || o.face === 'right') return drawPetSide(ctx, o);
   const { x, y, s, kind = 1, bright = 1, still = false } = o;
+  const facingFront = o.face === 'front';
   const t = o.t || 0;
   const dog = kind === 1;
   const f = (c) => {
@@ -656,11 +658,111 @@ function drawPetWalk(ctx, o) {
   ctx.beginPath();
   ctx.ellipse(x, hy + k * 0.2, k * 0.17, k * 0.045, 0, 0, Math.PI * 2);
   ctx.fill();
+  if (facingFront) {
+    // 앞을 보고 걸어올 때 얼굴
+    ctx.fillStyle = '#2b1d16';
+    for (const sg of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(x + sg * k * 0.08, hy - k * 0.01, Math.max(0.8, k * 0.03), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.ellipse(x, hy + k * 0.08, k * 0.035, k * 0.025, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 옆모습 반려동물 (총총 걷기)
+function drawPetSide(ctx, o) {
+  const { x, y, s, kind = 1, bright = 1, still = false } = o;
+  const t = o.t || 0;
+  const d = o.face === 'left' ? -1 : 1;
+  const dog = kind === 1;
+  const f = (c) => {
+    const n = parseInt(c.slice(1), 16);
+    const m = (v) => Math.round(v * bright);
+    return `rgb(${m((n >> 16) & 255)},${m((n >> 8) & 255)},${m(n & 255)})`;
+  };
+  const F = f(dog ? '#b98652' : '#8a8f99');
+  const D = f(dog ? '#8a5f37' : '#5f646e');
+  const k = s * 0.42;
+  const ph = still ? 0 : t / (dog ? 95 : 120);
+  const by = y - Math.abs(Math.sin(ph)) * k * 0.04;
+  ctx.save();
+  ctx.fillStyle = 'rgba(30,18,12,0.16)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + k * 0.02, k * 0.48, k * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 다리 네 개 (앞뒤 엇갈림)
+  ctx.strokeStyle = D;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = k * 0.09;
+  for (const [lx, off] of [[-0.24, 0], [-0.14, Math.PI], [0.18, Math.PI], [0.28, 0]]) {
+    const sw = Math.sin(ph + off) * k * 0.08;
+    const lift = Math.max(0, Math.cos(ph + off)) * k * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(x + d * lx * k, by - k * 0.3);
+    ctx.lineTo(x + d * (lx * k + sw), y - lift);
+    ctx.stroke();
+  }
+  // 꼬리
+  const wag = Math.sin(t / (dog ? 90 : 260)) * (dog ? 1 : 0.5);
+  ctx.strokeStyle = dog ? F : D;
+  ctx.lineWidth = k * (dog ? 0.11 : 0.08);
+  ctx.beginPath();
+  ctx.moveTo(x - d * k * 0.3, by - k * 0.4);
+  ctx.quadraticCurveTo(x - d * k * (0.45 + wag * 0.05), by - k * 0.62, x - d * k * (0.42 + wag * 0.1), by - k * (dog ? 0.7 : 0.85));
+  ctx.stroke();
+  // 몸통
+  ctx.fillStyle = F;
+  ctx.beginPath();
+  ctx.ellipse(x, by - k * 0.38, k * 0.36, k * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 머리
+  const hx = x + d * k * 0.38;
+  const hy = by - k * 0.58;
+  ctx.beginPath();
+  ctx.arc(hx, hy, k * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(hx + d * k * 0.15, hy + k * 0.05, k * 0.1, k * 0.07, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = D;
+  if (dog) {
+    ctx.beginPath();
+    ctx.ellipse(hx - d * k * 0.06, hy + k * 0.02, k * 0.07, k * 0.14, d * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(hx - d * k * 0.02, hy - k * 0.14);
+    ctx.lineTo(hx + d * k * 0.06, hy - k * 0.3);
+    ctx.lineTo(hx + d * k * 0.13, hy - k * 0.1);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = '#2b1d16';
+  ctx.beginPath();
+  ctx.arc(hx + d * k * 0.08, hy - k * 0.02, Math.max(0.8, k * 0.03), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(hx + d * k * 0.24, hy + k * 0.04, Math.max(0.7, k * 0.025), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = dog ? '#c9574e' : '#e2b04a';
+  ctx.beginPath();
+  ctx.ellipse(hx - d * k * 0.05, hy + k * 0.16, k * 0.05, k * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
 // ---------- 걷는 사람 (서서 걸어가는 뒷모습) ----------
 export function drawWalker(ctx, o) {
+  if (o.face === 'left' || o.face === 'right') return drawWalkerSide(ctx, o);
+  if (o.face === 'front') return drawWalkerBackOrFront(ctx, o, true);
+  return drawWalkerBackOrFront(ctx, o, false);
+}
+
+function drawWalkerBackOrFront(ctx, o, front) {
   const { x, y, s, type = 'blanket', color = 0, bright = 1, dir = 0, still = false } = o;
   const t = still ? 0 : o.t || 0; // 서서 쉬는 중이면 다리 멈춤
   const [base, accent] = BLANKETS[color % BLANKETS.length];
@@ -735,6 +837,7 @@ export function drawWalker(ctx, o) {
   } else {
     hair(ctx, kind, x, gm, s, hairColor);
   }
+  if (front) drawFace(ctx, x, gm, s, type === 'hood' ? null : hairColor);
   if (type === 'beanie') {
     ctx.fillStyle = accent;
     ctx.beginPath();
@@ -747,6 +850,138 @@ export function drawWalker(ctx, o) {
   if (type === 'scarf') {
     ctx.fillStyle = accent;
     ctx.fillRect(x - sw * 0.8, shY - s * 0.02, sw * 1.6, s * 0.08);
+    if (front) ctx.fillRect(x + sw * 0.2, shY, s * 0.07, s * 0.28);
   }
+  ctx.restore();
+}
+
+// 앞모습 얼굴: 피부, 앞머리, 점 눈, 볼
+function drawFace(ctx, x, gm, s, hairColor) {
+  const r = gm.headR;
+  const y = gm.headY;
+  ctx.fillStyle = '#ecc9b0';
+  ctx.beginPath();
+  ctx.ellipse(x, y + r * 0.12, r * 0.82, r * 0.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (hairColor) {
+    ctx.fillStyle = hairColor;
+    ctx.beginPath();
+    ctx.ellipse(x, y - r * 0.42, r * 0.92, r * 0.45, 0, Math.PI, 0);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#2b1d16';
+  for (const sg of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(x + sg * r * 0.32, y + r * 0.12, Math.max(0.8, r * 0.09), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(235,130,130,0.45)';
+  for (const sg of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(x + sg * r * 0.52, y + r * 0.38, r * 0.16, r * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = '#7a4a3a';
+  ctx.lineWidth = Math.max(0.6, r * 0.06);
+  ctx.beginPath();
+  ctx.arc(x, y + r * 0.38, r * 0.14, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.stroke();
+}
+
+// 옆모습 걷기 (왼쪽·오른쪽)
+function drawWalkerSide(ctx, o) {
+  const { x, y, s, type = 'blanket', color = 0, bright = 1, still = false } = o;
+  const t = still ? 0 : o.t || 0;
+  const d = o.face === 'left' ? -1 : 1;
+  const [base, accent] = BLANKETS[color % BLANKETS.length];
+  const hairColor = o.hair != null && HAIRS[o.hair] ? HAIRS[o.hair][1] : HAIR[(color + type.length) % HAIR.length];
+  const ph = t / 150;
+  const bob = Math.abs(Math.sin(ph)) * s * 0.03;
+  ctx.save();
+  if (bright < 0.999) ctx.filter = `brightness(${bright.toFixed(2)})`;
+  ctx.fillStyle = 'rgba(30,18,12,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + s * 0.01, s * 0.26, s * 0.045, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const hipY = y - s * 0.5 - bob;
+  // 다리: 앞뒤로 엇갈림
+  ctx.lineCap = 'round';
+  ctx.lineWidth = s * 0.1;
+  for (const off of [Math.PI, 0]) {
+    const swing = Math.sin(ph + off) * s * 0.14;
+    const lift = Math.max(0, Math.cos(ph + off)) * s * 0.05;
+    ctx.strokeStyle = off === 0 ? '#3a3640' : '#2c2930';
+    ctx.beginPath();
+    ctx.moveTo(x, hipY);
+    ctx.lineTo(x + swing * d, y - lift);
+    ctx.stroke();
+    ctx.fillStyle = '#2a2628';
+    ctx.beginPath();
+    ctx.ellipse(x + swing * d + d * s * 0.03, y - lift, s * 0.07, s * 0.03, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 몸
+  const shY = y - s * 1.12 - bob;
+  const hemY = type === 'blanket' || type === 'coat' ? y - s * 0.32 - bob : hipY + s * 0.05;
+  ctx.fillStyle = base;
+  ctx.beginPath();
+  ctx.moveTo(x - s * 0.13, shY + s * 0.04);
+  ctx.quadraticCurveTo(x, shY - s * 0.03, x + s * 0.13, shY + s * 0.04);
+  ctx.lineTo(x + s * (type === 'blanket' ? 0.2 : 0.15), hemY);
+  ctx.lineTo(x - s * (type === 'blanket' ? 0.22 : 0.16), hemY);
+  ctx.closePath();
+  ctx.fill();
+  // 팔: 앞뒤로 흔들기
+  ctx.strokeStyle = `color-mix(in srgb, ${base} 85%, black)`;
+  ctx.lineWidth = s * 0.08;
+  const asw = Math.sin(ph) * s * 0.12;
+  ctx.beginPath();
+  ctx.moveTo(x, shY + s * 0.08);
+  ctx.lineTo(x - asw * d, shY + s * 0.44);
+  ctx.stroke();
+  // 머리: 옆얼굴
+  const hr = s * 0.17;
+  const hy = shY - s * 0.17;
+  ctx.fillStyle = '#ecc9b0';
+  ctx.beginPath();
+  ctx.arc(x + d * hr * 0.08, hy, hr, 0, Math.PI * 2);
+  ctx.fill();
+  if (type === 'hood') {
+    ctx.fillStyle = base;
+    ctx.beginPath();
+    ctx.arc(x - d * hr * 0.1, hy - hr * 0.05, hr * 1.12, d > 0 ? Math.PI * 0.55 : -Math.PI * 0.45, d > 0 ? Math.PI * 1.75 : Math.PI * 0.75);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = hairColor;
+    ctx.beginPath();
+    ctx.arc(x - d * hr * 0.12, hy - hr * 0.1, hr * 1.02, d > 0 ? Math.PI * 0.6 : -Math.PI * 0.6, d > 0 ? Math.PI * 1.95 : Math.PI * 0.05 + Math.PI * 0.35);
+    ctx.fill();
+    if (type === 'blanket') ctx.fillRect(x - d * hr * 1.0 - (d > 0 ? 0 : -hr * 0.0), hy, d * hr * 0.9, s * 0.32);
+    if (type === 'coat') {
+      ctx.beginPath();
+      ctx.arc(x - d * hr * 0.6, hy - hr * 0.9, hr * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  if (type === 'beanie') {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(x, hy - hr * 0.1, hr * 1.06, Math.PI, 0);
+    ctx.fill();
+  }
+  if (type === 'scarf') {
+    ctx.fillStyle = accent;
+    ctx.fillRect(x - s * 0.12, shY - s * 0.02, s * 0.24, s * 0.08);
+    ctx.fillRect(x - d * s * 0.14, shY, s * 0.06, s * 0.22);
+  }
+  // 눈과 코
+  ctx.fillStyle = '#2b1d16';
+  ctx.beginPath();
+  ctx.arc(x + d * hr * 0.55, hy + hr * 0.05, Math.max(0.8, hr * 0.09), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(235,130,130,0.45)';
+  ctx.beginPath();
+  ctx.ellipse(x + d * hr * 0.45, hy + hr * 0.38, hr * 0.15, hr * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }

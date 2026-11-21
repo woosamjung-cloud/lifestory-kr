@@ -209,7 +209,7 @@ function roomSnapshot(room, withPeople = true) {
         // 모습 코드 = 반려동물*384 + 머리색*64 + 모습*8 + 옷색
         const code = (c.pet || 0) * 384 + (c.hair || 0) * 64 + CHARS.indexOf(c.char) * 8 + c.color;
         // [좌석, 모습 코드, 아이템 표시, 걸어간 x, 걸어간 y(0~1000)]
-        if (c.pos) people.push([i, code, flags, c.pos[0], c.pos[1]]);
+        if (c.pos) people.push([i, code, flags, c.pos[0], c.pos[1], c.up ? 1 : 0]);
         else people.push(flags ? [i, code, flags] : [i, code]);
       }
     }
@@ -348,6 +348,13 @@ function handle(c, msg) {
       if (now - (c.lastMove || 0) < 400) return;
       c.lastMove = now;
       c.pos = [x, y];
+      c.up = true; // 걸어가면 서 있음 (아래로 쓸면 앉음)
+      rooms[c.room].dirty = true;
+      return;
+    }
+    case 'sit': {
+      if (c.seat == null || !c.up) return;
+      c.up = false;
       rooms[c.room].dirty = true;
       return;
     }

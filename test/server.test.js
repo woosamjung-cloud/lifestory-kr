@@ -224,8 +224,12 @@ test('해변 걷기 위치 전달, 장작은 모두 합산·연타 무시', asyn
   b.send(JSON.stringify({ t: 'wood' }));
   await wait(1600);
   const room = last(b, 'room');
-  const moved = room.people.find((p) => p.length === 5);
-  assert.deepEqual(moved.slice(3), [300, 700]);
+  const moved = room.people.find((p) => p.length === 6);
+  assert.deepEqual(moved.slice(3), [300, 700, 1]); // 걸어가면 서 있음
+  a.send(JSON.stringify({ t: 'sit' }));
+  await wait(1300);
+  const sat = last(b, 'room').people.find((p) => p.length === 6);
+  assert.equal(sat[5], 0); // 아래로 쓸면 앉음
   assert.equal(room.wood, 2);
   const fx = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list).filter(([k]) => k === 'wood');
   assert.ok(fx.length >= 1);

@@ -128,6 +128,10 @@ export class Net {
     this.send({ t: 'move', x, y });
   }
 
+  sit() {
+    this.send({ t: 'sit' });
+  }
+
   wood() {
     this.send({ t: 'wood' });
   }

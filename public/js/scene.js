@@ -198,6 +198,7 @@ export class Scene {
   // 내 캐릭터를 걷게 함
   walkSelf(px, py) {
     this.selfPos = [px, py];
+    this.selfUp = true;
     this.walkTo(this.mySlot, this.posToSlot(px, py));
   }
 
@@ -213,11 +214,13 @@ export class Scene {
         sl.y = sl.ty;
         sl.s = sl.ts;
         sl.r = sl.tr ?? sl.r;
-        if (sl.walking) sl.arrivedAt = performance.now(); // 도착하면 잠시 서 있다가 앉음
         sl.walking = false;
+        sl.face = 'back'; // 멈추면 바다를 바라봄
         return;
       }
       const k = Math.min(1, (speed * dt) / d);
+      // 걷는 방향에 따라 앞모습·뒷모습·옆모습
+      sl.face = Math.abs(dx) > Math.abs(dy) * 1.1 ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'front' : 'back';
       sl.x += dx * k;
       sl.y += dy * k;
       sl.s += (sl.ts - sl.s) * k;
@@ -554,12 +557,17 @@ export class Scene {
       // 손전등 빛은 몸 앞쪽에서 나가므로 사람보다 먼저 그림 (몸에 살짝 가려짐)
       const fl = this.flashes.get(sl);
       if (fl) this.drawFlash(ctx, sl, nowMs, fl);
-      const standing = sl.walking || (sl.arrivedAt && nowMs - sl.arrivedAt < 8000);
+      const standing = sl.walking || (p.me ? this.selfUp : p.up);
       if (standing) {
-        // 걷는 중이거나 막 도착해서 서 있는 중 (8초 동안 가만히 있으면 앉음)
+        // 걷는 중이거나 서 있는 중 (아래로 쓸면 앉음)
         const still = !sl.walking;
-        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.x * 13, bright: critterBright, dir: still ? 0 : Math.sign((sl.tx ?? sl.x) - sl.x), still });
-        if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.55, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, walking: true, still });
+        const face = sl.walking ? sl.face || 'back' : 'back';
+        const petX = sl.x + sl.s * (face === 'left' ? -0.55 : 0.55);
+        const petFirst = face === 'front';
+        const pet = () => p.pet && drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, walking: true, still, face });
+        if (!petFirst) pet();
+        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.x * 13, bright: critterBright, still, face });
+        if (petFirst) pet();
         continue;
       }
       drawCritterFast(ctx, {

@@ -99,7 +99,7 @@ const net = new Net({
     if (m.people.length || !m.seated) {
       scene.people = m.people
         .filter(([seat]) => seat !== state.seat)
-        .map(([seat, code, flags = 0, px, py]) => ({ seat, flags, pos: px != null ? [px, py] : null, pet: Math.floor(code / 384), hair: Math.floor((code % 384) / 64), char: CHAR_LIST[Math.floor((code % 64) / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
+        .map(([seat, code, flags = 0, px, py, up = 0]) => ({ seat, flags, up: !!up, pos: px != null ? [px, py] : null, pet: Math.floor(code / 384), hair: Math.floor((code % 384) / 64), char: CHAR_LIST[Math.floor((code % 64) / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
     }
     updateOnlineLabels();
   },
@@ -516,7 +516,7 @@ $('board').addEventListener('click', () => {
   // 처음 탑승하면 놀이 방법 안내
   if (!store.get('playHint', false)) {
     store.set('playHint', true);
-    setTimeout(() => toast('👆 모래를 누르면 걸어가요 · 🔥 불을 누르면 장작 · ↑ 위로 쓸면 물수제비'), 7000);
+    setTimeout(() => toast('👆 모래를 누르면 걸어가요 · ↓ 아래로 쓸면 앉아요 · 🔥 불을 누르면 장작 · ↑ 위로 쓸면 물수제비'), 7000);
   }
   if (store.get('sound', true)) ambience.start().then((ok) => ok && setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200));
   show('ride');
@@ -916,6 +916,14 @@ canvasEl.addEventListener('pointerup', (e) => {
     lastMoveAt = now;
     scene.walkSelf(pos[0], pos[1]);
     net.move(pos[0], pos[1]);
+    return;
+  }
+  // 아래로 쓸기 → 그 자리에 앉기
+  if (dy > 40 && Math.abs(dy) > Math.abs(dx) * 0.6) {
+    if (scene.selfUp) {
+      scene.selfUp = false;
+      net.sit();
+    }
     return;
   }
   // 위로 휙 쓸기 → 물수제비
