@@ -543,3 +543,9 @@ textarea { resize: none; line-height: 1.5; }
 }
 
 input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
+
+/* 오늘의 한 줄 · 나의 하루 */
+.today-line { margin: 0 0 14px; padding: 12px 14px; border-left: 3px solid rgba(255, 200, 140, 0.7); background: rgba(255, 255, 255, 0.06); border-radius: 0 10px 10px 0; }
+.today-line blockquote { margin: 0; font-size: 15.5px; line-height: 1.6; }
+.today-line figcaption { margin-top: 6px; font-size: 12.5px; color: var(--muted); text-align: right; }
+.my-days { margin: -4px 0 14px; font-size: 13px; color: var(--muted); }

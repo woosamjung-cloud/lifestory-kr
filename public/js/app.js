@@ -14,6 +14,7 @@ import { Scene } from './scene.js';
 import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait } from './characters.js';
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare } from './cards.js';
+import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
 import { Ambience } from './ambience.js';
 
 const $ = (id) => document.getElementById(id);
@@ -235,7 +236,19 @@ function applyEvent(ev, { animate = false } = {}) {
     if (animate && state.screen === 'ride') playTrain(ev);
   }
   renderEventTexts();
+  renderDaily();
   if (typeof applyWeather === 'function') applyWeather();
+}
+
+function renderDaily() {
+  const [text, src] = todayLine();
+  $('tl-text').textContent = text;
+  $('tl-src').textContent = src ? `— ${src}` : '';
+  $('tl-src').hidden = !src;
+  const st = dayStats(loadDays(store));
+  const el = $('my-days');
+  el.hidden = st.total === 0;
+  if (st.total) el.textContent = `나의 하루 ${st.total}일 · 연 아침 ${st.opened} · 닫은 저녁 ${st.closed}`;
 }
 
 function renderEventTexts() {
@@ -252,11 +265,11 @@ function renderEventTexts() {
   $('hud-special').textContent = ev.special ? `✨ ${ev.special}` : '';
   $('ritual-ico').textContent = east ? '🏮' : '🍾';
   $('ritual-name').textContent = place.ritual;
-  $('ritual-title').textContent = east ? '소원 풍등 날리기' : '유리병 편지 띄우기';
+  $('ritual-title').textContent = east ? '오늘의 다짐 풍등' : '내려놓기 유리병';
   $('ritual-desc').textContent = east
-    ? '해 뜨는 하늘에 소원을 띄워 보내요.'
-    : '오늘(올해) 털어버리고 싶은 걸 적어 바다로 보내요.';
-  $('ritual-text').placeholder = east ? '예) 올해는 꼭 합격!' : '예) 오늘의 실수, 잊어버리자';
+    ? '오늘 하루, 새로 해 볼 한 가지를 적어 하늘로 띄워요.'
+    : '오늘 묵은 마음, 털어버리고 싶은 걸 적어 바다로 보내요.';
+  $('ritual-text').placeholder = east ? '예) 오늘은 먼저 웃으며 인사하기' : '예) 아까 그 말, 마음에 두지 말자';
   $('preview-start').textContent = east ? '⏩ 해돋이 장면 60초 미리보기' : '⏩ 해넘이 장면 60초 미리보기';
   document.querySelectorAll('.seg-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.place === state.placeMode)));
 }
@@ -518,6 +531,13 @@ $('save-ticket').addEventListener('click', async () => {
 
 $('board').addEventListener('click', () => {
   scene.self = { ...state.profile };
+  // 나의 하루 기록 (미리보기·해외 장소는 세지 않음)
+  if (state.event && (state.event.place === 'east' || state.event.place === 'west')) {
+    const before = dayStats(loadDays(store)).total;
+    const st = dayStats(recordDay(store, state.event.place));
+    if (st.total > before && st.total > 1) setTimeout(() => toast(`🌱 오늘로 ${st.total}번째 하루를 함께해요`), 2500);
+    renderDaily();
+  }
   // 탑승 화면의 버튼 위치에 맞춰 자리 다시 배치
   requestAnimationFrame(() => scene.layoutSlots());
   // 탑승 버튼을 누른 순간 배경음 시작 (브라우저는 사용자가 누른 뒤에만 소리를 허용)
@@ -601,7 +621,7 @@ $('ritual-form').addEventListener('submit', (e) => {
   net.ritual(publicWish);
   const place = state.event.place;
   const lantern = PLACES[place].kind === 'sunrise';
-  toast(text ? `${lantern ? '🏮' : '🍾'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 소원 풍등이 하늘로 올라가요' : '🍾 유리병 편지가 바다로 떠나요');
+  toast(text ? `${lantern ? '🏮' : '🍾'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 오늘의 다짐이 하늘로 올라가요' : '🍾 내려놓은 마음이 바다로 떠나요');
 });
 
 $('act-card').addEventListener('click', async () => {
