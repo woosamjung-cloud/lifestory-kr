@@ -475,6 +475,27 @@ export function renderPortrait(canvas, type, color, hair = null, pet = 0) {
 }
 
 // ---------- 반려동물 (옆에 나란히 앉은 뒷모습, 꼬리가 살랑) ----------
+// 가끔 한 번, 어쩔 때는 두 번 천천히 움직이도록 시각마다 정해진 일정을 만듦
+function hash01(n) {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+// cycle(ms)마다 한 번 움직일 기회. 움직이지 않는 주기도 있음. 반환값 -1~1
+function episode(t, seed, cycle, swingMs, restChance) {
+  const tt = t + seed * 9973;
+  const idx = Math.floor(tt / cycle);
+  const local = tt - idx * cycle;
+  const r = hash01(idx + seed * 7.3);
+  if (r < restChance) return 0; // 이번엔 가만히
+  const swings = hash01(idx * 3.1 + seed) < 0.35 ? 2 : 1;
+  const start = (0.1 + 0.5 * hash01(idx * 1.7 + seed * 2.9)) * cycle;
+  const dur = swings * swingMs;
+  if (local < start || local > start + dur) return 0;
+  const u = (local - start) / dur;
+  const env = Math.sin(Math.PI * u); // 부드럽게 시작하고 끝남
+  return Math.sin(2 * Math.PI * swings * u) * env;
+}
+
 export function drawPet(ctx, o) {
   const { x, y, s, kind = 1, t = 0, bright = 1, hop = 0 } = o;
   if (!kind) return;
@@ -498,7 +519,8 @@ export function drawPet(ctx, o) {
   ctx.fill();
   // 살랑이는 꼬리
   // 살랑살랑 꼬리 (강아지는 신나게 빠르게, 고양이는 느긋하게 크게)
-  const wag = Math.sin(t / (dog ? 110 : 420)) * (dog ? 1 : 0.9);
+  const seed = Math.round(Math.abs(x)) % 997;
+  const wag = dog ? episode(t, seed, 6000, 1100, 0.3) : episode(t, seed, 9000, 1600, 0.35);
   ctx.strokeStyle = dog ? F : D;
   ctx.lineCap = 'round';
   ctx.lineWidth = k * (dog ? 0.13 : 0.1);
@@ -514,8 +536,8 @@ export function drawPet(ctx, o) {
   ctx.fill();
   // 머리: 까딱까딱 고개를 갸웃 (가끔 멈췄다 다시)
   const hy = by - k * 0.82;
-  const beat = Math.sin(t / (dog ? 260 : 380));
-  const tilt = (dog ? 0.3 : 0.24) * Math.sign(beat) * Math.pow(Math.abs(beat), 0.6) * (0.6 + 0.4 * Math.sin(t / 2300));
+  // 고개도 가끔 천천히 갸웃
+  const tilt = (dog ? 0.28 : 0.22) * episode(t, seed + 41, dog ? 5600 : 7400, dog ? 1300 : 1700, 0.35);
   ctx.save();
   ctx.translate(x, hy + k * 0.2);
   ctx.rotate(tilt);
