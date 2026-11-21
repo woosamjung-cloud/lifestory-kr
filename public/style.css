@@ -675,3 +675,21 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
 .sns-ico.fb { background: #1877f2; font-size: 26px; font-family: Georgia, serif; }
 .sns-ico.link { background: var(--paper-2); color: var(--ink); border: 2px solid var(--line); font-size: 18px; }
 @media (max-width: 380px) { .sns-row { grid-template-columns: repeat(3, 1fr); row-gap: 10px; } }
+
+/* 지금 흐르는 곡 */
+.nowplay { position: fixed; left: 16px; top: calc(96px + var(--safe-t)); z-index: 3; display: flex; align-items: center; gap: 8px; max-width: min(calc(100vw - 150px), 360px); padding: 8px 10px 8px 12px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-line); color: var(--on-glass); font-size: 13.5px; opacity: 0; transform: translateY(-6px); transition: opacity 1.4s ease, transform 1.4s ease; pointer-events: none; }
+.nowplay.show { opacity: 1; transform: none; pointer-events: auto; }
+.np-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.np-btn { flex: none; border: none; border-radius: 999px; padding: 5px 12px; background: #ffe08a; color: #5a3508; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+.track-list { display: grid; gap: 8px; margin: 10px 0 14px; max-height: 50dvh; overflow-y: auto; }
+.track { padding: 12px; border-radius: 14px; border: 2px solid var(--line); background: var(--paper-2); }
+.track.on { border-color: #e2a53b; }
+.tr-name b { display: block; font-size: 16px; }
+.tr-name span { font-size: 13px; color: var(--muted); }
+.tr-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tr-link { padding: 6px 12px; border-radius: 999px; font-size: 13px; text-decoration: none; color: #fff; background: #555; }
+.tr-link.melon { background: #00cd3c; }
+.tr-link.genie { background: #2b7fff; }
+.tr-link.spotify { background: #1db954; }
+.tr-link.youtube { background: #ff0033; }
+.tr-link.apple { background: #fa2d48; }

@@ -1382,6 +1382,63 @@ $('toggle-music').addEventListener('click', async () => {
   musicButton();
 });
 setInterval(() => music.on && music.setMood(musicMood()), 15000);
+
+// 지금 흐르는 곡 카드 (곡이 시작될 때 잠깐 은은하게) + 우리 음악 목록
+const LINK_NAMES = { melon: '멜론', genie: '지니', spotify: '스포티파이', youtube: '유튜브 뮤직', apple: '애플 뮤직' };
+function trackLinks(t) {
+  return Object.entries(t.links || {}).filter(([k, u]) => LINK_NAMES[k] && /^https:\/\//.test(u));
+}
+let npTimer = null;
+music.onTrack = (t) => {
+  $('np-title').textContent = t.title;
+  $('np-artist').textContent = t.artist ? ` · ${t.artist}` : '';
+  $('np-listen').hidden = !trackLinks(t).length;
+  const el = $('nowplay');
+  el.hidden = false;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(npTimer);
+  npTimer = setTimeout(() => el.classList.remove('show'), 9000);
+  setTimeout(() => !el.classList.contains('show') && (el.hidden = true), 10500);
+};
+$('np-listen').addEventListener('click', () => {
+  if (!music.current) return;
+  net.stat('musiclink');
+  openMusicList(music.current);
+});
+function openMusicList(focus) {
+  const box = $('track-list');
+  box.innerHTML = '';
+  const list = music.allTracks();
+  for (const t of focus ? [focus, ...list.filter((x) => x.file !== focus.file)] : list) {
+    const row = document.createElement('div');
+    row.className = 'track' + (focus && t.file === focus.file ? ' on' : '');
+    row.innerHTML = '<div class="tr-name"><b></b><span></span></div><div class="tr-links"></div>';
+    row.querySelector('b').textContent = t.title;
+    row.querySelector('span').textContent = t.artist || '';
+    for (const [k, u] of trackLinks(t)) {
+      const a = document.createElement('a');
+      a.href = u;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.className = 'tr-link ' + k;
+      a.textContent = LINK_NAMES[k];
+      a.addEventListener('click', () => net.stat('musiclink'));
+      row.querySelector('.tr-links').append(a);
+    }
+    box.append(row);
+  }
+  if ($('menu').open) $('menu').close();
+  $('musicdlg').showModal();
+}
+$('menu-music').addEventListener('click', () => openMusicList(null));
+$('music-close').addEventListener('click', () => $('musicdlg').close());
+// 곡 정보가 있을 때만 메뉴에 보임
+setTimeout(function checkTracks() {
+  if (music.tracks) $('menu-music').hidden = !music.allTracks().length;
+  else setTimeout(checkTracks, 2000);
+}, 1500);
 setInterval(soundButton, 1000);
 
 // ---------- 별자리 보기 (기본은 끔, 기기에 기억) ----------

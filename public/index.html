@@ -129,6 +129,11 @@
       <button class="btn tiny" id="preview-stop">실시간으로</button>
     </div>
 
+    <div class="nowplay" id="nowplay" hidden>
+      <span class="np-ico">🎵</span>
+      <span class="np-text"><b id="np-title"></b><span id="np-artist"></span></span>
+      <button class="np-btn" id="np-listen">듣기</button>
+    </div>
     <div class="saylog" id="saylog" aria-live="polite"></div>
     <div class="saypick" id="saypick" hidden></div>
     <div class="itembar" id="itembar" aria-label="내 아이템">
@@ -160,6 +165,7 @@
     </div>
     <button class="btn wide" id="preview-start">⏩ 해돋이 장면 60초 미리보기</button>
     <button class="btn wide" id="menu-shop">🎁 상점 · 내 아이템</button>
+    <button class="btn wide" id="menu-music" hidden>🎵 우리 음악</button>
     <button class="btn wide" id="show-help">이용 안내</button>
     <button class="btn wide ghost" id="menu-close">닫기</button>
   </dialog>
@@ -275,6 +281,14 @@
       <button class="sns" data-sns="link" title="링크 복사"><span class="sns-ico link">🔗</span><span>링크 복사</span></button>
     </div>
     <button class="btn ghost wide" id="card-close">닫기</button>
+  </dialog>
+
+  <!-- 우리 음악 -->
+  <dialog id="musicdlg" class="modal">
+    <h3>우리 음악</h3>
+    <p class="muted small">불멍하며 듣던 그 곡, 음원 사이트에서도 들을 수 있어요.</p>
+    <div class="track-list" id="track-list"></div>
+    <button class="btn wide ghost" id="music-close">닫기</button>
   </dialog>
 
   <!-- 이용 안내 -->

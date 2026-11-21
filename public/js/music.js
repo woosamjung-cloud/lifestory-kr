@@ -1,6 +1,8 @@
 // 배경 음악 (켜고 끄기, 기본은 꺼짐)
 // - public/music/tracks.json 이 있으면 그 음원 파일을 시간대에 맞춰 재생 (예: 수노 AI로 만든 곡)
-//   형식: { "sunrise": ["sunrise1.mp3"], "sunset": ["sunset1.mp3"], "night": ["night1.mp3"] }
+//   형식: { "sunrise": [곡, ...], "sunset": [...], "night": [...] }
+//   곡은 "파일.mp3" 또는 { "file", "title", "artist", "links": { "melon", "spotify", "youtube", "apple" } }
+//   곡 정보가 있으면 재생될 때 '지금 흐르는 곡' 카드가 뜨고, 음원 사이트로 이어짐 (우리 음원 홍보)
 // - 없으면 브라우저에서 직접 만드는 잔잔한 피아노·패드 연주 (음원 파일 없음, 저작권 걱정 없음)
 // 불멍을 방해하지 않게: 느린 박자, 작은 소리, 가사 없음
 
@@ -34,6 +36,21 @@ export class Music {
     }
   }
 
+  // 곡 정보가 있는 모든 곡 (메뉴의 '우리 음악' 목록)
+  allTracks() {
+    if (!this.tracks) return [];
+    const seen = new Set();
+    const out = [];
+    for (const k of ['sunrise', 'sunset', 'night']) {
+      for (const p of this.tracks[k] || []) {
+        if (typeof p !== 'object' || !p.title || seen.has(p.file)) continue;
+        seen.add(p.file);
+        out.push(p);
+      }
+    }
+    return out;
+  }
+
   setMood(mood) {
     if (!MOODS[mood] || mood === this.mood) return;
     this.mood = mood;
@@ -53,6 +70,7 @@ export class Music {
     this.on = false;
     if (this.audio) this.fadeAudio(this.audio, 0, 1500, true);
     this.audio = null;
+    this.current = null;
     this.timers.forEach(clearTimeout);
     this.timers = [];
     if (this.master) this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.6);
@@ -67,8 +85,10 @@ export class Music {
   playFile(crossfade) {
     const list = (this.tracks && this.tracks[this.mood]) || [];
     if (!list.length) return this.startSynth();
-    const src = 'music/' + list[Math.floor(Math.random() * list.length)];
-    const a = new Audio(src);
+    const pick = list[Math.floor(Math.random() * list.length)];
+    const track = typeof pick === 'string' ? { file: pick } : pick;
+    const a = new Audio('music/' + track.file);
+    this.current = track;
     a.volume = 0;
     a.loop = list.length === 1;
     a.addEventListener('ended', () => this.on && this.playFile(true));
@@ -79,6 +99,7 @@ export class Music {
       .play()
       .then(() => {
         this.fadeAudio(a, 0.35, 3000);
+        if (track.title && this.onTrack) this.onTrack(track);
         return true;
       })
       .catch(() => false);

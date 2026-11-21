@@ -42,7 +42,7 @@ let countsDirty = false;
 
 // ---------- 하루 통계 (개인정보 없이 숫자만) ----------
 // visitors: 하루 동안 접속한 기기 수 (기기마다 만든 무작위 번호로 중복 제거, 번호 자체는 저장하지 않음)
-const STAT_KINDS = ['ticket', 'card', 'save', 'preview'];
+const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink'];
 const dailyVisitors = new Map(); // dateKey -> Set(visitorId)  (메모리에만, 하루 지나면 지움)
 function today() {
   return dateKey(new Date());
