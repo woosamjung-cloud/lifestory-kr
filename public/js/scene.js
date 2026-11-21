@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritterFast, drawPet } from './characters.js';
+import { drawCritterFast, drawPet, drawWalker } from './characters.js';
 import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -207,7 +207,7 @@ export class Scene {
       const dx = sl.tx - sl.x;
       const dy = sl.ty - sl.y;
       const d = Math.hypot(dx, dy);
-      const speed = this.W * 0.16 + 60; // px/초
+      const speed = this.W * 0.1 + 40; // px/초 (발걸음에 맞춰 천천히)
       if (d < 1) {
         sl.x = sl.tx;
         sl.y = sl.ty;
@@ -553,6 +553,12 @@ export class Scene {
       // 손전등 빛은 몸 앞쪽에서 나가므로 사람보다 먼저 그림 (몸에 살짝 가려짐)
       const fl = this.flashes.get(sl);
       if (fl) this.drawFlash(ctx, sl, nowMs, fl);
+      if (sl.walking) {
+        // 걸어가는 중: 일어서서 걷는 모습
+        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.x * 13, bright: critterBright, dir: Math.sign((sl.tx ?? sl.x) - sl.x) });
+        if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.55, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, walking: true });
+        continue;
+      }
       drawCritterFast(ctx, {
         x: sl.x,
         y: sl.y,
@@ -560,7 +566,7 @@ export class Scene {
         type: p.char,
         color: p.color,
         arms: Math.max(hopT > 0 ? 1 : 0, celebrating ? 1 : 0),
-        hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5, sl.walking ? Math.abs(Math.sin(nowMs / 120)) * 0.12 : 0),
+        hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5),
         rim,
         t: nowMs,
         steam: p.me || sl.r >= 3,
