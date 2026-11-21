@@ -211,3 +211,24 @@ test('응원 한마디: 정해진 문구만, 10초에 한 번만 전달', async 
   a.close();
   b.close();
 });
+
+test('해변 걷기 위치 전달, 장작은 모두 합산·연타 무시', async () => {
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'join', room: 'east', char: 'coat', color: 0 }));
+  b.send(JSON.stringify({ t: 'join', room: 'east', char: 'hood', color: 1 }));
+  await wait(600);
+  a.send(JSON.stringify({ t: 'move', x: 300, y: 700 }));
+  a.send(JSON.stringify({ t: 'move', x: 5000, y: 1 })); // 범위 밖 → 무시
+  a.send(JSON.stringify({ t: 'wood' }));
+  a.send(JSON.stringify({ t: 'wood' })); // 연타 → 무시
+  b.send(JSON.stringify({ t: 'wood' }));
+  await wait(1600);
+  const room = last(b, 'room');
+  const moved = room.people.find((p) => p.length === 5);
+  assert.deepEqual(moved.slice(3), [300, 700]);
+  assert.equal(room.wood, 2);
+  const fx = b.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list).filter(([k]) => k === 'wood');
+  assert.ok(fx.length >= 1);
+  a.close();
+  b.close();
+});

@@ -124,6 +124,14 @@ export class Net {
     if (this.ws) this.ws.close();
   }
 
+  move(x, y) {
+    this.send({ t: 'move', x, y });
+  }
+
+  wood() {
+    this.send({ t: 'wood' });
+  }
+
   say(i) {
     this.send({ t: 'say', i });
   }

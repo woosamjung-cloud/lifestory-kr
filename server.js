@@ -30,9 +30,9 @@ const WITNESS_BEFORE_MS = 30 * 60 * 1000; // 이벤트 30분 전부터
 const WITNESS_AFTER_MS = 20 * 60 * 1000; // 이벤트 20분 후까지 자리에 있으면 "함께 본 사람"
 
 // ---------- 집계 저장 (함성 수, 함께 본 사람 수) ----------
-let counts = { cheers: {}, witnesses: {}, daily: {} };
+let counts = { cheers: {}, witnesses: {}, daily: {}, wood: {} };
 try {
-  counts = { cheers: {}, witnesses: {}, daily: {}, ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) };
+  counts = { cheers: {}, witnesses: {}, daily: {}, wood: {}, ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) };
 } catch {
   /* 처음 실행이면 파일이 없습니다 */
 }
@@ -138,6 +138,7 @@ function seatClient(room, c) {
   if (idx === -1) return false;
   room.seats[idx] = c;
   c.seat = idx;
+  c.pos = null; // 걸어간 자리 (없으면 원래 좌석)
   c.queued = false;
   send(c.ws, { t: 'seat', seat: idx });
   markWitness(room, c);
@@ -207,7 +208,9 @@ function roomSnapshot(room, withPeople = true) {
         const flags = (c.show.candle && shop.hasItem(c.visitor, 'candle') ? 1 : 0) | (c.show.bigfire && shop.hasItem(c.visitor, 'bigfire') ? 4 : 0);
         // 모습 코드 = 반려동물*384 + 머리색*64 + 모습*8 + 옷색
         const code = (c.pet || 0) * 384 + (c.hair || 0) * 64 + CHARS.indexOf(c.char) * 8 + c.color;
-        people.push(flags ? [i, code, flags] : [i, code]);
+        // [좌석, 모습 코드, 아이템 표시, 걸어간 x, 걸어간 y(0~1000)]
+        if (c.pos) people.push([i, code, flags, c.pos[0], c.pos[1]]);
+        else people.push(flags ? [i, code, flags] : [i, code]);
       }
     }
   }
@@ -222,6 +225,7 @@ function roomSnapshot(room, withPeople = true) {
     eventKey: ev ? ev.key : null,
     cheers: ev ? counts.cheers[ev.key] || 0 : 0,
     witnesses: ev ? counts.witnesses[ev.key] || 0 : 0,
+    wood: ev ? counts.wood[ev.key] || 0 : 0,
     people,
   };
 }
@@ -334,6 +338,32 @@ function handle(c, msg) {
       bump('wish');
       rooms[c.room].fx.push(['wish', c.seat, i]);
       send(c.ws, { t: 'wallet', wallet: shop.wallet(c.visitor) });
+      return;
+    }
+    case 'move': {
+      // 해변 걷기: 도착 지점만 받음 (0~1000 정수), 0.4초에 한 번
+      const x = Math.round(Number(msg.x));
+      const y = Math.round(Number(msg.y));
+      if (c.seat == null || !(x >= 0 && x <= 1000 && y >= 0 && y <= 1000)) return;
+      if (now - (c.lastMove || 0) < 400) return;
+      c.lastMove = now;
+      c.pos = [x, y];
+      rooms[c.room].dirty = true;
+      return;
+    }
+    case 'wood': {
+      // 장작 넣기: 모두의 장작이 모여 불을 키움, 2.5초에 한 번
+      if (c.seat == null || now - (c.lastWood || 0) < 2500) return;
+      c.lastWood = now;
+      const room = rooms[c.room];
+      const ev = currentEventOf(room.key);
+      if (ev) {
+        counts.wood[ev.key] = (counts.wood[ev.key] || 0) + 1;
+        countsDirty = true;
+      }
+      bump('wood');
+      room.fx.push(['wood', c.seat]);
+      room.dirty = true;
       return;
     }
     case 'say': {

@@ -99,7 +99,7 @@ const net = new Net({
     if (m.people.length || !m.seated) {
       scene.people = m.people
         .filter(([seat]) => seat !== state.seat)
-        .map(([seat, code, flags = 0]) => ({ seat, flags, pet: Math.floor(code / 384), hair: Math.floor((code % 384) / 64), char: CHAR_LIST[Math.floor((code % 64) / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
+        .map(([seat, code, flags = 0, px, py]) => ({ seat, flags, pos: px != null ? [px, py] : null, pet: Math.floor(code / 384), hair: Math.floor((code % 384) / 64), char: CHAR_LIST[Math.floor((code % 64) / 8)]?.key || CHAR_LIST[0].key, color: code % 8 }));
     }
     updateOnlineLabels();
   },
@@ -145,6 +145,10 @@ const net = new Net({
       // 폭죽과 소원은 보이지 않는 자리에서 보내도 하늘에는 보임
       if (kind === 'fireworks') {
         scene.fireworksFrom(slot ? slot.x : scene.W * (0.2 + Math.random() * 0.6));
+        continue;
+      }
+      if (kind === 'wood') {
+        scene.throwWood(slot);
         continue;
       }
       if (kind === 'say') {
@@ -297,6 +301,17 @@ function updateOnlineLabels() {
   $('hud-online').textContent = text;
   const homeOnline = s === 'online' && r ? `지금 ${r.seated.toLocaleString('ko-KR')}명이 탑승해 있어요` : '';
   $('nt-online').textContent = homeOnline;
+  const woodEl = $('hud-wood');
+  if (s === 'online' && r && r.wood) {
+    // 1,000개마다 불꽃이 크게 피어오름
+    if (state.lastWood != null && Math.floor(r.wood / 1000) > Math.floor(state.lastWood / 1000)) {
+      scene.fireBoost = 2;
+      toast(`🔥 다 함께 장작 ${(Math.floor(r.wood / 1000) * 1000).toLocaleString('ko-KR')}개! 불이 활활 타올라요`);
+    }
+    state.lastWood = r.wood;
+    woodEl.hidden = false;
+    woodEl.textContent = `🪵 장작 ${r.wood.toLocaleString('ko-KR')}`;
+  } else woodEl.hidden = true;
   const cheers = $('hud-cheers');
   if (s === 'online' && r && r.cheers) {
     cheers.hidden = false;
@@ -498,6 +513,11 @@ $('board').addEventListener('click', () => {
   // 탑승 화면의 버튼 위치에 맞춰 자리 다시 배치
   requestAnimationFrame(() => scene.layoutSlots());
   // 탑승 버튼을 누른 순간 배경음 시작 (브라우저는 사용자가 누른 뒤에만 소리를 허용)
+  // 처음 탑승하면 놀이 방법 안내
+  if (!store.get('playHint', false)) {
+    store.set('playHint', true);
+    setTimeout(() => toast('👆 모래를 누르면 걸어가요 · 🔥 불을 누르면 장작 · ↑ 위로 쓸면 물수제비'), 7000);
+  }
   if (store.get('sound', true)) ambience.start().then((ok) => ok && setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200));
   show('ride');
   playTrain(state.event);
@@ -866,6 +886,66 @@ scene.onBoom = () => ambience.boom();
 scene.onCoin = () => ambience.plop();
 loadShop();
 
+
+// ---------- 해변 놀이: 누르면 걷기 · 불을 누르면 장작 · 위로 쓸면 물수제비 ----------
+const canvasEl = $('scene');
+let pdown = null;
+let lastMoveAt = 0;
+let lastWoodAt = 0;
+let lastStoneAt = 0;
+canvasEl.addEventListener('pointerdown', (e) => {
+  if (state.screen !== 'ride') return;
+  pdown = { x: e.clientX, y: e.clientY, t: performance.now() };
+});
+canvasEl.addEventListener('pointerup', (e) => {
+  if (state.screen !== 'ride' || !pdown) return;
+  const dx = e.clientX - pdown.x;
+  const dy = e.clientY - pdown.y;
+  const dt = Math.max(16, performance.now() - pdown.t);
+  const dist = Math.hypot(dx, dy);
+  const start = pdown;
+  pdown = null;
+  if (dist < 14) {
+    // 짧게 누름
+    if (scene.nearFire(e.clientX, e.clientY)) return addWood();
+    const pos = scene.screenToPos(e.clientX, e.clientY);
+    if (!pos) return;
+    if (scene.selfStanding) return toast('자리에 앉은 뒤에 움직일 수 있어요');
+    const now = Date.now();
+    if (now - lastMoveAt < 400) return;
+    lastMoveAt = now;
+    scene.walkSelf(pos[0], pos[1]);
+    net.move(pos[0], pos[1]);
+    return;
+  }
+  // 위로 휙 쓸기 → 물수제비
+  if (dy < -40 && Math.abs(dy) > Math.abs(dx) * 0.6 && start.y > scene.horizonY) {
+    const now = Date.now();
+    if (now - lastStoneAt < 1200) return;
+    lastStoneAt = now;
+    const speed = dist / dt; // px/ms
+    const n = Math.max(0, Math.min(14, Math.round(speed * 3.2 + Math.random() * 3 - 1.5)));
+    const dir = Math.max(-1, Math.min(1, dx / Math.abs(dy)));
+    scene.skipStone(scene.mySlot, dir, n, true);
+    const best = store.get('stoneBest', 0);
+    if (n > best) {
+      store.set('stoneBest', n);
+      if (best > 0) setTimeout(() => toast(`🪨 물수제비 최고 기록! ${n}번`), 1800);
+    }
+  }
+});
+canvasEl.addEventListener('pointercancel', () => (pdown = null));
+
+function addWood() {
+  const now = Date.now();
+  if (now - lastWoodAt < 2500) return;
+  lastWoodAt = now;
+  scene.throwWood(scene.mySlot, true);
+  net.wood();
+}
+
+scene.onWood = () => ambience.on && ambience.boom && ambience.scheduleOneCrackle && [0, 60, 130, 220].forEach((d) => setTimeout(() => ambience.on && ambience.scheduleOneCrackle(0.6), d));
+scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick());
 
 // ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------
 let lastSay = 0;

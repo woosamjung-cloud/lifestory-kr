@@ -152,12 +152,83 @@ export class Scene {
       const score = Math.abs(sl.x - (W / 2 - W * 0.08));
       return !best || score < best.score ? { sl, score } : best;
     }, null).sl;
-    this.mySlot = mine;
+    // 걷기용: 해변 자리 범위
+    this.rowTop = top;
+    this.rowBottom = bottom;
+    this.sMin = unit * 0.03;
+    this.sMax = unit * 0.075;
+    this.homeSlot = mine; // 원래 내 자리 (모닥불 위치 기준)
+    const prev = this.mySlot;
+    this.mySlot = { ...mine };
+    if (this.selfPos) {
+      Object.assign(this.mySlot, this.posToSlot(this.selfPos[0], this.selfPos[1]));
+      if (prev) {
+        // 화면 크기가 바뀌어도 걷던 흐름 유지
+        this.mySlot.tx = this.mySlot.x;
+        this.mySlot.ty = this.mySlot.y;
+        this.mySlot.ts = this.mySlot.s;
+      }
+    }
+    this.moved = new Map();
     this.slots = slots.filter((sl) => sl !== mine);
+  }
+
+  // ---------- 해변 걷기 ----------
+  // 0~1000 위치 → 화면 자리
+  posToSlot(px, py) {
+    const t = clamp(py / 1000);
+    return { x: (px / 1000) * this.W, y: lerp(this.rowTop, this.rowBottom, t ** 1.15), s: lerp(this.sMin, this.sMax, t), r: Math.round(t * 4) };
+  }
+
+  // 화면 좌표 → 0~1000 위치 (해변 밖이면 null)
+  screenToPos(x, y) {
+    if (y < this.shoreY + 6) return null;
+    const f = clamp((y - this.rowTop) / (this.rowBottom - this.rowTop));
+    const t = f ** (1 / 1.15);
+    return [Math.round(clamp(x / this.W, 0.05, 0.95) * 1000), Math.round(t * 1000)];
+  }
+
+  walkTo(slot, target) {
+    slot.tx = target.x;
+    slot.ty = target.y;
+    slot.ts = target.s;
+    slot.tr = target.r;
+  }
+
+  // 내 캐릭터를 걷게 함
+  walkSelf(px, py) {
+    this.selfPos = [px, py];
+    this.walkTo(this.mySlot, this.posToSlot(px, py));
+  }
+
+  stepWalkers(dt) {
+    const step = (sl) => {
+      if (sl.tx == null) return;
+      const dx = sl.tx - sl.x;
+      const dy = sl.ty - sl.y;
+      const d = Math.hypot(dx, dy);
+      const speed = this.W * 0.16 + 60; // px/초
+      if (d < 1) {
+        sl.x = sl.tx;
+        sl.y = sl.ty;
+        sl.s = sl.ts;
+        sl.r = sl.tr ?? sl.r;
+        sl.walking = false;
+        return;
+      }
+      const k = Math.min(1, (speed * dt) / d);
+      sl.x += dx * k;
+      sl.y += dy * k;
+      sl.s += (sl.ts - sl.s) * k;
+      sl.walking = true;
+    };
+    step(this.mySlot);
+    for (const sl of this.moved.values()) step(sl);
   }
 
   slotForSeat(seat) {
     if (seat == null) return null;
+    if (this.moved && this.moved.has(seat)) return this.moved.get(seat);
     // 서버 좌석 번호를 화면 자리에 대응 (내 좌석보다 앞 번호는 그대로, 뒤 번호는 한 칸 당김)
     let idx = seat;
     if (this.selfSeat != null && seat > this.selfSeat) idx -= 1;
@@ -443,6 +514,24 @@ export class Scene {
     const rim = { x: sun.x > W / 2 ? 1 : -1, color: 'rgb(255,190,120)', a: clamp(1 - Math.abs(e - 2) / 8) * 0.9 };
     const celebrating = nowMs - this.celebrateAt < 4000;
     const draw = [];
+    const dtw = this._walkT ? Math.min(0.1, (nowMs - this._walkT) / 1000) : 0;
+    this._walkT = nowMs;
+    const seen = new Set();
+    for (const p of this.people) {
+      if (p.pos) {
+        seen.add(p.seat);
+        let ms = this.moved.get(p.seat);
+        const target = this.posToSlot(p.pos[0], p.pos[1]);
+        if (!ms) {
+          const base = this.slotForSeat(p.seat);
+          ms = base ? { ...base } : { ...target };
+          this.moved.set(p.seat, ms);
+        }
+        if (ms.tx !== target.x || ms.ty !== target.y) this.walkTo(ms, target);
+      }
+    }
+    for (const k of [...this.moved.keys()]) if (!seen.has(k)) this.moved.delete(k);
+    this.stepWalkers(dtw);
     for (const p of this.people) {
       const sl = this.slotForSeat(p.seat);
       if (sl) draw.push({ sl, p });
@@ -471,7 +560,7 @@ export class Scene {
         type: p.char,
         color: p.color,
         arms: Math.max(hopT > 0 ? 1 : 0, celebrating ? 1 : 0),
-        hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5),
+        hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5, sl.walking ? Math.abs(Math.sin(nowMs / 120)) * 0.12 : 0),
         rim,
         t: nowMs,
         steam: p.me || sl.r >= 3,
@@ -507,6 +596,9 @@ export class Scene {
 
     // 효과들
     this.renderEffects(nowMs, sun);
+
+    // 장작·물수제비
+    this.drawThrows(ctx, nowMs);
 
     // 폭죽·동전 소원
     this.drawBursts(ctx, nowMs);
@@ -565,7 +657,7 @@ export class Scene {
 
   // ---------- 불멍 화로 ----------
   fireSpot() {
-    const sl = this.mySlot;
+    const sl = this.homeSlot || this.mySlot;
     const fs = Math.min(sl.s * 1.5, this.W * 0.16) * (this.selfItems.bigfire ? 1.35 : 1);
     return { x: Math.min(sl.x + this.W * 0.22, this.W - fs * 0.8), y: sl.y - sl.s * 0.1, s: fs };
   }
@@ -667,7 +759,7 @@ export class Scene {
       tongues.push([-0.24, 0.5, 0.1, 6.3], [0.24, 0.48, 0.1, 7.9], [0.04, 1.0, 0.13, 9.1]);
     }
     for (const [ox, hh, ww, k] of tongues) {
-      const h = s * hh * (0.75 + 0.25 * Math.sin(t / (150 + k * 30) + k) + 0.1 * Math.sin(t / 53 + k * 3));
+      const h = s * hh * (0.75 + 0.25 * Math.sin(t / (150 + k * 30) + k) + 0.1 * Math.sin(t / 53 + k * 3)) * (1 + (this.fireBoost || 0));
       const w = s * ww;
       const sway = Math.sin(t / 310 + k) * s * 0.06 + Math.sin(t / 89 + k * 2) * s * 0.025;
       const bx = x + ox * s;
@@ -705,7 +797,8 @@ export class Scene {
     if (!this.embers) this.embers = [];
     const dt = this._fireT ? Math.min(0.1, (t - this._fireT) / 1000) : 0;
     this._fireT = t;
-    if (Math.random() < dt * (this.selfItems.bigfire ? 22 : 9)) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
+    this.fireBoost = Math.max(0, (this.fireBoost || 0) - dt * 0.35);
+    if (Math.random() < dt * (this.selfItems.bigfire ? 22 : 9) * (1 + (this.fireBoost || 0) * 4)) this.embers.push({ x: x + (Math.random() - 0.5) * s * 0.3, y: base - s * 0.2, vx: (Math.random() - 0.5) * s * 0.3, vy: -(s * 0.8 + Math.random() * s * 0.9), life: 0, max: 1.4 + Math.random() * 1.8, r: 0.8 + Math.random() * 1.4, ph: Math.random() * 6 });
     this.embers = this.embers.filter((e) => {
       e.life += dt;
       if (e.life > e.max) return false;
@@ -925,6 +1018,127 @@ export class Scene {
       ctx.fillText(w.text, w.tx, y);
       ctx.shadowBlur = 0;
       return true;
+    });
+    ctx.restore();
+  }
+
+  // ---------- 장작 넣기 ----------
+  nearFire(x, y) {
+    const f = this.fireSpot();
+    return Math.hypot(x - f.x, (y - (f.y - f.s * 0.3)) * 1.2) < Math.max(36, f.s * 0.75);
+  }
+
+  throwWood(fromSlot, isSelf = false) {
+    const f = this.fireSpot();
+    const from = fromSlot || this.slots[Math.floor(Math.random() * Math.min(30, this.slots.length))] || this.mySlot;
+    if (!this.throws) this.throws = [];
+    this.throws.push({ kind: 'wood', x0: from.x, y0: from.y - from.s * 0.9, x1: f.x + (Math.random() - 0.5) * f.s * 0.2, y1: f.y - f.s * 0.2, s: f.s, t0: performance.now(), self: isSelf, rot: Math.random() * 6 });
+  }
+
+  // ---------- 물수제비 ----------
+  // dir: 좌우로 기울어진 정도(-1~1), bounces: 튀는 횟수
+  skipStone(fromSlot, dir, bounces, isSelf = true) {
+    const from = fromSlot || this.mySlot;
+    const pts = [];
+    let depth = 0;
+    let gap = 0.22;
+    for (let i = 0; i <= bounces; i++) {
+      depth = Math.min(0.97, depth + gap);
+      gap *= 0.78;
+      const y = lerp(this.shoreY - 3, this.horizonY + 4, depth);
+      pts.push({ x: from.x + dir * (this.shoreY - y) * 0.9, y, d: depth });
+    }
+    if (!this.throws) this.throws = [];
+    this.throws.push({ kind: 'stone', x0: from.x, y0: from.y - from.s * 0.9, pts, n: bounces, t0: performance.now(), self: isSelf });
+  }
+
+  drawThrows(ctx, t) {
+    if (!this.throws || !this.throws.length) return;
+    ctx.save();
+    this.throws = this.throws.filter((th) => {
+      const age = (t - th.t0) / 1000;
+      if (th.kind === 'wood') {
+        const fly = 0.7;
+        if (age < fly) {
+          const p = age / fly;
+          const x = lerp(th.x0, th.x1, p);
+          const y = lerp(th.y0, th.y1, p) - Math.sin(p * Math.PI) * th.s * 1.2;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(th.rot + age * 9);
+          ctx.fillStyle = '#7a4b2e';
+          ctx.fillRect(-th.s * 0.2, -th.s * 0.05, th.s * 0.4, th.s * 0.1);
+          ctx.fillStyle = '#c99a6b';
+          ctx.beginPath();
+          ctx.ellipse(th.s * 0.2, 0, th.s * 0.03, th.s * 0.05, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          return true;
+        }
+        if (!th.landed) {
+          th.landed = true;
+          this.fireBoost = Math.min(1.2, (this.fireBoost || 0) + (th.self ? 0.7 : 0.35));
+          if (this.onWood) this.onWood();
+        }
+        return false;
+      }
+      // 물수제비
+      const segs = [0.45];
+      for (let i = 1; i < th.pts.length; i++) segs.push(segs[i - 1] * 0.82);
+      let acc = 0;
+      let seg = -1;
+      for (let i = 0; i < segs.length; i++) {
+        if (age < acc + segs[i]) {
+          seg = i;
+          break;
+        }
+        acc += segs[i];
+      }
+      // 튄 자리마다 물결
+      for (let i = 0; i < th.pts.length; i++) {
+        const hitAt = segs.slice(0, i + 1).reduce((a, b) => a + b, 0);
+        const ra = age - hitAt;
+        if (ra < 0 || ra > 1.6) continue;
+        const pt = th.pts[i];
+        const sc = 1 - pt.d * 0.85;
+        const last = i === th.pts.length - 1;
+        ctx.strokeStyle = `rgba(255,255,255,${(0.65 - ra / 1.6 * 0.65) * (last ? 1 : 0.8)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(pt.x, pt.y, (4 + ra * 26) * sc, (1.2 + ra * 6) * sc, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        if (!th['s' + i] && ra >= 0) {
+          th['s' + i] = true;
+          if (this.onSkip) this.onSkip(last, i);
+        }
+      }
+      if (seg >= 0) {
+        const p = (age - acc) / segs[seg];
+        const a0 = seg === 0 ? { x: th.x0, y: th.y0, d: -0.1 } : th.pts[seg - 1];
+        const a1 = th.pts[seg];
+        const sc = Math.max(0.15, 1 - lerp(Math.max(0, a0.d), a1.d, p) * 0.9);
+        const lift = (seg === 0 ? 40 : 18 * (1 - a1.d)) * Math.sin(p * Math.PI) * sc;
+        const x = lerp(a0.x, a1.x, p);
+        const y = lerp(a0.y, a1.y, p) - lift;
+        ctx.fillStyle = '#8c8a90';
+        ctx.beginPath();
+        ctx.ellipse(x, y, 4 * sc, 2.6 * sc, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const total = segs.reduce((a, b) => a + b, 0);
+      // 결과 글자 (내 돌만)
+      if (th.self && age > total * 0.6 && age < total + 2.2) {
+        const last = th.pts[th.pts.length - 1];
+        const a = Math.min(1, (age - total * 0.6) / 0.4) * Math.min(1, (total + 2.2 - age) / 0.6);
+        ctx.font = `700 ${Math.max(15, this.H * 0.022)}px "Gowun Batang", serif`;
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.fillText(th.n > 0 ? `통통 ${th.n}번!` : '퐁당', last.x, last.y - 18 - (age - total * 0.6) * 8);
+        ctx.shadowBlur = 0;
+      }
+      return age < total + 2.4;
     });
     ctx.restore();
   }

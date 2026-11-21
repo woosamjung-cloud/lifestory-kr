@@ -37,6 +37,9 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   margin: 0;
   height: 100%;
   overflow: hidden;
@@ -48,6 +51,7 @@ html, body {
 button, input, textarea { font: inherit; color: inherit; }
 
 #scene {
+  touch-action: none;
   position: fixed;
   inset: 0;
   width: 100%;
@@ -534,3 +538,5 @@ textarea { resize: none; line-height: 1.5; }
   }
   .actions { margin-top: auto; }
 }
+
+input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
