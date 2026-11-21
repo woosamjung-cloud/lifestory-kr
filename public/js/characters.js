@@ -567,7 +567,7 @@ export const BREEDS = [
   { name: '웰시코기', dog: true, fur: '#dc9248', dark: '#b8702f', ears: 'erect', earSize: 1.4, earInner: '#f3dcc4', tail: 'stub', loaf: true, size: 0.95, legs: 0.42, wide: 1.15, long: 1.4, paw: '#f7f1e8', bib: '#f7f1e8', blaze: '#f7f1e8', whiteLegs: true, smile: true },
   { name: '말티즈', dog: true, fur: '#f6f3ee', dark: '#ddd5c8', ears: 'long', tail: 'plume', size: 0.72, fluff: 0.55 },
   { name: '스피츠', dog: true, fur: '#fbfaf7', dark: '#e4dfd5', ears: 'erect', earSize: 0.8, earInner: '#f1d2c8', tail: 'curl', size: 0.9, fluff: 1.35, mane: true, smile: true },
-  { name: '페르시안', dog: false, fur: '#efe1c8', dark: '#d2bd9a', ears: 'small', tail: 'fluffy', size: 1.05, fluff: 1, flat: true },
+  { name: '페르시안', dog: false, fur: '#efdcbf', dark: '#d4bb94', ears: 'small', earInner: '#efc7b8', tail: 'fluffy', size: 1.05, fluff: 1.3, flat: true, mane: true, bib: '#fbf6ee', eye: '#d98a2b', bigEyes: true },
   { name: '샴', dog: false, fur: '#f0e4cf', dark: '#5a4233', ears: 'pointy', earDark: true, tail: 'long', size: 0.95, paw: '#5a4233', mask: true },
   { name: '장화 고양이', dog: false, fur: '#3d3b42', dark: '#2a292e', ears: 'pointy', tail: 'long', size: 1, paw: '#f4f1ec', boots: true, bib: '#f4f1ec' },
 ];
@@ -763,6 +763,14 @@ export function drawPet(ctx, o) {
       ctx.quadraticCurveTo(x + k * 0.52, by - k * (0.12 + wag * 0.15), x + k * (0.48 + wag * 0.08), by - k * (0.26 + wag * 0.2));
     }
     ctx.stroke();
+    if (B.tail === 'fluffy' && hop <= 0.04) {
+      // 길고 복슬복슬한 꼬리털
+      ctx.fillStyle = F;
+      for (let i = 0; i < 6; i++) {
+        const u = i / 5;
+        circle(ctx, x + k * (0.12 + 0.36 * u + wag * 0.06 * u), by - k * (0.02 + 0.2 * u * u + Math.max(0, wag) * 0.1 * u), k * (0.09 + 0.03 * u));
+      }
+    }
   }
   // 스피츠: 목 둘레 갈기털
   if (B.mane) fluffRing(ctx, x, by - k * 0.62, k * 0.24, k * 0.1, 12, k * 0.09, F);
@@ -930,9 +938,9 @@ function drawPetWalk(ctx, o) {
       ctx.quadraticCurveTo(x + wag * k * 0.12, bodyY - k * 0.08, ex, ey);
     }
     ctx.stroke();
-    if (B.tail === 'pom') {
+    if (B.tail === 'pom' || B.tail === 'fluffy') {
       ctx.fillStyle = F;
-      circle(ctx, ex, ey, k * 0.1);
+      circle(ctx, ex, ey, k * (B.tail === 'fluffy' ? 0.12 : 0.1));
     }
   };
   if (facingFront) drawTail();
@@ -1002,9 +1010,16 @@ function drawPetWalk(ctx, o) {
       ctx.ellipse(hx, hy + hr * 0.4, hr * 0.42, hr * 0.32, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    const eyeCol = B.mask ? '#5aa0d8' : B.fur === '#3d3b42' ? '#d8b84a' : '#2b1d16';
+    const eyeCol = B.eye || (B.mask ? '#5aa0d8' : B.fur === '#3d3b42' ? '#d8b84a' : '#2b1d16');
     ctx.fillStyle = eyeCol;
-    for (const sg of [-1, 1]) circle(ctx, hx + sg * k * 0.08, hy - k * 0.01, Math.max(0.8, k * (B.flat ? 0.04 : 0.03)));
+    for (const sg of [-1, 1]) circle(ctx, hx + sg * k * 0.08, hy - k * 0.01, Math.max(0.8, k * (B.bigEyes ? 0.055 : B.flat ? 0.04 : 0.03)));
+    if (B.bigEyes) {
+      // 동그란 호박색 눈 + 까만 눈동자 + 반짝
+      ctx.fillStyle = '#2b1d16';
+      for (const sg of [-1, 1]) circle(ctx, hx + sg * k * 0.08, hy - k * 0.005, Math.max(0.6, k * 0.03));
+      ctx.fillStyle = '#fff';
+      for (const sg of [-1, 1]) circle(ctx, hx + sg * k * 0.08 + k * 0.015, hy - k * 0.025, Math.max(0.4, k * 0.012));
+    }
     ctx.fillStyle = '#2b1d16';
     ctx.beginPath();
     ctx.ellipse(hx, hy + k * (B.flat ? 0.05 : 0.08), k * (B.flat ? 0.025 : 0.035), k * 0.022, 0, 0, Math.PI * 2);
@@ -1088,9 +1103,10 @@ function drawPetSide(ctx, o) {
     ctx.moveTo(rx, by - k * 0.4);
     ctx.quadraticCurveTo(x - d * k * (0.45 + wag * 0.05) * W, by - k * 0.62, ex, ey);
     ctx.stroke();
-    if (B.tail === 'pom') {
+    if (B.tail === 'pom' || B.tail === 'fluffy') {
       ctx.fillStyle = F;
-      circle(ctx, ex, ey, k * 0.1);
+      if (B.tail === 'fluffy') for (let i = 1; i <= 4; i++) circle(ctx, rx + (ex - rx) * (i / 4), by - k * 0.4 + (ey - by + k * 0.4) * (i / 4), k * 0.1);
+      else circle(ctx, ex, ey, k * 0.1);
     }
   }
   // 몸통
@@ -1158,8 +1174,12 @@ function drawPetSide(ctx, o) {
     ctx.closePath();
     ctx.fill();
   }
-  ctx.fillStyle = B.mask ? '#5aa0d8' : B.fur === '#3d3b42' ? '#d8b84a' : '#2b1d16';
-  circle(ctx, hx + d * k * 0.08, hy - k * 0.02, Math.max(0.8, k * 0.03));
+  ctx.fillStyle = B.eye || (B.mask ? '#5aa0d8' : B.fur === '#3d3b42' ? '#d8b84a' : '#2b1d16');
+  circle(ctx, hx + d * k * 0.08, hy - k * 0.02, Math.max(0.8, k * (B.bigEyes ? 0.045 : 0.03)));
+  if (B.bigEyes) {
+    ctx.fillStyle = '#2b1d16';
+    circle(ctx, hx + d * k * 0.09, hy - k * 0.02, Math.max(0.5, k * 0.022));
+  }
   ctx.fillStyle = '#2b1d16';
   circle(ctx, hx + d * k * (B.flat ? 0.17 : 0.24), hy + k * 0.04, Math.max(0.7, k * 0.025));
   ctx.fillStyle = dog ? '#c9574e' : '#e2b04a';
