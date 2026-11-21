@@ -585,7 +585,8 @@ export function drawPet(ctx, o) {
 
 // 걷는 반려동물: 네 발로 총총 (뒷모습)
 function drawPetWalk(ctx, o) {
-  const { x, y, s, kind = 1, t = 0, bright = 1 } = o;
+  const { x, y, s, kind = 1, bright = 1, still = false } = o;
+  const t = o.t || 0;
   const dog = kind === 1;
   const f = (c) => {
     const n = parseInt(c.slice(1), 16);
@@ -595,7 +596,7 @@ function drawPetWalk(ctx, o) {
   const F = f(dog ? '#b98652' : '#8a8f99');
   const D = f(dog ? '#8a5f37' : '#5f646e');
   const k = s * 0.42;
-  const ph = t / (dog ? 95 : 120);
+  const ph = still ? 0 : t / (dog ? 95 : 120);
   const bob = Math.abs(Math.sin(ph)) * k * 0.05;
   const by = y - bob;
   ctx.save();
@@ -660,7 +661,8 @@ function drawPetWalk(ctx, o) {
 
 // ---------- 걷는 사람 (서서 걸어가는 뒷모습) ----------
 export function drawWalker(ctx, o) {
-  const { x, y, s, type = 'blanket', color = 0, t = 0, bright = 1, dir = 0 } = o;
+  const { x, y, s, type = 'blanket', color = 0, bright = 1, dir = 0, still = false } = o;
+  const t = still ? 0 : o.t || 0; // 서서 쉬는 중이면 다리 멈춤
   const [base, accent] = BLANKETS[color % BLANKETS.length];
   const hairIdx = o.hair;
   const hairColor = hairIdx != null && HAIRS[hairIdx] ? HAIRS[hairIdx][1] : HAIR[(color + type.length) % HAIR.length];

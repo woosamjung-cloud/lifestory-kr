@@ -213,6 +213,7 @@ export class Scene {
         sl.y = sl.ty;
         sl.s = sl.ts;
         sl.r = sl.tr ?? sl.r;
+        if (sl.walking) sl.arrivedAt = performance.now(); // 도착하면 잠시 서 있다가 앉음
         sl.walking = false;
         return;
       }
@@ -553,10 +554,12 @@ export class Scene {
       // 손전등 빛은 몸 앞쪽에서 나가므로 사람보다 먼저 그림 (몸에 살짝 가려짐)
       const fl = this.flashes.get(sl);
       if (fl) this.drawFlash(ctx, sl, nowMs, fl);
-      if (sl.walking) {
-        // 걸어가는 중: 일어서서 걷는 모습
-        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.x * 13, bright: critterBright, dir: Math.sign((sl.tx ?? sl.x) - sl.x) });
-        if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.55, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, walking: true });
+      const standing = sl.walking || (sl.arrivedAt && nowMs - sl.arrivedAt < 8000);
+      if (standing) {
+        // 걷는 중이거나 막 도착해서 서 있는 중 (8초 동안 가만히 있으면 앉음)
+        const still = !sl.walking;
+        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.x * 13, bright: critterBright, dir: still ? 0 : Math.sign((sl.tx ?? sl.x) - sl.x), still });
+        if (p.pet) drawPet(ctx, { x: sl.x + sl.s * 0.55, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.x * 37, bright: critterBright, walking: true, still });
         continue;
       }
       drawCritterFast(ctx, {
