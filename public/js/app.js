@@ -134,6 +134,10 @@ const net = new Net({
   onWallet(w) {
     setWallet(w);
   },
+  onGotHeart(m) {
+    setWallet(m.wallet);
+    toast(`❤️ 하트를 선물 받았어요 (모두 ${m.total.toLocaleString('ko-KR')}개)`);
+  },
   onNeed(item) {
     openShop(item === 'coins' ? '소원 동전이 부족해요. 충전해 주세요' : '이 아이템은 기간이 끝났어요');
   },
@@ -147,12 +151,16 @@ const net = new Net({
         scene.fireworksFrom(slot ? slot.x : scene.W * (0.2 + Math.random() * 0.6));
         continue;
       }
+      if (kind === 'heart') {
+        scene.heartFrom(slot, scene.slotForSeat(extra), extra === state.seat);
+        continue;
+      }
       if (kind === 'wood') {
         scene.throwWood(slot);
         continue;
       }
       if (kind === 'say') {
-        if (shopInfo && shopInfo.sayings[extra]) showSay(shopInfo.sayings[extra], false);
+        if (shopInfo && shopInfo.sayings[extra]) showSay(shopInfo.sayings[extra], false, list.find((f) => f[0] === 'say' && f[1] === seat)?.[3] || 1);
         continue;
       }
       if (kind === 'wish') {
@@ -686,6 +694,12 @@ function setWallet(w) {
   });
   $('wish-coins').textContent = myWallet.coins;
   $('shop-coins').textContent = myWallet.coins;
+  const hh = myWallet.hearts;
+  const hp = $('hud-hearts');
+  if (hh) {
+    hp.hidden = false;
+    hp.textContent = `❤️ 받은 ${hh.received.toLocaleString('ko-KR')} · 준 ${hh.given.toLocaleString('ko-KR')}`;
+  }
   if (shopInfo && $('shopdlg').open) renderProducts();
 }
 
@@ -908,6 +922,9 @@ canvasEl.addEventListener('pointerup', (e) => {
   if (dist < 14) {
     // 짧게 누름
     if (scene.nearFire(e.clientX, e.clientY)) return addWood();
+    // 다른 사람을 누르면 하트 선물
+    const who = scene.personAt(e.clientX, e.clientY);
+    if (who) return sendHeart(who);
     const pos = scene.screenToPos(e.clientX, e.clientY);
     if (!pos) return;
     if (scene.selfStanding) return toast('자리에 앉은 뒤에 움직일 수 있어요');
@@ -944,6 +961,24 @@ canvasEl.addEventListener('pointerup', (e) => {
 });
 canvasEl.addEventListener('pointercancel', () => (pdown = null));
 
+let lastHeartAt = 0;
+function sendHeart(who) {
+  if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 하트를 보낼 수 있어요');
+  const now = Date.now();
+  if (now - lastHeartAt < 1500) return;
+  lastHeartAt = now;
+  scene.heartFrom(scene.mySlot, who.slot, false, true);
+  net.heart(who.seat);
+}
+
+// 지금 내 한마디의 무게 (서버와 같은 기준)
+function myWeight() {
+  const got = myWallet.hearts ? myWallet.hearts.received + myWallet.hearts.given * 0.5 : 0;
+  let w = got >= 200 ? 4 : got >= 50 ? 3 : got >= 10 ? 2 : 1;
+  if (['candle', 'flash', 'fireworks', 'bigfire'].some((k) => owned(k))) w += 1;
+  return Math.min(5, w);
+}
+
 function addWood() {
   const now = Date.now();
   if (now - lastWoodAt < 2500) return;
@@ -957,14 +992,30 @@ scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick(
 
 // ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------
 let lastSay = 0;
-function showSay(text, me) {
+// 무게(1~5): 하트를 많이 받은 사람, 아이템을 쓰는 사람의 한마디일수록 높이·오래 떠오름
+function showSay(text, me, w = 1) {
   const log = $('saylog');
   const el = document.createElement('div');
-  el.className = 'say' + (me ? ' me' : '');
+  el.className = 'say' + (me ? ' me' : '') + (w >= 3 ? ' heavy' : '');
   el.textContent = text;
-  log.prepend(el);
-  while (log.children.length > 5) log.lastChild.remove(); // 한꺼번에 많이 오면 오래된 것부터 정리
-  setTimeout(() => el.remove(), 7200);
+  if (w >= 2) {
+    const tag = document.createElement('span');
+    tag.className = 'w';
+    tag.textContent = '❤️'.repeat(Math.min(3, w - 1));
+    el.append(tag);
+  }
+  const room = Math.max(200, window.innerHeight * 0.55);
+  const rise = Math.min(room, 140 + (w - 1) * (room - 140) / 4);
+  const dur = 9 + (w - 1) * 2.5;
+  el.style.setProperty('--rise', `${Math.round(rise)}px`);
+  el.style.setProperty('--dur', `${dur}s`);
+  el.style.setProperty('--w', w);
+  // 여러 개가 겹치지 않게 좌우 자리를 번갈아
+  showSay.lane = ((showSay.lane || 0) + 1) % 3;
+  el.style.setProperty('--x', `${Math.round(showSay.lane * Math.min(70, window.innerWidth * 0.12) + Math.random() * 12)}px`);
+  log.append(el);
+  while (log.children.length > 7) log.firstChild.remove(); // 한꺼번에 많이 오면 오래된 것부터 정리
+  setTimeout(() => el.remove(), dur * 1000 + 200);
 }
 $('open-say').addEventListener('click', () => {
   const pick = $('saypick');
@@ -980,7 +1031,7 @@ $('open-say').addEventListener('click', () => {
       if (wait > 0) return toast(`한마디는 10초에 한 번 할 수 있어요 (${Math.ceil(wait / 1000)}초 뒤)`);
       if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 할 수 있어요');
       lastSay = Date.now();
-      showSay(text, true);
+      showSay(text, true, myWeight());
       net.say(i);
     });
     pick.append(b);
@@ -1080,3 +1131,4 @@ requestAnimationFrame(frame);
 
 // 개발·시험용
 window.__haedoti = { state, scene, net, solarPosition, EVENT_AFTERGLOW_MS, setClock, ambience };
+window.__showSay = showSay;

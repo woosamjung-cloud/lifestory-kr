@@ -76,6 +76,7 @@ export class Net {
       else if (m.t === 'full') this.h.onStatus('full');
       else if (m.t === 'wallet' && this.h.onWallet) this.h.onWallet(m.wallet);
       else if (m.t === 'need' && this.h.onNeed) this.h.onNeed(m.item);
+      else if (m.t === 'gotheart' && this.h.onGotHeart) this.h.onGotHeart(m);
     };
     ws.onclose = () => {
       clearTimeout(giveUp);
@@ -134,6 +135,10 @@ export class Net {
 
   wood() {
     this.send({ t: 'wood' });
+  }
+
+  heart(seat) {
+    this.send({ t: 'heart', seat });
   }
 
   say(i) {

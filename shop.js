@@ -108,12 +108,46 @@ export function wallet(visitor) {
   const now = Date.now();
   const items = {};
   if (a) for (const k of ITEM_KEYS) if (a.items[k] > now) items[k] = a.items[k];
-  return { coins: a ? a.coins : 0, items, hasCode: !!(a && a.code) };
+  return {
+    coins: a ? a.coins : 0,
+    items,
+    hasCode: !!(a && a.code),
+    hearts: { received: a ? a.heartsIn || 0 : 0, given: a ? a.heartsOut || 0 : 0 },
+  };
 }
 
 export function hasItem(visitor, key) {
   const a = account(visitor, false);
   return !!(a && a.items[key] > Date.now());
+}
+
+// ---------- 하트 ----------
+
+// 하트는 마음껏 줄 수 있음 (사랑은 주면 줄수록 많이 나오니까). 준 하트도 기록
+export function spendHeart(visitor) {
+  const a = account(visitor);
+  if (!a) return false;
+  a.heartsOut = (a.heartsOut || 0) + 1;
+  dirty = true;
+  return true;
+}
+
+export function receiveHeart(visitor) {
+  const a = account(visitor);
+  if (!a) return 0;
+  a.heartsIn = (a.heartsIn || 0) + 1;
+  dirty = true;
+  return a.heartsIn;
+}
+
+// 한마디의 무게: 받은 하트가 많을수록, 아이템을 쓰고 있으면 한 단계 더 (1~5)
+export function sayWeight(visitor) {
+  const a = account(visitor, false);
+  // 받은 하트 + 준 하트의 절반 (주는 사람도 마음이 커짐)
+  const got = a ? (a.heartsIn || 0) + (a.heartsOut || 0) * 0.5 : 0;
+  let w = got >= 200 ? 4 : got >= 50 ? 3 : got >= 10 ? 2 : 1;
+  if (ITEM_KEYS.some((k) => hasItem(visitor, k))) w += 1;
+  return Math.min(5, w);
 }
 
 export function spendCoin(visitor) {
@@ -130,6 +164,7 @@ function grant(visitor, product) {
   const now = Date.now();
   for (const k of g.items || []) a.items[k] = Math.max(a.items[k] || 0, now) + ITEM_DAYS * DAY; // 이미 있으면 기간 연장
   if (g.coins) a.coins += g.coins;
+  if (g.hearts) a.heartsBought = (a.heartsBought || 0) + g.hearts;
   dirty = true;
 }
 

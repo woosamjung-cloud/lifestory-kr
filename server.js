@@ -373,6 +373,29 @@ function handle(c, msg) {
       room.dirty = true;
       return;
     }
+    case 'heart': {
+      // 하트 선물: 같은 해변의 다른 사람에게 (1.5초에 하나, 같은 사람에게는 10초에 하나)
+      const to = Number(msg.seat);
+      const room = rooms[c.room];
+      if (c.seat == null || !Number.isInteger(to) || to === c.seat || !room || !room.seats[to]) return;
+      if (now - (c.lastHeart || 0) < 1500) return;
+      c.heartTo = c.heartTo || {};
+      if (now - (c.heartTo[to] || 0) < 10000) return;
+      const target = room.seats[to];
+      if (target.visitor === c.visitor) return;
+      if (!shop.spendHeart(c.visitor)) {
+        send(c.ws, { t: 'need', item: 'hearts' });
+        return;
+      }
+      c.lastHeart = now;
+      c.heartTo[to] = now;
+      const total = shop.receiveHeart(target.visitor);
+      bump('heart');
+      room.fx.push(['heart', c.seat, to]);
+      send(c.ws, { t: 'wallet', wallet: shop.wallet(c.visitor) });
+      send(target.ws, { t: 'gotheart', total, wallet: shop.wallet(target.visitor) });
+      return;
+    }
     case 'say': {
       // 응원 한마디: 정해진 문구만, 10초에 한 번
       const i = Number(msg.i);
@@ -380,7 +403,7 @@ function handle(c, msg) {
       if (now - (c.lastSay || 0) < 10000) return;
       c.lastSay = now;
       bump('say');
-      rooms[c.room].fx.push(['say', c.seat, i]);
+      rooms[c.room].fx.push(['say', c.seat, i, shop.sayWeight(c.visitor)]);
       return;
     }
     case 'ritual': {

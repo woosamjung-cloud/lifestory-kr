@@ -471,36 +471,39 @@ textarea { resize: none; line-height: 1.5; }
 .pw-chip { border: 2px solid var(--line); background: var(--paper-2); border-radius: 999px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
 .pw-chip[aria-pressed="true"] { border-color: #d9a43a; background: #fff3c4; color: #6b3b10; }
 
-/* ---------- 응원 한마디: 왼쪽에서 서서히 떠올랐다 사라짐 ---------- */
+/* ---------- 응원 한마디: 왼쪽에서 서서히 떠올랐다 사라짐 (무게가 클수록 높이·오래) ---------- */
 .saylog {
   position: fixed;
   left: calc(14px + env(safe-area-inset-left, 0px));
   bottom: calc(150px + var(--safe-b));
-  width: min(62vw, 300px);
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 6px;
+  width: min(66vw, 320px);
+  height: 0;
   pointer-events: none;
   z-index: 3;
 }
 .say {
-  align-self: flex-start;
+  position: absolute;
+  left: var(--x, 0px);
+  bottom: 0;
+  white-space: nowrap;
   background: rgba(16, 22, 48, 0.42);
   color: var(--on-glass);
   border-radius: 14px;
   padding: 6px 12px;
-  font-size: 14px;
+  font-size: calc(13px + var(--w, 1) * 0.6px);
   line-height: 1.35;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: sayfloat 7s ease-in-out forwards;
+  animation: sayfloat var(--dur, 9s) cubic-bezier(0.25, 0.6, 0.4, 1) forwards;
 }
 .say.me { background: rgba(255, 190, 110, 0.4); }
+.say .w { font-size: 0.8em; opacity: 0.85; margin-left: 6px; }
+.say.heavy { box-shadow: 0 0 14px rgba(255, 170, 120, 0.45); }
 @keyframes sayfloat {
-  0% { opacity: 0; transform: translateY(14px); }
-  12% { opacity: 1; transform: translateY(0); }
-  75% { opacity: 1; transform: translateY(-18px); }
-  100% { opacity: 0; transform: translateY(-34px); }
+  0% { opacity: 0; transform: translateY(16px); }
+  8% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(calc(var(--rise, 160px) * -1)); }
 }
 .saypick {
   position: fixed;

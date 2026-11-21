@@ -333,12 +333,19 @@ export class Scene {
     const cloudList = cover > 0.4 ? this.cloudsMore : cover < 0.2 ? this.clouds.slice(0, 2) : this.clouds;
     const cloudScale = cover > 0.4 ? 1.35 : 1;
     for (const c of cloudList) {
-      const cx = (((c.x + (nowMs / 1000) * c.v * 0.05) % 1.3) - 0.15) * W;
-      const cy = c.y * horizonY;
-      const cw = c.w * W * cloudScale * 1.6;
+      // 높은 구름은 왼쪽→오른쪽, 낮은 구름은 오른쪽→왼쪽 (바람 층이 다름)
+      const dir = c.y < 0.28 ? 1 : -1;
+      const period = 140 / (0.6 + c.v * 120); // 화면을 건너는 데 걸리는 초 (약 1~3분)
+      const life = (((nowMs / 1000) / period + c.x) % 1 + 1) % 1; // 0→1 한 번 건너기
+      const cx = dir > 0 ? (-0.25 + life * 1.5) * W : (1.25 - life * 1.5) * W;
+      // 흘러가며 조금씩 부풀었다 작아지고, 끝 무렵에는 흩어지며 사라짐
+      const grow = 0.75 + 0.35 * Math.sin(life * Math.PI) + 0.06 * Math.sin(nowMs / 7000 + c.k);
+      const fade = clamp(life / 0.12) * clamp((1 - life) / 0.2);
+      const cy = (c.y + 0.03 * Math.sin(nowMs / 23000 + c.k)) * horizonY;
+      const cw = c.w * W * cloudScale * 1.6 * grow;
       const img = this.cloudSprite(c, cloudTop, cloudUnder);
-      const ch = cw * (img.height / img.width);
-      ctx.globalAlpha = 0.6 + 0.3 * light;
+      const ch = cw * (img.height / img.width) * (0.9 + 0.15 * (grow - 0.75));
+      ctx.globalAlpha = (0.6 + 0.3 * light) * fade;
       ctx.drawImage(img, cx - cw / 2, cy - ch * 0.6, cw, ch);
       ctx.globalAlpha = 1;
     }
@@ -365,6 +372,49 @@ export class Scene {
       // 대기 굴절로 수평선 근처의 해는 살짝 납작해 보임
       ctx.ellipse(sun.x, sun.y, sunR, sunR * (1 - 0.12 * low), 0, 0, Math.PI * 2);
       ctx.fill();
+      // 눈부심: 하얗게 타는 중심, 넓게 번지는 빛, 가늘게 뻗는 빛살
+      const glare = clamp((e + 1.2) / 3) * (1 - clamp((cover - 0.3) * 1.4));
+      if (glare > 0.02) {
+        ctx.globalCompositeOperation = 'lighter';
+        const hot = ctx.createRadialGradient(sun.x, sun.y, 0, sun.x, sun.y, sunR * 1.15);
+        hot.addColorStop(0, `rgba(255,255,245,${0.95 * glare})`);
+        hot.addColorStop(0.55, `rgba(255,250,220,${0.75 * glare})`);
+        hot.addColorStop(1, 'rgba(255,230,170,0)');
+        ctx.fillStyle = hot;
+        ctx.fillRect(sun.x - sunR * 1.2, sun.y - sunR * 1.2, sunR * 2.4, sunR * 2.4);
+        const br = sunR * (9 + 5 * glare);
+        const bloom = ctx.createRadialGradient(sun.x, sun.y, sunR * 0.8, sun.x, sun.y, br);
+        bloom.addColorStop(0, `rgba(255,236,190,${0.55 * glare})`);
+        bloom.addColorStop(0.18, `rgba(255,205,140,${0.28 * glare})`);
+        bloom.addColorStop(0.5, `rgba(255,170,110,${0.1 * glare})`);
+        bloom.addColorStop(1, 'rgba(255,150,100,0)');
+        ctx.fillStyle = bloom;
+        ctx.fillRect(sun.x - br, sun.y - br, br * 2, br * 2);
+        // 빛살 (천천히 반짝)
+        const rays = 12;
+        for (let i = 0; i < rays; i++) {
+          const ang = (i / rays) * Math.PI * 2 + nowMs / 9000;
+          const len = sunR * (3 + 2.5 * Math.abs(Math.sin(i * 1.7 + nowMs / 1300))) * glare;
+          const lg = ctx.createLinearGradient(sun.x, sun.y, sun.x + Math.cos(ang) * len, sun.y + Math.sin(ang) * len);
+          lg.addColorStop(0, `rgba(255,248,220,${0.3 * glare})`);
+          lg.addColorStop(1, 'rgba(255,240,200,0)');
+          ctx.strokeStyle = lg;
+          ctx.lineWidth = Math.max(1, sunR * 0.09);
+          ctx.beginPath();
+          ctx.moveTo(sun.x, sun.y);
+          ctx.lineTo(sun.x + Math.cos(ang) * len, sun.y + Math.sin(ang) * len);
+          ctx.stroke();
+        }
+        // 가로로 퍼지는 빛줄기 (카메라로 해를 볼 때처럼)
+        const fw = this.W * 0.45 * glare;
+        const fl = ctx.createLinearGradient(sun.x - fw, 0, sun.x + fw, 0);
+        fl.addColorStop(0, 'rgba(255,220,170,0)');
+        fl.addColorStop(0.5, `rgba(255,240,210,${0.35 * glare})`);
+        fl.addColorStop(1, 'rgba(255,220,170,0)');
+        ctx.fillStyle = fl;
+        ctx.fillRect(sun.x - fw, sun.y - sunR * 0.08, fw * 2, sunR * 0.16);
+        ctx.globalCompositeOperation = 'source-over';
+      }
       ctx.restore();
     }
 
@@ -634,8 +684,12 @@ export class Scene {
     // 효과들
     this.renderEffects(nowMs, sun);
 
-    // 장작·물수제비
+    // 바람 자국, 날리는 먼지·낙엽
+    this.drawWind(ctx, nowMs, light);
+
+    // 장작·물수제비·하트
     this.drawThrows(ctx, nowMs);
+    this.drawHearts(ctx, nowMs);
 
     // 폭죽·동전 소원
     this.drawBursts(ctx, nowMs);
@@ -1054,6 +1108,177 @@ export class Scene {
       ctx.fillStyle = `rgba(255,250,235,${a})`;
       ctx.fillText(w.text, w.tx, y);
       ctx.shadowBlur = 0;
+      return true;
+    });
+    ctx.restore();
+  }
+
+  // ---------- 바람 ----------
+  // 가끔 바람이 지나가며 하얀 바람 자국이 그어지고, 먼지·낙엽이 날려 한쪽으로 사라짐
+  drawWind(ctx, t, light) {
+    const wx = this.weather;
+    const windMs = wx && wx.wind != null ? wx.wind : 3;
+    const strength = clamp(windMs / 8, 0.25, 1.4);
+    const dir = this.place === 'west' ? 1 : -1; // 바다에서 육지 쪽으로 부는 바람 느낌
+    if (!this.wind) this.wind = { lines: [], bits: [], nextGust: t + 2500, lastT: t };
+    const W = this.W;
+    const H = this.H;
+    const dt = Math.min(0.1, (t - this.wind.lastT) / 1000);
+    this.wind.lastT = t;
+    // 돌풍: 몇 초에 한 번 (바람이 셀수록 자주)
+    if (t > this.wind.nextGust) {
+      this.wind.nextGust = t + (7000 + Math.random() * 9000) / strength;
+      const baseY = this.horizonY * (0.35 + Math.random() * 0.9);
+      const n = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) {
+        this.wind.lines.push({ y: baseY + i * (10 + Math.random() * 14), t0: t + i * 120, len: W * (0.25 + Math.random() * 0.2), amp: 6 + Math.random() * 10, curl: Math.random() < 0.5, speed: W * (0.45 + 0.25 * strength) });
+      }
+      // 돌풍에 실려 날아가는 먼지·낙엽
+      const snowy = wx && [3, 7].includes(wx.pty);
+      const m = Math.round(4 + 6 * strength);
+      for (let i = 0; i < m; i++) {
+        const leaf = !snowy && Math.random() < 0.35;
+        this.wind.bits.push({
+          x: dir > 0 ? -20 - Math.random() * W * 0.3 : W + 20 + Math.random() * W * 0.3,
+          y: this.shoreY + Math.random() * (H - this.shoreY) * 0.8,
+          vx: dir * (W * (0.25 + Math.random() * 0.25) * strength),
+          vy: -(10 + Math.random() * 30),
+          rot: Math.random() * 6,
+          vr: (Math.random() - 0.5) * 8,
+          leaf,
+          col: ['#b5652e', '#c98a3a', '#8a5a2b', '#d1a14a'][Math.floor(Math.random() * 4)],
+          sz: leaf ? 3 + Math.random() * 3 : 0.8 + Math.random() * 1.4,
+          ph: Math.random() * 6,
+        });
+      }
+    }
+    // 가끔 바닥에서 낙엽 하나가 떨어져 굴러감
+    if (Math.random() < dt * 0.15 * strength && this.wind.bits.length < 60) {
+      this.wind.bits.push({ x: Math.random() * W, y: this.shoreY - 20 - Math.random() * 60, vx: dir * W * 0.08 * strength, vy: 20, rot: 0, vr: 3, leaf: true, col: '#b5652e', sz: 3.5, ph: Math.random() * 6, falling: true });
+    }
+    ctx.save();
+    // 바람 자국: 가는 곡선이 휙 지나가며 그어졌다 사라짐
+    ctx.lineCap = 'round';
+    this.wind.lines = this.wind.lines.filter((l) => {
+      const age = (t - l.t0) / 1000;
+      if (age < 0) return true;
+      const travel = age * l.speed;
+      const total = W + l.len * 2;
+      if (travel > total) return false;
+      const head = dir > 0 ? -l.len + travel : W + l.len - travel;
+      const tail = head - dir * l.len;
+      const a = Math.min(1, age * 3) * Math.min(1, (total - travel) / (W * 0.3)) * (0.22 + 0.25 * light);
+      const g = ctx.createLinearGradient(tail, 0, head, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.7, `rgba(255,255,255,${a})`);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      const steps = 18;
+      for (let i = 0; i <= steps; i++) {
+        const u = i / steps;
+        const x = tail + (head - tail) * u;
+        let y = l.y + Math.sin(u * Math.PI * 2 + age * 3) * l.amp * 0.4;
+        // 끝에서 돌돌 말리는 바람 자국
+        if (l.curl && u > 0.8) {
+          const k = (u - 0.8) / 0.2;
+          y -= Math.sin(k * Math.PI) * l.amp;
+        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      return true;
+    });
+    // 먼지·낙엽
+    this.wind.bits = this.wind.bits.filter((b) => {
+      if (b.falling) {
+        b.vy = Math.min(b.vy + 30 * dt, 40);
+        if (b.y > this.shoreY + 10) b.falling = false;
+      } else {
+        b.vy += (Math.sin(t / 300 + b.ph) * 40 - b.vy) * dt;
+      }
+      b.x += b.vx * dt + Math.sin(t / 250 + b.ph) * 0.6;
+      b.y += b.vy * dt;
+      b.rot += b.vr * dt;
+      if (b.x < -60 || b.x > W + 60 || b.y > H + 20) return false;
+      if (b.leaf) {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.rot);
+        ctx.scale(1, Math.abs(Math.cos(b.rot * 1.3)) * 0.8 + 0.2); // 뒤집히며 날림
+        ctx.fillStyle = b.col;
+        ctx.globalAlpha = 0.6 + 0.4 * light;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, b.sz * 1.4, b.sz * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.fillStyle = `rgba(230,215,190,${0.35 + 0.3 * light})`;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.sz, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return true;
+    });
+    ctx.restore();
+  }
+
+  // ---------- 하트 선물 ----------
+  // 화면 좌표에 있는 다른 사람 (가장 가까운 사람)
+  personAt(x, y) {
+    let best = null;
+    for (const p of this.people) {
+      const sl = this.slotForSeat(p.seat);
+      if (!sl) continue;
+      const cy = sl.y - sl.s * 0.5;
+      const d = Math.hypot(x - sl.x, (y - cy) * 0.8);
+      if (d < Math.max(24, sl.s * 0.6) && (!best || d < best.d)) best = { d, seat: p.seat, slot: sl };
+    }
+    return best;
+  }
+
+  heartFrom(from, to, toMe = false, fromMe = false) {
+    if (!to) return;
+    const f = from || { x: to.x + (Math.random() - 0.5) * this.W * 0.4, y: to.y + 40, s: to.s };
+    if (!this.hearts) this.hearts = [];
+    this.hearts.push({ x0: f.x, y0: f.y - f.s * 1.1, to, t0: performance.now(), big: toMe || fromMe });
+    if (this.hearts.length > 40) this.hearts.shift();
+  }
+
+  drawHearts(ctx, t) {
+    if (!this.hearts || !this.hearts.length) return;
+    const heart = (x, y, r, a) => {
+      ctx.fillStyle = `rgba(255,95,120,${a})`;
+      ctx.beginPath();
+      ctx.moveTo(x, y + r * 0.9);
+      ctx.bezierCurveTo(x - r * 1.4, y - r * 0.1, x - r * 0.6, y - r * 1.25, x, y - r * 0.45);
+      ctx.bezierCurveTo(x + r * 0.6, y - r * 1.25, x + r * 1.4, y - r * 0.1, x, y + r * 0.9);
+      ctx.fill();
+    };
+    ctx.save();
+    this.hearts = this.hearts.filter((h) => {
+      const age = (t - h.t0) / 1000;
+      const fly = 0.9;
+      const tx = h.to.x;
+      const ty = h.to.y - h.to.s * 1.3;
+      if (age < fly) {
+        const p = age / fly;
+        const x = h.x0 + (tx - h.x0) * p;
+        const y = h.y0 + (ty - h.y0) * p - Math.sin(p * Math.PI) * this.H * 0.08;
+        heart(x, y, h.big ? 8 : 6, 0.95);
+        return true;
+      }
+      const e = age - fly;
+      if (e > 1.4) return false;
+      // 도착하면 퐁 터지며 작은 하트들이 떠오름
+      const a = 1 - e / 1.4;
+      heart(tx, ty - e * 22, (h.big ? 9 : 7) * (1 + e * 0.3), a);
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2 + 0.6;
+        heart(tx + Math.cos(ang) * e * 26, ty - e * 30 + Math.sin(ang) * e * 12, 3, a * 0.8);
+      }
       return true;
     });
     ctx.restore();

@@ -236,3 +236,25 @@ test('해변 걷기 위치 전달, 장작은 모두 합산·연타 무시', asyn
   a.close();
   b.close();
 });
+
+test('하트: 마음껏 주고, 받은 사람에게 알림·집계, 같은 사람에게 연타는 무시, 한마디 무게 전달', async () => {
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'hello', visitor: 'hearttest01' }));
+  b.send(JSON.stringify({ t: 'hello', visitor: 'hearttest02' }));
+  a.send(JSON.stringify({ t: 'join', room: 'east', char: 'coat', color: 0, visitor: 'hearttest01' }));
+  b.send(JSON.stringify({ t: 'join', room: 'east', char: 'hood', color: 1, visitor: 'hearttest02' }));
+  await wait(700);
+  const bSeat = last(b, 'seat').seat;
+  a.send(JSON.stringify({ t: 'heart', seat: bSeat }));
+  a.send(JSON.stringify({ t: 'heart', seat: bSeat })); // 연타 → 무시
+  a.send(JSON.stringify({ t: 'heart', seat: last(a, 'seat').seat })); // 나에게 → 무시
+  await wait(700);
+  assert.equal(last(b, 'gotheart').total, 1);
+  assert.equal(last(a, 'wallet').wallet.hearts.given, 1);
+  b.send(JSON.stringify({ t: 'say', i: 0 }));
+  await wait(700);
+  const say = a.inbox.filter((m) => m.t === 'fx').flatMap((m) => m.list).find(([k]) => k === 'say');
+  assert.ok(say[3] >= 1);
+  a.close();
+  b.close();
+});
