@@ -620,3 +620,12 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
 
 .run-banner { background: linear-gradient(135deg, #fff1d6, #ffe0c2); color: #6b3b10; border-radius: 12px; padding: 8px 12px; font-size: 13.5px; line-height: 1.5; margin: 0 0 6px; text-align: center; }
 .test-note { font-size: 11.5px; color: var(--muted); text-align: center; margin: 0 0 8px; }
+
+/* PC: 첫 화면은 좌우 두 칸 (왼쪽 소개 · 오른쪽 탑승 준비) - 스크롤 없이 한눈에 */
+@media (min-width: 900px) and (min-height: 560px) {
+  .home-sheet { max-width: 960px; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; padding: 32px 36px; align-items: start; }
+  .home-intro { position: sticky; top: 0; }
+  .home-intro h1 { font-size: 68px; }
+  .home-form .field-label:first-child { margin-top: 0; }
+  .home-form .btn.big { margin-top: 14px; }
+}
