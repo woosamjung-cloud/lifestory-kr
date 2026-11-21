@@ -617,3 +617,6 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
 .coin-tiers { gap: 10px; }
 .shop-modal.sub .fineprint { font-size: 11px; margin-top: 8px; }
 .shop-modal.sub #shop-coins-view > p { margin: 0 0 8px; font-size: 13px; }
+
+.run-banner { background: linear-gradient(135deg, #fff1d6, #ffe0c2); color: #6b3b10; border-radius: 12px; padding: 8px 12px; font-size: 13.5px; line-height: 1.5; margin: 0 0 6px; text-align: center; }
+.test-note { font-size: 11.5px; color: var(--muted); text-align: center; margin: 0 0 8px; }
