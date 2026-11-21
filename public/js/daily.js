@@ -40,10 +40,24 @@ function dayKey(d = new Date()) {
   return k.toISOString().slice(0, 10);
 }
 
-export function todayLine(d = new Date()) {
+export const LINES_EN = [
+  ['The sun gets up without an alarm. We just cheer from under the blanket.', ''],
+  ['Today’s to-do: watch the sun. Done. Great job.', ''],
+  ['Pajamas welcome. Dress code: cozy.', ''],
+  ['Sunset is on the house today. No waiting line.', ''],
+  ['Even on cloudy days, the sun showed up for work. It just drew the curtains.', ''],
+  ['Yesterday’s mistakes left with yesterday’s sun.', ''],
+  ['Tea, a sunrise and a blanket. The perfect combo.', ''],
+  ['Today’s fortune: the sun will rise. 100% accurate.', ''],
+  ['The campfire listens without a word. Just bring some wood.', ''],
+  ['Nothing happened today? That’s the best thing that could happen.', ''],
+];
+
+export function todayLine(d = new Date(), lang = 'ko') {
   const k = dayKey(d);
   const n = Math.floor(Date.parse(k) / 86400e3);
-  return LINES[((n % LINES.length) + LINES.length) % LINES.length];
+  const list = lang === 'en' ? LINES_EN : LINES;
+  return list[((n % list.length) + list.length) % list.length];
 }
 
 // 나의 하루 기록 (내 기기에만 저장). 끊겨도 아무 불이익 없음.

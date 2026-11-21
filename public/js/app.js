@@ -15,6 +15,7 @@ import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait, renderPetPortrait } f
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare, downloadCanvas, shareImage } from './cards.js';
 import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
+import { t, tOr, getLang, setLang, applyI18n } from './i18n.js';
 import { Ambience } from './ambience.js';
 import { Music } from './music.js';
 
@@ -241,7 +242,76 @@ if (location.protocol !== 'file:') {
 // ---------- 이벤트(장소) 결정 ----------
 function pickEvent(now) {
   if (state.placeMode === 'auto') return currentEvent(now);
-  return nextEventAt(state.placeMode, now) || currentEvent(now);
+  return destEvent(state.placeMode, now) || currentEvent(now);
+}
+
+// ---------- 매표소: 행선지 승차권 (나라·장소가 늘면 한 줄씩 추가) ----------
+const DESTS = [
+  { key: 'east', country: 'KR', flag: '🇰🇷', en: 'KOREA' },
+  { key: 'west', country: 'KR', flag: '🇰🇷', en: 'KOREA' },
+];
+// 그 장소의 지금 진행 중이거나 다음 해돋이·해넘이
+function destEvent(key, now) {
+  const cur = currentEvent(now);
+  return cur && cur.place === key ? cur : nextEventAt(key, now);
+}
+function destText(key, now) {
+  const ev = destEvent(key, now);
+  if (!ev) return null;
+  const kind = PLACES[key].kind;
+  const diff = ev.time.getTime() - now.getTime();
+  if (diff > 0) return { ev, kind, label: t(`dest.until.${kind}`), count: formatCountdown(diff) };
+  const mins = Math.floor(-diff / 60000);
+  return { ev, kind, label: t(`dest.done.${kind}`), count: mins < 1 ? t('dest.justnow') : t('dest.ago', { m: mins }) };
+}
+function renderDepartures() {
+  const box = $('dest-list');
+  if (!box) return;
+  const now = realNow();
+  const sel = state.event ? state.event.place : null;
+  box.innerHTML = '';
+  for (const d of DESTS) {
+    const x = destText(d.key, now);
+    if (!x) continue;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `dest-ticket ${x.kind}`;
+    b.dataset.place = d.key;
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(d.key === sel));
+    b.innerHTML =
+      '<div class="dt-main"><div class="dt-country"><span class="dt-flag"></span><span class="dt-cname"></span><span class="dt-en"></span></div>' +
+      '<div class="dt-place"></div><div class="dt-event"></div><div class="dt-special" hidden></div></div>' +
+      '<div class="dt-stub"><div class="dt-time"></div><div class="dt-label"></div><div class="dt-count"></div><div class="dt-check"></div></div>';
+    b.querySelector('.dt-flag').textContent = d.flag;
+    b.querySelector('.dt-cname').textContent = getLang() === 'ko' ? t(`country.${d.country}`) : '';
+    b.querySelector('.dt-en').textContent = d.en;
+    b.querySelector('.dt-place').textContent = t('dest.bound', { place: tOr(`place.${d.key}`, PLACES[d.key].name) });
+    b.querySelector('.dt-event').textContent = t(`event.${x.kind}`);
+    if (x.ev.special && getLang() === 'ko') {
+      b.querySelector('.dt-special').hidden = false;
+      b.querySelector('.dt-special').textContent = `✨ ${x.ev.special}`;
+    }
+    b.querySelector('.dt-time').textContent = formatHM(x.ev.time);
+    b.querySelector('.dt-check').textContent = d.key === sel ? `✓ ${t('booth.selected')}` : '';
+    b.addEventListener('click', () => {
+      state.placeMode = d.key;
+      stopPreview();
+      applyEvent(pickEvent(realNow()));
+      renderEventTexts();
+    });
+    box.append(b);
+  }
+  updateDepartures();
+}
+function updateDepartures() {
+  const now = realNow();
+  document.querySelectorAll('.dest-ticket').forEach((b) => {
+    const x = destText(b.dataset.place, now);
+    if (!x) return;
+    b.querySelector('.dt-label').textContent = x.label;
+    b.querySelector('.dt-count').textContent = x.count;
+  });
 }
 
 function applyEvent(ev, { animate = false } = {}) {
@@ -263,7 +333,7 @@ function applyEvent(ev, { animate = false } = {}) {
 }
 
 function renderDaily() {
-  const [text, src] = todayLine();
+  const [text, src] = todayLine(new Date(), getLang());
   $('tl-text').textContent = text;
   $('tl-src').textContent = src ? `— ${src}` : '';
   $('tl-src').hidden = !src;
@@ -274,11 +344,7 @@ function renderEventTexts() {
   const ev = state.event;
   const place = PLACES[ev.place];
   const east = ev.place === 'east';
-  $('nt-place').textContent = `${place.name}행`;
-  $('nt-time').textContent = formatHM(ev.time);
-  $('next-train').classList.toggle('west', !east);
-  $('nt-special').hidden = !ev.special;
-  $('nt-special').textContent = ev.special ? `✨ ${ev.special}` : '';
+  renderDepartures();
   $('hud-place').textContent = place.name;
   $('hud-special').hidden = !ev.special;
   $('hud-special').textContent = ev.special ? `✨ ${ev.special}` : '';
@@ -321,8 +387,7 @@ function updateTexts(now, tScene) {
     const mins = Math.floor(-diff / 60000);
     count = mins < 1 ? '방금' : `${mins}분 전`;
   }
-  $('nt-label').textContent = label;
-  $('nt-count').textContent = count;
+  updateDepartures();
   $('hud-label').textContent = label;
   $('hud-count').textContent = count;
   $('hud-clock').textContent = formatHM(tScene);
@@ -340,7 +405,7 @@ function updateOnlineLabels() {
   else if (s === 'full') text = '서버 만원 · 혼자 보기';
   else text = '혼자 보기';
   $('hud-online').textContent = text;
-  const homeOnline = s === 'online' && r ? `지금 ${r.seated.toLocaleString('ko-KR')}명이 탑승해 있어요` : '';
+  const homeOnline = s === 'online' && r ? t('booth.online', { n: r.seated.toLocaleString('ko-KR') }) : '';
   $('nt-online').textContent = homeOnline;
   const woodEl = $('hud-wood');
   if (s === 'online' && r && r.wood) {
@@ -426,7 +491,7 @@ function buildPicker() {
     const cv = document.createElement('canvas');
     cv.width = 128;
     cv.height = 128;
-    b.append(cv, document.createTextNode(c.name));
+    b.append(cv, document.createTextNode(tOr(`char.${c.key}`, c.name)));
     b.addEventListener('click', () => {
       state.profile.char = c.key;
       refreshPicker();
@@ -472,8 +537,8 @@ function buildPicker() {
     b.className = 'pet-opt';
     b.setAttribute('role', 'radio');
     b.innerHTML = '<canvas aria-hidden="true"></canvas><span></span>';
-    b.querySelector('span').textContent = name;
-    b.title = name;
+    b.querySelector('span').textContent = tOr(`pet.${i}`, name);
+    b.title = tOr(`pet.${i}`, name);
     b.addEventListener('click', () => {
       state.profile.pet = i;
       refreshPicker();
@@ -545,7 +610,7 @@ $('board-form').addEventListener('submit', async (e) => {
   $('ticket-img').src = ticketCanvas.toDataURL('image/png');
   net.stat('ticket');
   btn.disabled = false;
-  btn.textContent = '승차권 받기';
+  btn.textContent = t('form.ticket');
   show('ticket');
 });
 
@@ -1565,3 +1630,20 @@ fitHomeTitle();
 addEventListener('resize', fitHomeTitle);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHomeTitle);
 if (document.fonts) document.fonts.addEventListener?.('loadingdone', fitHomeTitle);
+
+// ---------- 언어 바꾸기 ----------
+function refreshLang() {
+  applyI18n();
+  document.querySelectorAll('.lang-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === getLang())));
+  buildPicker();
+  renderDepartures();
+  renderDaily();
+  fitHomeTitle();
+}
+document.querySelectorAll('.lang-btn').forEach((b) =>
+  b.addEventListener('click', () => {
+    setLang(b.dataset.lang);
+    refreshLang();
+  }),
+);
+refreshLang();

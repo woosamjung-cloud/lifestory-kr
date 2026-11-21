@@ -717,3 +717,41 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
 
 /* 첫 화면 제목은 항상 한 줄 (글자 크기는 화면 폭에 맞춰 자동 조절) */
 #home-title { white-space: nowrap; overflow: hidden; }
+
+/* 언어 바꾸기 */
+.lang-switch { display: flex; justify-content: flex-end; gap: 4px; margin: -6px 0 6px; }
+.lang-btn { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.lang-btn[aria-pressed="true"] { background: var(--paper-2); color: var(--ink); border-color: var(--accent); }
+
+/* 대기실 피켓: 나무 막대에 붙은 손글씨 안내판 */
+.today-line.picket { position: relative; margin: 6px auto 30px; max-width: 360px; padding: 26px 18px 16px; border: none; border-radius: 6px; background: linear-gradient(180deg, #f8ecd2, #efdcb6); color: #4a3424; transform: rotate(-1.2deg); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25); }
+.today-line.picket::after { content: ''; position: absolute; left: 50%; bottom: -24px; width: 8px; height: 24px; margin-left: -4px; background: linear-gradient(90deg, #7a5233, #9a6a42); border-radius: 0 0 3px 3px; z-index: -1; }
+.today-line.picket::before { content: ''; position: absolute; top: 8px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: #c9574e; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+.picket-tag { position: absolute; top: 6px; left: 12px; font-size: 11px; letter-spacing: 0.06em; color: #9a7454; }
+.today-line.picket blockquote { font-family: var(--title); font-size: 21px; line-height: 1.45; text-align: center; }
+.today-line.picket figcaption { color: #8a6a50; }
+
+/* 매표소: 행선지 승차권 */
+.booth { margin-bottom: 18px; }
+.booth-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.booth-title { font-family: var(--title); font-size: 24px; }
+.booth-sub { font-size: 13px; color: var(--muted); }
+.dest-list { display: grid; gap: 10px; }
+.dest-ticket { position: relative; display: grid; grid-template-columns: 1fr auto; text-align: left; border: none; padding: 0; border-radius: 14px; overflow: hidden; color: #fff8ee; font: inherit; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); opacity: 0.78; transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s; }
+.dest-ticket.sunrise { background: linear-gradient(135deg, #1a2757, #6d4a7c 60%, #ff965a); }
+.dest-ticket.sunset { background: linear-gradient(135deg, #2a3c78, #d26f5f 60%, #ffbe7a); }
+.dest-ticket[aria-checked="true"] { opacity: 1; transform: translateY(-1px); box-shadow: 0 0 0 3px #ffd98a, 0 8px 18px rgba(0, 0, 0, 0.3); }
+.dt-main { padding: 12px 14px; }
+.dt-country { font-size: 11.5px; letter-spacing: 0.08em; opacity: 0.9; display: flex; gap: 5px; align-items: center; }
+.dt-place { font-family: var(--title); font-size: 30px; line-height: 1.15; margin-top: 2px; }
+.dt-event { font-size: 13px; opacity: 0.9; }
+.dt-special { display: inline-block; margin-top: 4px; background: #fff3c4; color: #6b3b10; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+.dt-stub { position: relative; padding: 12px 14px 12px 16px; text-align: right; border-left: 2px dashed rgba(255, 248, 238, 0.55); min-width: 118px; display: grid; align-content: center; gap: 1px; }
+.dt-stub::before, .dt-stub::after { content: ''; position: absolute; left: -9px; width: 16px; height: 16px; border-radius: 50%; background: var(--paper); }
+.dt-stub::before { top: -8px; }
+.dt-stub::after { bottom: -8px; }
+.dt-time { font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums; }
+.dt-label { font-size: 12px; opacity: 0.9; }
+.dt-count { font-size: 15px; font-variant-numeric: tabular-nums; }
+.dt-check { font-size: 12px; color: #ffe3a0; min-height: 1em; font-weight: 700; }
+.home-intro, .home-form { min-width: 0; }
