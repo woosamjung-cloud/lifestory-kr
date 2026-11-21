@@ -414,6 +414,30 @@ export function drawCritterFast(ctx, o) {
     ctx.restore();
   }
 
+  // 와! 하고 뛰어오를 때: 담요 아래로 다리와 신발이 쏙 (몸 뒤에서 먼저 그림)
+  if (hop > 0.05) {
+    const L = s * (0.05 + 0.16 * hop);
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const sg of [-1, 1]) {
+      const fx = x + sg * s * 0.1;
+      ctx.strokeStyle = tone('#4a4e63', (bright - 1) * 0.6);
+      ctx.lineWidth = s * 0.075;
+      ctx.beginPath();
+      ctx.moveTo(fx, y - s * 0.06);
+      ctx.lineTo(fx + sg * s * 0.015, y + L);
+      ctx.stroke();
+      // 동그란 신발 (발끝이 살짝 바깥쪽)
+      ctx.fillStyle = tone('#3a2b26', (bright - 1) * 0.6);
+      ellipse(ctx, fx + sg * s * 0.03, y + L + s * 0.01, s * 0.07, s * 0.04);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ellipse(ctx, fx + sg * s * 0.02, y + L - s * 0.005, s * 0.03, s * 0.012);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   const sy = 1 + breathe * 0.008;
   const foot = sp.sz * SPRITE_FOOT * k;
   ctx.drawImage(sp.canvas, x - w / 2, y + foot - h * sy, w, h * sy);
