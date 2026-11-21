@@ -762,3 +762,6 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
 @font-face { font-family: 'EnHand'; src: url('fonts/continuous.ttf') format('truetype'); font-display: swap; }
 html[lang="en"] { --title: 'EnHand', 'ShinYoungbok', 'KotraHandwritingFont', "Nanum Brush Script", serif; }
 */
+
+/* 탑승 화면 왼쪽 위 사이트 이름 */
+.hud-brand { font-family: var(--title); font-size: 17px; line-height: 1.1; color: rgba(255, 236, 205, 0.88); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); margin-bottom: 2px; letter-spacing: 0.02em; }
