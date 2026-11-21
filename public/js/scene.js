@@ -528,13 +528,15 @@ export class Scene {
     for (const c of cloudList) {
       // 모든 구름이 같은 바람을 타고 한 방향으로 (가까운 낮은 구름이 조금 더 빨라 보임)
       const dir = this.windDir();
-      const period = (140 / (0.6 + c.v * 120)) * (1.25 - c.y * 0.6); // 화면을 건너는 데 걸리는 초
+      // 화면을 건너는 데 걸리는 초: 불멍처럼 아주 천천히 (7~12분), 바람이 세면 조금 빨라짐
+      const windK = 1 + clamp(((wx && wx.wind) || 0) / 12) * 0.6;
+      const period = ((560 / (0.6 + c.v * 120)) * (1.25 - c.y * 0.6)) / windK;
       const life = (((nowMs / 1000) / period + c.x) % 1 + 1) % 1; // 0→1 한 번 건너기
       const cx = dir > 0 ? (-0.25 + life * 1.5) * W : (1.25 - life * 1.5) * W;
       // 흘러가며 조금씩 부풀었다 작아지고, 끝 무렵에는 흩어지며 사라짐
-      const grow = 0.75 + 0.35 * Math.sin(life * Math.PI) + 0.06 * Math.sin(nowMs / 7000 + c.k);
+      const grow = 0.75 + 0.35 * Math.sin(life * Math.PI) + 0.04 * Math.sin(nowMs / 30000 + c.k);
       const fade = clamp(life / 0.12) * clamp((1 - life) / 0.2);
-      const cy = (c.y + 0.03 * Math.sin(nowMs / 23000 + c.k)) * horizonY;
+      const cy = (c.y + 0.02 * Math.sin(nowMs / 60000 + c.k)) * horizonY;
       const cw = c.w * W * cloudScale * 1.6 * grow;
       const img = this.cloudSprite(c, cloudTop, cloudUnder);
       const ch = cw * (img.height / img.width) * (0.9 + 0.15 * (grow - 0.75));
