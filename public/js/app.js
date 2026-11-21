@@ -267,10 +267,7 @@ function renderDaily() {
   $('tl-text').textContent = text;
   $('tl-src').textContent = src ? `— ${src}` : '';
   $('tl-src').hidden = !src;
-  const st = dayStats(loadDays(store));
-  const el = $('my-days');
-  el.hidden = st.total === 0;
-  if (st.total) el.textContent = `나의 하루 ${st.total}일 · 연 아침 ${st.opened} · 닫은 저녁 ${st.closed}`;
+  $('my-days').hidden = true; // 숫자 기록은 화면에 보이지 않게 (탑승할 때 인사로만)
 }
 
 function renderEventTexts() {
