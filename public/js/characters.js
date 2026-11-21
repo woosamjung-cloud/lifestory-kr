@@ -563,10 +563,10 @@ export const BREEDS = [
   null,
   { name: '강아지', dog: true, fur: '#b98652', dark: '#8a5f37', ears: 'floppy', tail: 'normal', size: 1 },
   { name: '고양이', dog: false, fur: '#8a8f99', dark: '#5f646e', ears: 'pointy', tail: 'long', size: 1, stripes: true },
-  { name: '푸들', dog: true, fur: '#c98a5a', dark: '#a96c40', ears: 'curly', tail: 'pom', size: 0.8, fluff: 0.9 },
-  { name: '웰시코기', dog: true, fur: '#d98a3d', dark: '#b4692c', ears: 'erect', earSize: 1.35, tail: 'stub', size: 0.95, legs: 0.55, wide: 1.15, paw: '#f4ece0', bib: '#f4ece0' },
+  { name: '푸들', dog: true, fur: '#cf8f5c', dark: '#ad6f42', ears: 'curly', tail: 'pom', size: 0.85, fluff: 0.9, legs: 1.3, wide: 0.9, topknot: true },
+  { name: '웰시코기', dog: true, fur: '#dc9248', dark: '#b8702f', ears: 'erect', earSize: 1.4, earInner: '#f3dcc4', tail: 'fluffy', size: 0.95, legs: 0.55, wide: 1.15, paw: '#f7f1e8', bib: '#f7f1e8', blaze: '#f7f1e8', whiteLegs: true, smile: true },
   { name: '말티즈', dog: true, fur: '#f6f3ee', dark: '#ddd5c8', ears: 'long', tail: 'plume', size: 0.72, fluff: 0.55 },
-  { name: '스피츠', dog: true, fur: '#f8f6f2', dark: '#e2ddd3', ears: 'erect', earSize: 0.85, tail: 'curl', size: 0.9, fluff: 1 },
+  { name: '스피츠', dog: true, fur: '#fbfaf7', dark: '#e4dfd5', ears: 'erect', earSize: 0.8, earInner: '#f1d2c8', tail: 'curl', size: 0.9, fluff: 1.35, mane: true, smile: true },
   { name: '페르시안', dog: false, fur: '#efe1c8', dark: '#d2bd9a', ears: 'small', tail: 'fluffy', size: 1.05, fluff: 1, flat: true },
   { name: '샴', dog: false, fur: '#f0e4cf', dark: '#5a4233', ears: 'pointy', earDark: true, tail: 'long', size: 0.95, paw: '#5a4233', mask: true },
   { name: '장화 고양이', dog: false, fur: '#3d3b42', dark: '#2a292e', ears: 'pointy', tail: 'long', size: 1, paw: '#f4f1ec', boots: true, bib: '#f4f1ec' },
@@ -750,6 +750,17 @@ export function drawPet(ctx, o) {
     }
     ctx.stroke();
   }
+  // 스피츠: 목 둘레 갈기털
+  if (B.mane) fluffRing(ctx, x, by - k * 0.62, k * 0.24, k * 0.1, 12, k * 0.09, F);
+  // 웰시코기: 목 양옆으로 보이는 하얀 털
+  if (B.blaze) {
+    ctx.fillStyle = shadeHex(B.blaze, bright);
+    for (const sg of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(x + sg * k * 0.17 * W, by - k * 0.56, k * 0.055, k * 0.09, sg * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   // 머리: 까딱까딱 고개를 갸웃 (가끔 멈췄다 다시), 쓰다듬는 사람(왼쪽)을 힐끔
   const hy = by - k * 0.82;
   const hr = k * 0.26;
@@ -762,6 +773,7 @@ export function drawPet(ctx, o) {
   if (B.fluff) fluffRing(ctx, x, hy, hr * 0.95, hr * 0.9, 10, k * 0.07 * B.fluff, F);
   ctx.fillStyle = F;
   circle(ctx, x, hy, hr);
+  if (B.topknot) fluffRing(ctx, x, hy - hr * 0.8, hr * 0.45, hr * 0.25, 7, hr * 0.28, F);
   petEars(ctx, B, x, hy, hr, tilt * 2, F, D, null);
   if (B.stripes) {
     ctx.strokeStyle = D;
@@ -826,7 +838,7 @@ function drawPetWalk(ctx, o) {
   const leg = (lx, off, top, w, col) => {
     const lift = Math.max(0, Math.sin(ph + off)) * k * 0.07;
     const fy = y - lift - k * 0.02;
-    ctx.strokeStyle = B.boots ? P : col;
+    ctx.strokeStyle = B.boots || B.whiteLegs ? P : col;
     ctx.lineWidth = w;
     ctx.beginPath();
     ctx.moveTo(x + lx * k * W, by - top + yOff);
@@ -896,10 +908,19 @@ function drawPetWalk(ctx, o) {
   const hy = by - k * 0.7 + yOff;
   const hr = k * 0.22;
   const hx = x + Math.sin(ph * 0.5) * k * 0.02;
+  if (B.mane) {
+    // 스피츠: 목과 가슴을 감싸는 풍성한 갈기털
+    fluffRing(ctx, x, hy + hr * 0.9, hr * 0.85, hr * 0.55, 12, k * 0.09, F);
+    ctx.fillStyle = F;
+    ctx.beginPath();
+    ctx.ellipse(x, hy + hr * 0.9, hr * 0.95, hr * 0.65, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   if (B.fluff) fluffRing(ctx, hx, hy, hr * 0.95, hr * 0.9, 10, k * 0.065 * B.fluff, F);
   ctx.fillStyle = F;
   circle(ctx, hx, hy, hr);
-  petEars(ctx, B, hx, hy, hr, Math.sin(ph * 2), F, D, facingFront ? '#d9a08a' : null);
+  if (B.topknot) fluffRing(ctx, hx, hy - hr * 0.8, hr * 0.45, hr * 0.25, 7, hr * 0.28, F);
+  petEars(ctx, B, hx, hy, hr, Math.sin(ph * 2), F, D, facingFront ? B.earInner || '#d9a08a' : null);
   if (facingFront && B.bib) {
     ctx.fillStyle = shadeHex(B.bib, bright);
     ctx.beginPath();
@@ -918,6 +939,20 @@ function drawPetWalk(ctx, o) {
       ctx.ellipse(hx, hy + hr * 0.25, hr * 0.55, hr * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (B.blaze) {
+      // 웰시코기: 이마에서 코까지 하얀 줄무늬 + 하얀 주둥이
+      ctx.fillStyle = shadeHex(B.blaze, bright);
+      ctx.beginPath();
+      ctx.moveTo(hx - hr * 0.1, hy - hr * 0.85);
+      ctx.quadraticCurveTo(hx, hy - hr * 0.95, hx + hr * 0.1, hy - hr * 0.85);
+      ctx.lineTo(hx + hr * 0.16, hy + hr * 0.05);
+      ctx.lineTo(hx - hr * 0.16, hy + hr * 0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(hx, hy + hr * 0.42, hr * 0.5, hr * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     if (B.boots) {
       // 턱시도처럼 입가가 하얀 고양이
       ctx.fillStyle = shadeHex(B.paw, bright);
@@ -932,6 +967,20 @@ function drawPetWalk(ctx, o) {
     ctx.beginPath();
     ctx.ellipse(hx, hy + k * (B.flat ? 0.05 : 0.08), k * (B.flat ? 0.025 : 0.035), k * 0.022, 0, 0, Math.PI * 2);
     ctx.fill();
+    if (B.smile) {
+      // 웃는 입과 살짝 내민 혀
+      ctx.fillStyle = '#e8737a';
+      ctx.beginPath();
+      ctx.ellipse(hx, hy + k * 0.135, k * 0.035, k * 0.03, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2b1d16';
+      ctx.lineWidth = Math.max(0.7, k * 0.014);
+      ctx.beginPath();
+      ctx.moveTo(hx - k * 0.06, hy + k * 0.1);
+      ctx.quadraticCurveTo(hx - k * 0.03, hy + k * 0.125, hx, hy + k * 0.1);
+      ctx.quadraticCurveTo(hx + k * 0.03, hy + k * 0.125, hx + k * 0.06, hy + k * 0.1);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -965,7 +1014,7 @@ function drawPetSide(ctx, o) {
     const lift = Math.max(0, Math.cos(ph + off)) * k * 0.05 * legs;
     const fx = x + d * (lx * k * W + sw);
     const fy = y - lift;
-    ctx.strokeStyle = B.boots ? P : B.paw && dog ? F : D;
+    ctx.strokeStyle = B.boots || B.whiteLegs ? P : D;
     ctx.beginPath();
     ctx.moveTo(x + d * lx * k * W, by - k * 0.3);
     ctx.lineTo(fx, fy);
@@ -1021,12 +1070,23 @@ function drawPetSide(ctx, o) {
   ctx.fillStyle = F;
   circle(ctx, hx, hy, k * 0.18);
   ctx.beginPath();
-  ctx.ellipse(hx + d * k * (B.flat ? 0.1 : 0.15), hy + k * 0.05, k * (B.flat ? 0.07 : 0.1), k * 0.07, 0, 0, Math.PI * 2);
+  ctx.ellipse(hx + d * k * (B.flat ? 0.1 : B.topknot ? 0.19 : 0.15), hy + k * 0.05, k * (B.flat ? 0.07 : B.topknot ? 0.13 : 0.1), k * 0.06, 0, 0, Math.PI * 2);
   ctx.fill();
+  if (B.topknot) fluffRing(ctx, hx - d * k * 0.02, hy - k * 0.15, k * 0.08, k * 0.05, 7, k * 0.055, F);
   if (B.mask) {
     ctx.fillStyle = D;
     ctx.beginPath();
     ctx.ellipse(hx + d * k * 0.13, hy + k * 0.04, k * 0.11, k * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (B.blaze) {
+    // 웰시코기: 하얀 주둥이와 볼, 하얀 배
+    ctx.fillStyle = shadeHex(B.blaze, bright);
+    ctx.beginPath();
+    ctx.ellipse(hx + d * k * 0.15, hy + k * 0.07, k * 0.11, k * 0.07, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x + d * k * 0.05, by - k * 0.27, k * 0.26 * W, k * 0.06, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.fillStyle = D;
