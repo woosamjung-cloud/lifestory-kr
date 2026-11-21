@@ -1,6 +1,6 @@
 // 방구석 해돋이호 서버
 // - public/ 폴더의 화면 파일을 보여주고
-// - WebSocket(/ws)으로 좌석, 대기열, "와!" 함성, 풍등·종이배 효과를 실시간으로 나눕니다.
+// - WebSocket(/ws)으로 좌석, 대기열, "와!" 함성, 풍등·유리병 편지 효과를 실시간으로 나눕니다.
 // 실행: npm install && npm start  (기본 주소 http://localhost:3000)
 
 import http from 'node:http';
@@ -407,9 +407,9 @@ function handle(c, msg) {
       return;
     }
     case 'ritual': {
-      // 풍등(정동진) / 종이배(정서진). 적은 글은 서버로 보내지 않습니다.
+      // 풍등(정동진) / 유리병 편지(정서진). 적은 글은 서버로 보내지 않습니다.
       if (c.seat == null || now - c.lastRitual < 8000) return;
-      // 동전 1개를 쓰면 고른 소원 문구가 풍등·종이배에 적혀 모두에게 보임
+      // 동전 1개를 쓰면 고른 소원 문구가 풍등·유리병 편지에 적혀 모두에게 보임
       const wi = Number(msg.i);
       const hasWish = msg.i != null && Number.isInteger(wi) && wi >= 0 && wi < shop.WISHES.length;
       if (hasWish && !shop.spendCoin(c.visitor)) {

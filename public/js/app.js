@@ -250,9 +250,9 @@ function renderEventTexts() {
   $('hud-place').textContent = place.name;
   $('hud-special').hidden = !ev.special;
   $('hud-special').textContent = ev.special ? `✨ ${ev.special}` : '';
-  $('ritual-ico').textContent = east ? '🏮' : '⛵';
+  $('ritual-ico').textContent = east ? '🏮' : '🍾';
   $('ritual-name').textContent = place.ritual;
-  $('ritual-title').textContent = east ? '소원 풍등 날리기' : '종이배 띄워 보내기';
+  $('ritual-title').textContent = east ? '소원 풍등 날리기' : '유리병 편지 띄우기';
   $('ritual-desc').textContent = east
     ? '해 뜨는 하늘에 소원을 띄워 보내요.'
     : '오늘(올해) 털어버리고 싶은 걸 적어 바다로 보내요.';
@@ -601,7 +601,7 @@ $('ritual-form').addEventListener('submit', (e) => {
   net.ritual(publicWish);
   const place = state.event.place;
   const lantern = PLACES[place].kind === 'sunrise';
-  toast(text ? `${lantern ? '🏮' : '⛵'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 소원 풍등이 하늘로 올라가요' : '⛵ 종이배가 바다로 떠나요');
+  toast(text ? `${lantern ? '🏮' : '🍾'} "${text}" 소원이 모두의 하늘에 떠올라요` : lantern ? '🏮 소원 풍등이 하늘로 올라가요' : '🍾 유리병 편지가 바다로 떠나요');
 });
 
 $('act-card').addEventListener('click', async () => {

@@ -23,7 +23,7 @@ export const PLACES = {
     lon: 126.6042,
     kind: 'sunset',
     eventName: '해넘이',
-    ritual: '종이배',
+    ritual: '유리병 편지',
   },
   // ---------- 해외 명소 (비행기로 이동) ----------
   haleakala: {
@@ -64,7 +64,7 @@ export const PLACES = {
     tz: 'Europe/Athens',
     kind: 'sunset',
     eventName: '해넘이',
-    ritual: '종이배',
+    ritual: '유리병 편지',
     scenery: 'santorini',
     abroad: true,
   },
