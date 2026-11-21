@@ -870,7 +870,7 @@ export class Scene {
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           const lx = sl.x + sl.s * 0.62;
-          const ly = sl.y - sl.s * 0.42 * sz * 1.25 - sl.s * 0.12;
+          const ly = sl.y - sl.s * 0.42 * sz * 1.75 - sl.s * 0.12; // 귀 위로 넉넉히
           const tw = ctx.measureText(p.petName).width + 12;
           ctx.fillStyle = 'rgba(255,248,236,0.85)';
           roundRect(ctx, lx - tw / 2, ly - 9, tw, 18, 9);

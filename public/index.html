@@ -88,10 +88,19 @@
     <div class="sheet ticket-sheet">
       <h2 id="ticket-title">승차권이 나왔어요</h2>
       <img id="ticket-img" alt="방구석 해돋이호 승차권">
-      <div class="btn-row">
-        <button class="btn" id="save-ticket">저장·공유</button>
-        <button class="btn primary" id="board">탑승하기</button>
+      <div class="ticket-share">
+        <button class="btn" id="save-ticket">📥 승차권 저장</button>
+        <p class="sns-title">친구에게 보내기</p>
+    <div class="sns-row">
+      <button class="sns" data-sns="kakao" title="카카오톡"><span class="sns-ico kakao">TALK</span><span>카카오톡</span></button>
+      <button class="sns" data-sns="instagram" title="인스타그램"><span class="sns-ico insta"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff"/></svg></span><span>인스타</span></button>
+      <button class="sns" data-sns="threads" title="스레드"><span class="sns-ico threads">@</span><span>스레드</span></button>
+      <button class="sns" data-sns="x" title="X"><span class="sns-ico xx">X</span><span>X</span></button>
+      <button class="sns" data-sns="facebook" title="페이스북"><span class="sns-ico fb">f</span><span>페이스북</span></button>
+      <button class="sns" data-sns="link" title="링크 복사"><span class="sns-ico link">🔗</span><span>링크 복사</span></button>
+    </div>
       </div>
+      <button class="btn primary big wide" id="board">탑승하기</button>
     </div>
   </section>
 
@@ -278,7 +287,7 @@
     <p class="sns-title">바로 공유하기</p>
     <div class="sns-row">
       <button class="sns" data-sns="kakao" title="카카오톡"><span class="sns-ico kakao">TALK</span><span>카카오톡</span></button>
-      <button class="sns" data-sns="instagram" title="인스타그램"><span class="sns-ico insta"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff"/></svg></span><span>인스타그램</span></button>
+      <button class="sns" data-sns="instagram" title="인스타그램"><span class="sns-ico insta"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff"/></svg></span><span>인스타</span></button>
       <button class="sns" data-sns="threads" title="스레드"><span class="sns-ico threads">@</span><span>스레드</span></button>
       <button class="sns" data-sns="x" title="X"><span class="sns-ico xx">X</span><span>X</span></button>
       <button class="sns" data-sns="facebook" title="페이스북"><span class="sns-ico fb">f</span><span>페이스북</span></button>

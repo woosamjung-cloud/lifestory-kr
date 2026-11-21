@@ -795,8 +795,14 @@ export function drawPet(ctx, o) {
   if (B.fluff) fluffRing(ctx, x, hy, hr * 0.95, hr * 0.9, 10, k * 0.07 * B.fluff, F);
   ctx.fillStyle = F;
   circle(ctx, x, hy, hr);
-  if (B.topknot) fluffRing(ctx, x, hy - hr * 0.8, hr * 0.45, hr * 0.25, 7, hr * 0.28, F);
+  if (B.topknot) fluffRing(ctx, x + hr * 0.25 * look, hy - hr * 0.8, hr * 0.45, hr * 0.25, 7, hr * 0.28, F);
+  // 고개를 돌리면 귀도 머리 뒤쪽(오른쪽)으로 옮겨가며 살짝 좁아짐
+  ctx.save();
+  ctx.translate(x + hr * 0.28 * look, hy);
+  ctx.scale(1 - 0.18 * look, 1);
+  ctx.translate(-x, -hy);
   petEars(ctx, B, x, hy, hr, tilt * 2, F, D, null);
+  ctx.restore();
   if (B.stripes) {
     ctx.strokeStyle = D;
     ctx.lineWidth = Math.max(0.8, k * 0.04);
@@ -807,24 +813,30 @@ export function drawPet(ctx, o) {
       ctx.stroke();
     }
   }
-  // 힐끔: 고개를 돌려 옆얼굴의 행복한 눈(∩)과 볼 홍조가 살짝 보임
+  // 힐끔: 고개를 사람 쪽(왼쪽)으로 돌려 옆얼굴이 살짝 보임 (주둥이·코가 머리 옆으로 삐져나오고, 그 위에 행복한 눈)
   if (look > 0.3) {
-    if (B.mask) {
-      ctx.fillStyle = D;
-      ctx.beginPath();
-      ctx.ellipse(x - hr * 0.62, hy + hr * 0.2, hr * 0.32, hr * 0.38, 0.3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.strokeStyle = B.mask || B.fur === '#3d3b42' ? 'rgba(250,240,225,0.9)' : 'rgba(40,25,20,0.85)';
-    ctx.lineWidth = Math.max(0.8, k * 0.035);
+    const a = Math.min(1, (look - 0.3) / 0.3);
+    ctx.globalAlpha = a;
+    const mx = x - hr * (0.92 + 0.08 * a);
+    const my = hy + hr * 0.26;
+    ctx.fillStyle = B.mask ? D : B.blaze ? shadeHex(B.blaze, bright) : F;
+    ctx.beginPath();
+    ctx.ellipse(mx, my, hr * (B.flat ? 0.22 : 0.34), hr * 0.24, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2b1d16';
+    circle(ctx, mx - hr * (B.flat ? 0.18 : 0.3), my - hr * 0.06, Math.max(0.9, hr * 0.11));
+    const darkFur = B.fur === '#3d3b42';
+    ctx.strokeStyle = darkFur ? 'rgba(250,240,225,0.9)' : 'rgba(40,25,20,0.85)';
+    ctx.lineWidth = Math.max(0.8, k * 0.03);
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(x - k * 0.15, hy + k * 0.01, k * 0.05, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.arc(x - hr * 0.62, hy - hr * 0.08, hr * 0.13, Math.PI * 1.1, Math.PI * 1.9);
     ctx.stroke();
-    ctx.fillStyle = `rgba(240,130,130,${0.45 * look})`;
+    ctx.fillStyle = 'rgba(240,130,130,0.5)';
     ctx.beginPath();
-    ctx.ellipse(x - k * 0.17, hy + k * 0.09, k * 0.05, k * 0.03, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - hr * 0.55, hy + hr * 0.2, hr * 0.13, hr * 0.08, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
   // 목줄 / 방울

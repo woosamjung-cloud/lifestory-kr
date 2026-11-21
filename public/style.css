@@ -695,3 +695,9 @@ input, textarea, .code-out { -webkit-user-select: text; user-select: text; }
 .tr-link.spotify { background: #1db954; }
 .tr-link.youtube { background: #ff0033; }
 .tr-link.apple { background: #fa2d48; }
+
+/* 승차권: 저장 + SNS 공유, 아래에 큰 탑승하기 */
+.ticket-share { margin-top: 12px; }
+.ticket-share #save-ticket { width: 100%; min-height: 46px; }
+.ticket-share .sns-title { margin: 12px 0 6px; }
+#ticket #board { width: 100%; margin-top: 14px; min-height: 54px; font-size: 20px; }
