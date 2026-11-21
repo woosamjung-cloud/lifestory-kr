@@ -1,4 +1,4 @@
-// 방구석 해돋이호 - 화면 흐름과 상호작용
+// 이불 밖은 추우니까 (방구석 해돋이호) - 화면 흐름과 상호작용
 
 import {
   PLACES,
@@ -683,7 +683,7 @@ const shareUrl = () => `${location.origin}/`;
 const shareText = () => {
   const ev = state.event;
   const what = ev && PLACES[ev.place].kind === 'sunset' ? '노을' : '해돋이';
-  return `방구석 해돋이호에서 오늘의 ${what}를 함께 봤어요 🌅`;
+  return `이불 밖은 추우니까, 방에서 오늘의 ${what}를 함께 봤어요 🌅`;
 };
 async function copyLink() {
   try {
@@ -741,7 +741,7 @@ async function shareTo(k, canvas, file, text) {
   else toast(`📥 사진을 저장했어요${copied ? ' · 🔗 링크도 복사했어요' : ''}`);
 }
 const TICKET_FILE = 'haedoji-ticket.png';
-const TICKET_TEXT = '방구석 해돋이호 승차권 나왔어요 🎫 잠옷 입고 같이 해 보러 가요!';
+const TICKET_TEXT = '이불 밖은 추우니까 🎫 방구석 해돋이호 승차권 나왔어요. 잠옷 입고 같이 해 보러 가요!';
 document.querySelectorAll('#card .sns').forEach((b) => b.addEventListener('click', () => shareTo(b.dataset.sns, cardCanvas, CARD_FILE, shareText())));
 document.querySelectorAll('#ticket .sns').forEach((b) => b.addEventListener('click', () => shareTo(b.dataset.sns, ticketCanvas, TICKET_FILE, TICKET_TEXT)));
 

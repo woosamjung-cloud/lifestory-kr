@@ -166,13 +166,13 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.textAlign = 'center';
   ctx.font = `30px ${FONT}`;
-  ctx.fillText(location.host || '방구석 해돋이호', W / 2, H - 80);
+  ctx.fillText(location.host || '이불 밖은 추우니까', W / 2, H - 80);
   return c;
 }
 
 // 인증 카드: 지금 화면(하늘)을 배경으로
 export async function makeProofCard({ sceneCanvas, event, name, witnesses, wish, focusY }) {
-  await loadGlyphs(`정동진정서진년월일오늘의해돋이해넘이새해첫마지막를함께봤어요방구석에서본사람명나소원바다에띄워보낸것호다짐내려놓은그리운이게“”·0123456789:,${name || ''}${wish || ''}`);
+  await loadGlyphs(`이불밖은추우니까정동진정서진년월일오늘의해돋이해넘이새해첫마지막를함께봤어요방구석에서본사람명나소원바다에띄워보낸것호다짐내려놓은그리운이게“”·0123456789:,${name || ''}${wish || ''}`);
   const c = newCanvas();
   const ctx = c.getContext('2d');
   const place = PLACES[event.place];
@@ -238,7 +238,7 @@ export async function makeProofCard({ sceneCanvas, event, name, witnesses, wish,
   ctx.font = `34px ${TITLE}`;
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
   ctx.shadowBlur = 10;
-  ctx.fillText(`방구석 해돋이호${name ? ` · ${name}` : ''}`, W / 2, H - 110);
+  ctx.fillText(`이불 밖은 추우니까${name ? ` · ${name}` : ''}`, W / 2, H - 110);
   ctx.font = `26px ${FONT}`;
   ctx.fillText(location.host || '', W / 2, H - 65);
   return c;

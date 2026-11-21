@@ -1,6 +1,6 @@
 {
-  "name": "방구석 해돋이호",
-  "short_name": "해돋이호",
+  "name": "이불 밖은 추우니까",
+  "short_name": "이불 밖은",
   "description": "이불 밖은 추우니까, 방에서 같이 보는 해돋이",
   "start_url": "./",
   "display": "standalone",

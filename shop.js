@@ -195,7 +195,7 @@ export function createOrder(visitor, product) {
   const orderId = 'hd' + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
   db.orders[orderId] = { visitor, product, amount: p.price, status: 'ready', created: Date.now() };
   dirty = true;
-  return { orderId, amount: p.price, orderName: `방구석 해돋이호 ${p.name}`, customerKey: 'c_' + visitor };
+  return { orderId, amount: p.price, orderName: `이불 밖은 추우니까 ${p.name}`, customerKey: 'c_' + visitor };
 }
 
 // 결제 확인: 금액이 주문과 같은지 확인한 뒤 토스페이먼츠에 승인 요청 (테스트 모드는 바로 승인)
