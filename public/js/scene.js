@@ -3,6 +3,7 @@
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
 import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS } from './characters.js';
+import { localizeCtx } from './i18n.js';
 import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -193,7 +194,7 @@ export const FUEL_SECONDS = 30 * 60;
 export class Scene {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.ctx = localizeCtx(canvas.getContext('2d'));
     this.place = 'east';
     this.placeInfo = PLACES.east;
     this.centerAz = 115;

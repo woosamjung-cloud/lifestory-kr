@@ -3,6 +3,8 @@
 import { PLACES, formatHM, formatDateKo } from './sun.js';
 import { renderPortrait, CHAR_LIST } from './characters.js';
 import { roundRect } from './scene.js';
+import { localizeCtx } from './i18n.js';
+
 
 const W = 1080;
 const H = 1350;
@@ -12,6 +14,7 @@ const TITLE = '"ShinYoungbok", "KotraHandwritingFont", "Nanum Brush Script", "Go
 // 구글 웹 글꼴은 글자 묶음별로 나눠 내려받기 때문에, 캔버스에 쓸 글자를 미리 불러옵니다.
 async function loadGlyphs(text) {
   if (!document.fonts || !document.fonts.load) return;
+  text += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz’·/';
   try {
     await Promise.all([document.fonts.load('40px "ShinYoungbok"', text), document.fonts.load('40px "KotraHandwritingFont"', text), document.fonts.load(`40px "Nanum Brush Script"`, text), document.fonts.load(`40px "Gowun Batang"`, text), document.fonts.load(`700 40px "Gowun Batang"`, text)]);
   } catch {
@@ -35,7 +38,7 @@ export function seatLabel(seat, fallbackSeed = 0) {
 export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, seat, seed }) {
   await loadGlyphs(`방구석해돋이호해넘이열차승차권편도잠옷착용출발도착내방정동진정서진승객날짜일출일몰예정좌석호차번익명의여행자년월일새해첫마지막이불밖은추우니에서봐요담요를두른후드를쓴목도리를한비니를쓴코트를입은→0123456789:${name || ''}`);
   const c = newCanvas();
-  const ctx = c.getContext('2d');
+  const ctx = localizeCtx(c.getContext('2d'));
   const place = PLACES[event.place];
   const east = event.place === 'east';
 
@@ -114,7 +117,11 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
     ctx.fillText(k, tx + 60, y);
     ctx.fillStyle = '#3b2a20';
     ctx.font = `46px ${FONT}`;
-    ctx.fillText(v, tx + 200, y);
+    // 이름표 글자가 길면(영어 등) 값을 그만큼 오른쪽으로
+    ctx.font = `34px ${FONT}`;
+    const kw = ctx.measureText(k).width;
+    ctx.font = `46px ${FONT}`;
+    ctx.fillText(v, tx + Math.max(200, 60 + kw + 28), y);
   });
 
   // 캐릭터
@@ -174,7 +181,7 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
 export async function makeProofCard({ sceneCanvas, event, name, witnesses, wish, focusY }) {
   await loadGlyphs(`이불밖은추우니까정동진정서진년월일오늘의해돋이해넘이새해첫마지막를함께봤어요방구석에서본사람명나소원바다에띄워보낸것호다짐내려놓은그리운이게“”·0123456789:,${name || ''}${wish || ''}`);
   const c = newCanvas();
-  const ctx = c.getContext('2d');
+  const ctx = localizeCtx(c.getContext('2d'));
   const place = PLACES[event.place];
   const east = event.place === 'east';
 

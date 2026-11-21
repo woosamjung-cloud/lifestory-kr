@@ -3,6 +3,7 @@
 // 키는 서버에만 있고 방문자에게는 결과(하늘 상태·기온)만 전달됩니다.
 
 import { PLACES } from './public/js/sun.js';
+import { DESTINATIONS, countryOf } from './public/js/countries.js';
 
 const ENDPOINT = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
 const REFRESH_MS = 20 * 60 * 1000;
@@ -70,7 +71,19 @@ export function parseForecast(items) {
   return { sky, pty, temp, wind, label, lightning: Number(pick.LGT) > 0, forecastAt: first };
 }
 
-const cache = { east: null, west: null, updatedAt: null, error: null };
+// ---------- 나라별 날씨 제공처 ----------
+// 나라를 늘리면 여기에 제공처를 하나 추가하고, countries.js의 weather에 그 이름을 적으면 됩니다.
+// 각 제공처는 장소(place)를 받아 { sky(1 맑음·3 구름많음·4 흐림), pty(0 없음·1 비·3 눈 …), temp, wind, label } 을 돌려줍니다.
+const PROVIDERS = {
+  kma: {
+    source: '기상청 초단기예보',
+    envKey: 'KMA_API_KEY',
+    fetch: (place, key) => fetchPlace(key, place),
+  },
+  // 예) openmeteo: { source: 'Open-Meteo', envKey: null, fetch: async (place) => { ... } },
+};
+
+const cache = { places: {}, updatedAt: null, error: null };
 let timer = null;
 
 async function fetchPlace(key, place) {
@@ -102,19 +115,29 @@ async function fetchPlace(key, place) {
 }
 
 export async function refreshWeather() {
-  const key = process.env.KMA_API_KEY;
-  if (!key) {
-    cache.error = 'KMA_API_KEY 없음';
-    return;
-  }
-  try {
-    const [east, west] = await Promise.all([fetchPlace(key, PLACES.east), fetchPlace(key, PLACES.west)]);
-    Object.assign(cache, { east, west, updatedAt: new Date().toISOString(), error: null });
-  } catch (err) {
-    // 오류 메시지에 키가 섞여 나가지 않도록 정리
-    cache.error = String(err.message || err).replaceAll(key, '***').slice(0, 200);
-    console.error('날씨 갱신 실패:', cache.error);
-  }
+  const errors = [];
+  await Promise.all(
+    DESTINATIONS.map(async (k) => {
+      const place = PLACES[k];
+      const country = countryOf(place);
+      const prov = country && PROVIDERS[country.weather];
+      if (!prov) return;
+      const key = prov.envKey ? process.env[prov.envKey] : null;
+      if (prov.envKey && !key) {
+        errors.push(`${prov.envKey} 없음`);
+        return;
+      }
+      try {
+        cache.places[k] = await prov.fetch(place, key);
+      } catch (err) {
+        // 오류 메시지에 키가 섞여 나가지 않도록 정리
+        errors.push(String(err.message || err).replaceAll(key || '\u0000', '***').slice(0, 200));
+      }
+    }),
+  );
+  if (Object.keys(cache.places).length) cache.updatedAt = new Date().toISOString();
+  cache.error = errors.length ? [...new Set(errors)].join(' / ') : null;
+  if (cache.error) console.error('날씨 갱신 실패:', cache.error);
 }
 
 export function startWeather() {
@@ -125,12 +148,12 @@ export function startWeather() {
 }
 
 export function weatherStatus() {
+  const sources = [...new Set(DESTINATIONS.map((k) => PROVIDERS[countryOf(PLACES[k])?.weather]?.source).filter(Boolean))];
   return {
-    available: !!(cache.east && cache.west),
-    east: cache.east,
-    west: cache.west,
+    available: DESTINATIONS.every((k) => cache.places[k]),
+    ...cache.places, // east, west … 장소 키별 날씨 (예전 화면과 같은 모양)
     updatedAt: cache.updatedAt,
     error: cache.error,
-    source: '기상청 초단기예보',
+    source: sources.join(', '),
   };
 }

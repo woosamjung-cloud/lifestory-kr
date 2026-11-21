@@ -9,6 +9,8 @@ const MIN_MS = 60 * 1000;
 export const PLACES = {
   east: {
     key: 'east',
+    country: 'KR',
+    names: { en: 'Jeongdongjin' },
     name: '정동진',
     lat: 37.6906,
     lon: 129.0339,
@@ -18,6 +20,8 @@ export const PLACES = {
   },
   west: {
     key: 'west',
+    country: 'KR',
+    names: { en: 'Jeongseojin' },
     name: '정서진',
     lat: 37.5622,
     lon: 126.6042,

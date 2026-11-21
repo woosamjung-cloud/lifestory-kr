@@ -15,7 +15,8 @@ import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait, renderPetPortrait } f
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, saveOrShare, downloadCanvas, shareImage } from './cards.js';
 import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
-import { t, tOr, getLang, setLang, applyI18n } from './i18n.js';
+import { t, tOr, getLang, setLang, applyI18n, startAutoTranslate, LANGS, L } from './i18n.js';
+import { COUNTRIES, DESTINATIONS } from './countries.js';
 import { Ambience } from './ambience.js';
 import { Music } from './music.js';
 
@@ -246,10 +247,9 @@ function pickEvent(now) {
 }
 
 // ---------- 매표소: 행선지 승차권 (나라·장소가 늘면 한 줄씩 추가) ----------
-const DESTS = [
-  { key: 'east', country: 'KR', flag: '🇰🇷', en: 'KOREA' },
-  { key: 'west', country: 'KR', flag: '🇰🇷', en: 'KOREA' },
-];
+// 행선지 목록과 나라 정보는 countries.js에서 (나라·장소가 늘면 그 파일만 고치면 됨)
+const DESTS = DESTINATIONS.filter((k) => PLACES[k]).map((k) => ({ key: k, country: PLACES[k].country }));
+const placeName = (key) => PLACES[key].names?.[getLang()] ?? tOr(`place.${key}`, PLACES[key].name);
 // 그 장소의 지금 진행 중이거나 다음 해돋이·해넘이
 function destEvent(key, now) {
   const cur = currentEvent(now);
@@ -283,14 +283,17 @@ function renderDepartures() {
       '<div class="dt-main"><div class="dt-country"><span class="dt-flag"></span><span class="dt-cname"></span><span class="dt-en"></span></div>' +
       '<div class="dt-place"></div><div class="dt-event"></div><div class="dt-special" hidden></div></div>' +
       '<div class="dt-stub"><div class="dt-time"></div><div class="dt-label"></div><div class="dt-count"></div><div class="dt-check"></div></div>';
-    b.querySelector('.dt-flag').textContent = d.flag;
-    b.querySelector('.dt-cname').textContent = getLang() === 'ko' ? t(`country.${d.country}`) : '';
-    b.querySelector('.dt-en').textContent = d.en;
-    b.querySelector('.dt-place').textContent = t('dest.bound', { place: tOr(`place.${d.key}`, PLACES[d.key].name) });
+    const c = COUNTRIES[d.country] || { flag: '', code: '', names: {} };
+    const cname = c.names[getLang()] || '';
+    b.querySelector('.dt-flag').textContent = c.flag;
+    // 나라 이름: 그 언어 이름 + 영문 코드 (영어면 코드만)
+    b.querySelector('.dt-cname').textContent = cname.toUpperCase() === c.code ? '' : cname;
+    b.querySelector('.dt-en').textContent = c.code;
+    b.querySelector('.dt-place').textContent = t('dest.bound', { place: placeName(d.key) });
     b.querySelector('.dt-event').textContent = t(`event.${x.kind}`);
-    if (x.ev.special && getLang() === 'ko') {
+    if (x.ev.special) {
       b.querySelector('.dt-special').hidden = false;
-      b.querySelector('.dt-special').textContent = `✨ ${x.ev.special}`;
+      b.querySelector('.dt-special').textContent = `✨ ${L(x.ev.special)}`;
     }
     b.querySelector('.dt-time').textContent = formatHM(x.ev.time);
     b.querySelector('.dt-check').textContent = d.key === sel ? `✓ ${t('booth.selected')}` : '';
@@ -1632,6 +1635,18 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHomeTit
 if (document.fonts) document.fonts.addEventListener?.('loadingdone', fitHomeTitle);
 
 // ---------- 언어 바꾸기 ----------
+// 언어 버튼은 lang/index.js 목록대로 자동 생성
+{
+  const box = $('lang-switch');
+  for (const l of LANGS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'lang-btn';
+    b.dataset.lang = l.code;
+    b.textContent = l.label;
+    box.append(b);
+  }
+}
 function refreshLang() {
   applyI18n();
   document.querySelectorAll('.lang-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === getLang())));
@@ -1647,3 +1662,4 @@ document.querySelectorAll('.lang-btn').forEach((b) =>
   }),
 );
 refreshLang();
+startAutoTranslate();
