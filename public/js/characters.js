@@ -606,19 +606,23 @@ function drawPetWalk(ctx, o) {
   ctx.beginPath();
   ctx.ellipse(x, y + k * 0.02, k * 0.42, k * 0.06, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 다리 네 개 (대각선끼리 함께 움직임)
-  ctx.strokeStyle = D;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = k * 0.1;
-  const legs = [[-0.17, 0], [0.17, Math.PI], [-0.09, Math.PI], [0.09, 0]];
-  legs.forEach(([lx, off], i) => {
-    const lift = Math.max(0, Math.sin(ph + off)) * k * 0.09;
-    const front = i >= 2;
+  // 뒤쪽 다리 한 쌍 (몸에 가려 짧게만 보임)
+  const leg = (lx, off, top, w, col) => {
+    const lift = Math.max(0, Math.sin(ph + off)) * k * 0.07;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
     ctx.beginPath();
-    ctx.moveTo(x + lx * k * 2, by - k * (front ? 0.36 : 0.3));
-    ctx.lineTo(x + lx * k * 2.1, y - lift - (front ? k * 0.03 : 0));
+    ctx.moveTo(x + lx * k, by - top);
+    ctx.lineTo(x + lx * k, y - lift - k * 0.02);
     ctx.stroke();
-  });
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.ellipse(x + lx * k, y - lift - k * 0.02, w * 0.6, w * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  ctx.lineCap = 'round';
+  leg(-0.12, Math.PI, k * 0.3, k * 0.1, D);
+  leg(0.12, 0, k * 0.3, k * 0.1, D);
   // 꼬리 (걸을 때는 위로 들고 신나게)
   const wag = Math.sin(t / (dog ? 90 : 260)) * (dog ? 1 : 0.5);
   ctx.strokeStyle = dog ? F : D;
@@ -630,8 +634,11 @@ function drawPetWalk(ctx, o) {
   // 몸통 (서 있으니 낮고 넓게)
   ctx.fillStyle = F;
   ctx.beginPath();
-  ctx.ellipse(x, by - k * 0.4, k * 0.3, k * 0.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, by - k * 0.4, k * 0.26, k * 0.2, 0, 0, Math.PI * 2);
   ctx.fill();
+  // 앞쪽 다리 한 쌍 (짧고 통통하게, 번갈아 걸음)
+  leg(-0.15, 0, k * 0.26, k * 0.12, F);
+  leg(0.15, Math.PI, k * 0.26, k * 0.12, F);
   // 머리 (앞쪽이라 몸 위로 살짝)
   const hy = by - k * 0.7;
   ctx.beginPath();
