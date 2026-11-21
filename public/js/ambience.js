@@ -187,6 +187,68 @@ export class Ambience {
     o.stop(t + 0.1);
   }
 
+  // '와!' 함성: 사람 목소리의 '우→아' 모음 울림을 흉내 낸 합성음 (voices명이 함께 외치는 느낌)
+  cheer(voices = 3, vol = 1) {
+    if (!this.on) return;
+    const now = this.ctx.currentTime;
+    // 너무 많이 겹치면 시끄러우니 1초에 몇 번까지만
+    this.cheerHits = (this.cheerHits || []).filter((t) => now - t < 1);
+    if (this.cheerHits.length >= 4) return;
+    this.cheerHits.push(now);
+    const ctx = this.ctx;
+    const out = ctx.createGain();
+    out.gain.value = 0.65 * vol;
+    out.connect(this.master);
+    for (let v = 0; v < voices; v++) {
+      const t = now + 0.02 + Math.random() * 0.12;
+      const dur = 0.55 + Math.random() * 0.35;
+      const f0 = (Math.random() < 0.5 ? 120 : 210) * (0.9 + Math.random() * 0.25); // 남녀 목소리 섞기
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      // 끝을 살짝 올렸다 내리는 억양
+      o.frequency.setValueAtTime(f0 * 0.92, t);
+      o.frequency.linearRampToValueAtTime(f0 * 1.12, t + dur * 0.35);
+      o.frequency.linearRampToValueAtTime(f0 * 0.85, t + dur);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 5 + Math.random() * 2;
+      const vibG = ctx.createGain();
+      vibG.gain.value = f0 * 0.02;
+      vib.connect(vibG).connect(o.frequency);
+      // 모음 울림(포먼트): '우'(낮음)에서 '아'(열림)로
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(1 / voices + 0.15, t + 0.06);
+      g.gain.setValueAtTime(1 / voices + 0.15, t + dur * 0.55);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      for (const [fa, fb, q, a] of [[320, 780, 6, 1], [700, 1180, 7, 0.6], [2400, 2600, 8, 0.15]]) {
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.Q.value = q;
+        bp.frequency.setValueAtTime(fa, t);
+        bp.frequency.exponentialRampToValueAtTime(fb, t + 0.12);
+        const ga = ctx.createGain();
+        ga.gain.value = a;
+        o.connect(bp).connect(ga).connect(g);
+      }
+      // 숨소리 섞기
+      const n = ctx.createBufferSource();
+      n.buffer = this.noise;
+      const nf = ctx.createBiquadFilter();
+      nf.type = 'bandpass';
+      nf.frequency.value = 1500;
+      nf.Q.value = 1;
+      const ng = ctx.createGain();
+      ng.gain.value = 0.25;
+      n.connect(nf).connect(ng).connect(g);
+      g.connect(out);
+      o.start(t);
+      vib.start(t);
+      n.start(t, Math.random() * 4, dur + 0.05);
+      o.stop(t + dur + 0.05);
+      vib.stop(t + dur + 0.05);
+    }
+  }
+
   // 기차: 역 안내 차임(딩-동-댕) → 철컥철컥 지나가는 바퀴 소리 + 멀리서 부드러운 기적
   // (실제 철도 안내음을 흉내 내지 않은, 직접 만든 소리)
   train(seconds = 3.2) {
