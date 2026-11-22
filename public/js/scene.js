@@ -788,29 +788,35 @@ export class Scene {
       sheen.addColorStop(1, 'rgba(255,150,90,0)');
       ctx.fillStyle = sheen;
       ctx.fillRect(0, horizonY, W, shoreY - horizonY + 2);
-      // 물비늘: 잔물결 선 위에 올라타서 물결과 함께 해변 쪽으로 밀려오고 출렁임 (은은하게)
+      // 물비늘: 부드러운 타원 빛 조각이 제각각의 박자로 수평선에서 해변 쪽으로 천천히 떠내려오며
+      // 서서히 나타났다 스러짐 (끊김·깜빡임 없이 이어짐)
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const LINES = 14;
-      const flow = (nowMs / 4000) % 1; // 잔물결과 같은 흐름
-      const N = 200;
+      const spr = this.glintSprite();
+      const warmG = Math.round(205 + 35 * clamp(e / 10));
+      const N = 150;
       for (let k = 0; k < N; k++) {
         const r1 = Math.abs((Math.sin(k * 127.1) * 43758.5453) % 1);
-        const li = k % LINES;
-        const t = (li + flow) / LINES; // 0 수평선 ~ 1 해변 쪽
+        const r2 = Math.abs((Math.sin(k * 311.7) * 24634.6345) % 1);
+        const r3 = Math.abs((Math.sin(k * 74.7) * 9631.17) % 1);
+        const life = 9000 + r3 * 7000; // 한 번 떠내려오는 데 9~16초
+        const ph = (nowMs / life + r2) % 1; // 0 생겨남 ~ 1 사라짐
+        const t = 0.04 + ph * 0.9; // 수평선 → 해변 쪽
         const yy = horizonY + t * t * (shoreY - horizonY);
-        const x = r1 * W + Math.sin(nowMs / 2600 + k) * 5;
-        const y = yy + Math.sin(x / 40 + li * 2 + nowMs / 900) * (0.6 + t * 2) - 0.5;
+        const x = r1 * W + Math.sin(nowMs / 3000 + k) * 6 + (ph - 0.5) * 10;
+        const y = yy + Math.sin(x / 40 + nowMs / 900 + k) * (0.6 + t * 2);
         const near = 1 - clamp(Math.abs(x - sx) / (W * 0.75));
-        const tw = Math.sin(nowMs / (700 + (k % 9) * 130) + k * 12.9898);
-        if (tw < 0.4) continue;
-        const edge = clamp(t / 0.08) * clamp((1 - t) / 0.12); // 수평선·해변 끝에서는 스르륵
-        const a = 0.75 * glit * (0.12 + 0.88 * near ** 1.5) * ((tw - 0.4) / 0.6) ** 2 * edge;
-        if (a < 0.03) continue;
-        const len = (2 + 6 * t) * (0.6 + 0.6 * near);
-        ctx.fillStyle = `rgba(255,${Math.round(205 + 35 * clamp(e / 10))},${Math.round(130 + 60 * clamp(e / 10))},${Math.min(0.6, a)})`;
-        ctx.fillRect(x - len / 2, y, len, 1 + t);
+        const env = Math.sin(ph * Math.PI) ** 1.5; // 서서히 나타났다 서서히 스러짐
+        const shimmer = 0.55 + 0.45 * Math.sin(nowMs / (1400 + r3 * 900) + k * 2.1); // 부드럽게 일렁임
+        const a = 0.55 * glit * (0.1 + 0.9 * near ** 1.5) * env * shimmer;
+        if (a < 0.02) continue;
+        const len = (4 + 12 * t) * (0.6 + 0.6 * near);
+        const h = 1.4 + 2.2 * t;
+        ctx.globalAlpha = Math.min(0.55, a);
+        ctx.drawImage(spr, x - len / 2, y - h / 2, len, h);
       }
+      ctx.globalAlpha = 1;
+      void warmG;
       ctx.restore();
     }
 
@@ -1674,6 +1680,27 @@ export class Scene {
   }
 
   // 사람과 사람이 만나는 거리 (모닥불 불빛이 닿는 반경 정도): 나와 상대 사이
+  // 윤슬 빛 조각: 가장자리가 부드럽게 퍼지는 금빛 타원 (한 번만 만들어 둠)
+  glintSprite() {
+    if (this._glint) return this._glint;
+    const c = document.createElement('canvas');
+    c.width = 64;
+    c.height = 16;
+    const g = c.getContext('2d');
+    g.translate(32, 8);
+    g.scale(4, 1);
+    const rg = g.createRadialGradient(0, 0, 0, 0, 0, 8);
+    rg.addColorStop(0, 'rgba(255,245,215,1)');
+    rg.addColorStop(0.35, 'rgba(255,215,150,0.7)');
+    rg.addColorStop(1, 'rgba(255,190,120,0)');
+    g.fillStyle = rg;
+    g.beginPath();
+    g.arc(0, 0, 8, 0, Math.PI * 2);
+    g.fill();
+    this._glint = c;
+    return c;
+  }
+
   reachR() {
     return this.fireSpot().s * 2.6;
   }
