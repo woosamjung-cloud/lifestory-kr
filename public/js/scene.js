@@ -1625,13 +1625,17 @@ export class Scene {
     return best;
   }
 
-  // 모닥불 불빛 안(마음을 건넬 수 있는 거리)에 있는지
+  // 사람과 사람이 만나는 거리 (모닥불 불빛이 닿는 반경 정도): 나와 상대 사이
+  reachR() {
+    return this.fireSpot().s * 2.6;
+  }
+
   isNear(slot) {
-    if (!slot) return false;
-    const f = this.fireSpot();
-    const R = f.s * 2.6;
-    const dx = (slot.x - f.x) / R;
-    const dy = (slot.y - f.y) / (R * 0.6);
+    const me = this.mySlot;
+    if (!slot || !me) return false;
+    const R = this.reachR();
+    const dx = (slot.x - me.x) / R;
+    const dy = (slot.y - me.y) / (R * 0.6);
     return dx * dx + dy * dy <= 1;
   }
 
@@ -1642,8 +1646,9 @@ export class Scene {
 
   drawReach(ctx, t) {
     if (!this.reachUntil || t > this.reachUntil) return;
-    const f = this.fireSpot();
-    const R = f.s * 2.6;
+    const f = this.mySlot; // 내 캐릭터 둘레
+    if (!f) return;
+    const R = this.reachR();
     const a = clamp((this.reachUntil - t) / 600) * 0.7;
     ctx.save();
     ctx.setLineDash([6, 6]);

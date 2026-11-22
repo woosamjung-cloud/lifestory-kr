@@ -1426,13 +1426,13 @@ function openPersonMenu(who, x, y) {
   if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 할 수 있어요');
   if (!scene.isNear(who.slot)) {
     scene.showReach();
-    return toast('🔥 모닥불 불빛 안으로 들어와야 마음을 건넬 수 있어요');
+    return toast('👣 조금 더 가까이 다가가야 마음을 건넬 수 있어요');
   }
   const box = $('person-menu');
   box.innerHTML = '';
   const title = document.createElement('div');
   title.className = 'pm-title';
-  title.textContent = '불빛 안에 함께 있는 사람';
+  title.textContent = '가까이 있는 사람';
   const say = document.createElement('button');
   say.textContent = '💬 한마디 건네기';
   say.addEventListener('click', () => {

@@ -340,7 +340,7 @@ const TEXT = {
   '👆 모래를 누르면 걸어가요 · ↔ 옆으로 끌면 해변 구경 · ↓ 아래로 쓸면 앉아요 · 🔥 불을 누르면 장작': '👆 Tap the sand to walk · ↔ Drag sideways to look around · ↓ Swipe down to sit · 🔥 Tap the fire to add wood',
   '↔ 옆으로 끌면': '↔ Drag sideways',
   '넓은 해변을 둘러봐요. 휴대폰을 좌우로 기울여도 화면이 그쪽으로 흘러가요.': ' to look around the wide beach. Tilting your phone works too.',
-  '❤️ 모닥불 불빛 안으로 들어온 사람을 누르면': '❤️ Tap someone in your firelight',
+  '❤️ 가까이 다가간 사람을 누르면': '❤️ Tap someone near you',
   '한마디를 건넬 수 있어요. 한마디를 나눈 사이에는 하트도 마음껏 줄 수 있어요.': ' to say something. Once you’ve talked, give as many hearts as you like.',
   '한마디를 건넬 수 있어요. 한마디를 나눈 사이에는 하트도 마음껏 줄 수 있어요. 하트를 많이 받을수록, 많이 줄수록, 아이템을 쓸수록 내 한마디가 더 높이 오래 떠올라요.': ' to say something. Once you’ve talked, give as many hearts as you like. The more hearts you give and get, the higher your words float.',
   '👇 서 있을 땐 화면을 아래로 쓸어내리면 그 자리에 앉아요': '👇 While standing, swipe down to sit',
@@ -395,12 +395,12 @@ const TEXT = {
   '메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요': 'Couldn’t send the email. Please try again shortly',
 
   // ---------- 가까이 온 사람 ----------
-  '불빛 안에 함께 있는 사람': 'Someone in your firelight',
+  '가까이 있는 사람': 'Someone nearby',
   '💬 한마디 건네기': '💬 Say something',
   '❤️ 하트 건네기': '❤️ Give a heart',
   '❤️ 하트 (먼저 한마디 건네 보세요)': '❤️ Heart (say something first)',
   '💬 먼저 한마디 건네 보세요. 이야기를 나눈 사이에만 하트를 줄 수 있어요': '💬 Say something first. Hearts are for people you’ve talked with',
-  '🔥 모닥불 불빛 안으로 들어와야 마음을 건넬 수 있어요': '🔥 Come into the firelight to reach out',
+  '👣 조금 더 가까이 다가가야 마음을 건넬 수 있어요': '👣 Get a little closer to reach out',
   '안녕하세요 😊': 'Hi there 😊',
   '같이 봐서 좋아요': 'Glad to watch with you',
   '불 따뜻하죠? 🔥': 'Nice and warm, right? 🔥',
