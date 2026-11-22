@@ -1262,6 +1262,11 @@ function drawWalkerBackOrFront(ctx, o, front) {
   // 몸 (코트·담요)
   const shY = y - s * 1.12 - bob;
   const hemY = type === 'blanket' || type === 'coat' ? y - s * 0.32 - bob : hipY + s * 0.05;
+  // 머리 모양 (앞모습은 뒷머리를 몸 뒤에 먼저 그려서 목·가슴을 덮지 않게)
+  const swPre = s * (type === 'blanket' ? 0.3 : 0.24);
+  const gm = { headR: s * 0.17, headY: shY - s * 0.17, neckY: shY - s * 0.02, shY, sw: swPre };
+  const kind = { blanket: 'long', scarf: 'bob', coat: 'bun', beanie: 'short', hood: 'short' }[type] || 'short';
+  if (front && type !== 'hood') hair(ctx, kind, x, gm, s, hairColor);
   const g = ctx.createLinearGradient(x - s * 0.3, shY, x + s * 0.3, hemY);
   g.addColorStop(0, base);
   g.addColorStop(1, `color-mix(in srgb, ${base} 80%, black)`);
@@ -1286,8 +1291,6 @@ function drawWalkerBackOrFront(ctx, o, front) {
     ctx.stroke();
   }
   // 머리
-  const gm = { headR: s * 0.17, headY: shY - s * 0.17, neckY: shY - s * 0.02, shY, sw };
-  const kind = { blanket: 'long', scarf: 'bob', coat: 'bun', beanie: 'short', hood: 'short' }[type] || 'short';
   ctx.fillStyle = '#d9b49c';
   ctx.fillRect(x - s * 0.04, gm.headY + gm.headR * 0.6, s * 0.08, s * 0.08);
   if (type === 'hood') {
@@ -1295,6 +1298,16 @@ function drawWalkerBackOrFront(ctx, o, front) {
     ctx.beginPath();
     ctx.arc(x, gm.headY, gm.headR * 1.15, 0, Math.PI * 2);
     ctx.fill();
+  } else if (front) {
+    // 앞모습: 얼굴 둘레 윗머리만 (뒷머리는 이미 몸 뒤에)
+    ctx.fillStyle = hairColor;
+    ctx.beginPath();
+    ctx.arc(x, gm.headY, gm.headR * 1.03, 0, Math.PI * 2);
+    ctx.fill();
+    if (kind === 'bun') {
+      ellipse(ctx, x + gm.headR * 0.1, gm.headY - gm.headR * 1.05, gm.headR * 0.45, gm.headR * 0.42);
+      ctx.fill();
+    }
   } else {
     hair(ctx, kind, x, gm, s, hairColor);
   }

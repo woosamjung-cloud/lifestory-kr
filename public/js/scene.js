@@ -334,7 +334,7 @@ export class Scene {
 
   // 매 프레임 카메라
   // - 걷거나 서 있을 때: 좌우로 기울이면 그쪽을 조금 더 보여 줌 (내 캐릭터는 항상 화면 안에)
-  // - 앉아 있을 때: 옆으로는 그대로, 앞뒤로 기울이면 장면이 위아래로 살짝만
+  // - 앉아 있을 때: 좌우로는 아주 조금, 앞뒤로 기울이면 장면이 위아래로 살짝만
   // - 손으로 끌어 구경하다가 앉은 채 6초 지나면 내 자리로 천천히 돌아옴
   updateCamera(dt) {
     const max = Math.max(0, this.WW - this.W);
@@ -368,8 +368,9 @@ export class Scene {
     this.camBase = clamp(this.camBase, 0, max);
 
     // 기울기로 살짝 더 보여 주기 (서 있을 때만, 부드럽게)
+    // 서 있을 때는 화면 폭의 18%까지, 앉아 있을 때는 6%까지만 살짝
     let leadT = 0;
-    if (standing && Math.abs(g) > 4) leadT = Math.sign(g) * Math.min(1, (Math.abs(g) - 4) / 22) * this.W * 0.18;
+    if (Math.abs(g) > 4) leadT = Math.sign(g) * Math.min(1, (Math.abs(g) - 4) / 22) * this.W * (standing ? 0.18 : 0.06);
     this.camLead = (this.camLead || 0) + (leadT - (this.camLead || 0)) * Math.min(1, dt * 3);
     let cam = this.camBase + this.camLead;
     // 내 캐릭터는 화면 안쪽(18%~82%)에 꼭 남게
