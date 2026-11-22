@@ -1780,8 +1780,64 @@ export class Scene {
       const y = lerp(this.shoreY - 3, this.horizonY + 4, depth);
       pts.push({ x: from.x + dir * (this.shoreY - y) * 0.9, y, d: depth });
     }
+    // 가는 길에 바위(정동진 해안 절벽)가 있으면 부딪혀서 튕겨 나옴
+    const x0 = from.x;
+    const y0 = from.y - from.s * 0.9;
+    const hit = this.rockHit(x0, y0, pts, from.y);
+    let rock = false;
+    if (hit) {
+      rock = true;
+      const back = Math.sign(x0 - hit.x) || 1;
+      const landX = hit.x + back * Math.max(18, Math.abs(x0 - hit.x) * 0.35);
+      const landY = Math.min(this.rowBottom, Math.max(this.shoreY + 14, hit.y + from.s * 0.6));
+      pts.length = 0;
+      pts.push({ x: hit.x, y: hit.y, d: 0, type: 'rock' }, { x: landX, y: landY, d: 0, type: 'sand' });
+      bounces = 0;
+    }
     if (!this.throws) this.throws = [];
-    this.throws.push({ kind: 'stone', x0: from.x, y0: from.y - from.s * 0.9, pts, n: bounces, t0: performance.now(), self: isSelf });
+    this.throws.push({ kind: 'stone', x0, y0, pts, n: bounces, t0: performance.now(), self: isSelf, rock });
+  }
+
+  // 정동진 해안 바위의 자리 (땅 그림과 같은 크기 계산)
+  rockZone() {
+    if (this.place !== 'east') return null;
+    const rk = Math.min(this.WW * 0.22, this.H * 0.16);
+    return { rk, top: this.shoreY - rk * 0.65, bottom: this.shoreY + rk * 0.42 };
+  }
+
+  // 바위 안쪽인지: 위는 좁고 아래는 넓은 바위 모양을 대략 따라감
+  inRock(x, y) {
+    const z = this.rockZone();
+    if (!z || y < z.top || y > z.bottom) return false;
+    const u = (y - z.top) / (z.bottom - z.top); // 0 위 ~ 1 아래
+    const right = z.rk * (0.45 + 0.45 * Math.sin(Math.min(1, u * 1.3) * Math.PI * 0.5));
+    return x < right;
+  }
+
+  // 돌이 날아가는 길(던진 곳 → 튀는 자리들)을 따라가며 처음 바위에 닿는 곳
+  // (바위는 해안선에 있으니, 돌이 바위가 있는 깊이까지 날아갔을 때만 부딪힘)
+  rockHit(x0, y0, pts, groundY0 = y0) {
+    const z = this.rockZone();
+    if (!z) return null;
+    const baseY = this.shoreY + z.rk * 0.3; // 바위 밑동 깊이
+    let ax = x0;
+    let ay = y0;
+    let gy = groundY0;
+    for (let i = 0; i < pts.length; i++) {
+      const b = pts[i];
+      const lift = i === 0 ? 40 : 18 * (1 - b.d);
+      for (let k = 1; k <= 16; k++) {
+        const p = k / 16;
+        if (lerp(gy, b.y, p) > baseY) continue; // 아직 바위 앞쪽
+        const x = lerp(ax, b.x, p);
+        const y = lerp(ay, b.y, p) - lift * Math.sin(p * Math.PI);
+        if (this.inRock(x, y)) return { x, y };
+      }
+      ax = b.x;
+      ay = b.y;
+      gy = b.y;
+    }
+    return null;
   }
 
   // 가끔(20~50초마다, 사람마다 제각각) 옆의 강아지·고양이 머리를 쓰다듬음
@@ -1888,6 +1944,25 @@ export class Scene {
         const pt = th.pts[i];
         const sc = 1 - pt.d * 0.85;
         const last = i === th.pts.length - 1;
+        if (pt.type) {
+          // 바위에 탁 / 모래에 툭: 작은 부스러기가 튐
+          if (ra < 0.6) {
+            const k = ra / 0.6;
+            ctx.fillStyle = pt.type === 'rock' ? `rgba(230,225,215,${0.9 * (1 - k)})` : `rgba(200,170,130,${0.7 * (1 - k)})`;
+            for (let j = 0; j < 6; j++) {
+              const ang = Math.PI * (0.1 + 0.8 * (j / 5)) + (pt.type === 'rock' ? Math.PI * 0.5 : 0);
+              const r = 4 + k * 16;
+              ctx.beginPath();
+              ctx.arc(pt.x + Math.cos(ang) * r, pt.y - Math.abs(Math.sin(ang)) * r + k * k * 10, 1.4, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          if (!th['s' + i] && ra >= 0) {
+            th['s' + i] = true;
+            if (pt.type === 'rock' && this.onRock) this.onRock();
+          }
+          continue;
+        }
         ctx.strokeStyle = `rgba(255,255,255,${(0.65 - ra / 1.6 * 0.65) * (last ? 1 : 0.8)})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1903,7 +1978,7 @@ export class Scene {
         const a0 = seg === 0 ? { x: th.x0, y: th.y0, d: -0.1 } : th.pts[seg - 1];
         const a1 = th.pts[seg];
         const sc = Math.max(0.15, 1 - lerp(Math.max(0, a0.d), a1.d, p) * 0.9);
-        const lift = (seg === 0 ? 40 : 18 * (1 - a1.d)) * Math.sin(p * Math.PI) * sc;
+        const lift = (seg === 0 ? 40 : a1.type === 'sand' ? 14 : 18 * (1 - a1.d)) * Math.sin(p * Math.PI) * sc;
         const x = lerp(a0.x, a1.x, p);
         const y = lerp(a0.y, a1.y, p) - lift;
         ctx.fillStyle = '#8c8a90';
@@ -1921,7 +1996,11 @@ export class Scene {
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 8;
         ctx.fillStyle = `rgba(255,255,255,${a})`;
-        ctx.fillText(th.n > 0 ? `통통 ${th.n}번!` : '퐁당', last.x, last.y - 18 - (age - total * 0.6) * 8);
+        const word = th.rock ? '탁! 바위에 맞았어요' : th.n > 0 ? `통통 ${th.n}번!` : '퐁당';
+        // 글자는 지금 보이는 화면 안에
+        const half = ctx.measureText(word).width / 2 + 8;
+        const wx = clamp(th.rock ? th.pts[0].x + 40 : last.x, this.camX + half, this.camX + this.W - half);
+        ctx.fillText(word, wx, (th.rock ? th.pts[0].y : last.y) - 18 - (age - total * 0.6) * 8);
         ctx.shadowBlur = 0;
       }
       return age < total + 2.4;

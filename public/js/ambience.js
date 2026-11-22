@@ -224,6 +224,36 @@ export class Ambience {
     o.stop(t + 0.35);
   }
 
+  // 돌이 바위에 '탁' 부딪히는 소리
+  knock() {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource();
+    s.buffer = this.noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800;
+    bp.Q.value = 3;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+    s.connect(bp).connect(g).connect(this.master);
+    s.start(t, Math.random() * 4, 0.1);
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(900, t);
+    o.frequency.exponentialRampToValueAtTime(420, t + 0.06);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.18, t + 0.003);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    o.connect(og).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.1);
+  }
+
   // 물수제비 '톡' (튈 때마다 작게)
   tick() {
     if (!this.on) return;

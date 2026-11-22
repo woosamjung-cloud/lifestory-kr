@@ -1405,6 +1405,7 @@ canvasEl.addEventListener('pointerup', (e) => {
     const n = Math.max(0, Math.min(14, Math.round(speed * 3.2 + Math.random() * 3 - 1.5)));
     const dir = Math.max(-1, Math.min(1, dx / Math.abs(dy)));
     scene.skipStone(scene.mySlot, dir, n, true);
+    if (scene.throws && scene.throws[scene.throws.length - 1].rock) return; // 바위에 맞으면 기록 없음
     const best = store.get('stoneBest', 0);
     if (n > best) {
       store.set('stoneBest', n);
@@ -1514,6 +1515,7 @@ scene.onWood = (self) => {
   }, 5000);
 }
 scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick());
+scene.onRock = () => ambience.on && ambience.knock && ambience.knock();
 
 // ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------
 let lastSay = 0;
