@@ -342,6 +342,7 @@ const TEXT = {
   '넓은 해변을 둘러봐요. 휴대폰을 좌우로 기울여도 화면이 그쪽으로 흘러가요.': ' to look around the wide beach. Tilting your phone works too.',
   '❤️ 모닥불 불빛 안으로 들어온 사람을 누르면': '❤️ Tap someone in your firelight',
   '한마디를 건넬 수 있어요. 한마디를 나눈 사이에는 하트도 마음껏 줄 수 있어요.': ' to say something. Once you’ve talked, give as many hearts as you like.',
+  '한마디를 건넬 수 있어요. 한마디를 나눈 사이에는 하트도 마음껏 줄 수 있어요. 하트를 많이 받을수록, 많이 줄수록, 아이템을 쓸수록 내 한마디가 더 높이 오래 떠올라요.': ' to say something. Once you’ve talked, give as many hearts as you like. The more hearts you give and get, the higher your words float.',
   '👇 서 있을 땐 화면을 아래로 쓸어내리면 그 자리에 앉아요': '👇 While standing, swipe down to sit',
   '🔥 장작이 얼마 남지 않았어요. 모닥불을 눌러 장작을 넣어 주세요': '🔥 The fire is running low. Tap it to add wood',
 
