@@ -269,6 +269,7 @@
       <div class="item-grid" id="item-grid"></div>
       <div class="item-detail" id="item-detail" hidden></div>
     </div>
+    <p class="login-who" id="login-who" hidden></p>
     <details class="restore-box">
       <summary>다른 기기로 옮기기 · 구매 복구</summary>
       <p class="muted small">회원가입 없이 이 기기에 구매 내역이 저장돼요. 휴대폰을 바꾸거나 다른 기기에서 쓰려면 복구 코드를 적어 두세요.</p>
@@ -282,6 +283,30 @@
     <p class="fineprint">아이템은 결제 즉시 지급되어 30일 동안 쓸 수 있어요. 다시 사면 기간이 30일 늘어나요. 환불은 결제 후 7일 이내, 지난 일수만큼 빼고 해 드려요.<br>
       <a href="terms.html" target="_blank">이용약관</a> · <a href="refund.html" target="_blank">환불 규정</a> · <a href="privacy.html" target="_blank">개인정보처리방침</a></p>
     <button class="btn wide ghost" id="shop-close">닫기</button>
+  </dialog>
+
+  <!-- 이메일 간편 로그인 (결제할 때만) -->
+  <dialog id="logindlg" class="modal">
+    <form method="dialog" id="login-form">
+      <h3>간편 로그인</h3>
+      <p class="muted small">결제하려면 이메일로 간편 로그인해 주세요. 비밀번호는 없어요.<br>산 동전과 아이템을 어느 기기에서든 그대로 쓸 수 있어요.</p>
+      <input id="login-email" type="email" inputmode="email" autocomplete="email" maxlength="120" placeholder="이메일 주소">
+      <p class="login-msg" id="login-msg" hidden></p>
+      <button type="button" class="btn wide" id="login-dev" hidden>🧪 테스트: 바로 로그인</button>
+      <div class="btn-row">
+        <button class="btn ghost" value="cancel">취소</button>
+        <button class="btn primary" id="login-send" value="send">로그인 링크 받기</button>
+      </div>
+      <p class="fineprint">이메일은 로그인과 구매 확인에만 써요. <a href="privacy.html" target="_blank">개인정보처리방침</a></p>
+    </form>
+  </dialog>
+
+  <!-- 해외 결제 (페이팔) -->
+  <dialog id="paypaldlg" class="modal">
+    <h3>PayPal</h3>
+    <p class="muted small" id="paypal-what"></p>
+    <div id="paypal-buttons"></div>
+    <button class="btn wide ghost" id="paypal-close">닫기</button>
   </dialog>
 
   <!-- 인증 사진 -->

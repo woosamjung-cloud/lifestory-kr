@@ -203,6 +203,45 @@ test('동전 소원 풍등: 동전을 쓰면 소원 번호가 함께 전달, 머
   b.close();
 });
 
+test('이메일 간편 로그인: 테스트 모드는 링크를 바로 주고, 다른 기기에서 로그인하면 동전·아이템이 합쳐짐', async () => {
+  const phone = 'loginphone01';
+  const laptop = 'loginlaptop1';
+  // 휴대폰에서 동전 구매 후 로그인
+  const o = await post('/api/shop/order', { visitor: phone, product: 'coins10' });
+  await post('/api/shop/confirm', { orderId: o.body.orderId, paymentKey: 'test', amount: 1000 });
+  assert.equal((await post('/api/shop/login', { email: 'bad', visitor: phone })).status, 400);
+  const l1 = await post('/api/shop/login', { email: 'Tester@Example.com', visitor: phone });
+  assert.equal(l1.status, 200);
+  const tok1 = new URL(l1.body.devLink).searchParams.get('login');
+  const v1 = await post('/api/shop/verify', { token: tok1, visitor: phone });
+  assert.equal(v1.body.visitor, phone);
+  assert.match(v1.body.email, /^te\*+@example\.com$/);
+  assert.equal(v1.body.wallet.coins, 11);
+  // 같은 링크는 한 번만
+  assert.equal((await post('/api/shop/verify', { token: tok1, visitor: phone })).status, 400);
+  // 노트북에서 폭죽을 산 뒤 같은 이메일로 로그인 → 휴대폰 계정으로 합쳐짐
+  const o2 = await post('/api/shop/order', { visitor: laptop, product: 'fireworks' });
+  await post('/api/shop/confirm', { orderId: o2.body.orderId, paymentKey: 'test', amount: 2000 });
+  // 1분 안에 같은 이메일로 또 요청하면 막힘 → 테스트에서는 다른 이메일 대소문자도 같은 사람으로 취급되는지만 확인
+  const again = await post('/api/shop/login', { email: 'tester@example.com', visitor: laptop });
+  assert.equal(again.status, 400);
+});
+
+test('해외 결제: 달러 가격은 서버가 정하고, 소액 묶음은 달러로 팔지 않음', async () => {
+  const visitor = 'usdbuyer0001';
+  const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=${visitor}`)).json();
+  assert.equal(info.products.coins5.usd, null);
+  assert.ok(info.products.coins33.usd >= 2.99);
+  assert.equal((await post('/api/shop/order', { visitor, product: 'coins5', currency: 'USD' })).status, 400);
+  const o = await post('/api/shop/order', { visitor, product: 'coins33', currency: 'USD' });
+  assert.equal(o.body.currency, 'USD');
+  assert.equal(o.body.amount, info.products.coins33.usd);
+  const bad = await post('/api/shop/confirm', { orderId: o.body.orderId, amount: 0.5 });
+  assert.equal(bad.status, 400);
+  const ok = await post('/api/shop/confirm', { orderId: o.body.orderId, paymentKey: 'test', amount: o.body.amount });
+  assert.equal(ok.body.wallet.coins, 35);
+});
+
 test('정서진 유리병 편지: 공개 문구는 그리운 이에게 보내는 말 목록', async () => {
   const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=lettertest01`)).json();
   assert.ok(info.letters.length >= 5);

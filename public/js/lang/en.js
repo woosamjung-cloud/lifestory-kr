@@ -372,6 +372,23 @@ const TEXT = {
   '물수제비! 세게 쓸수록 많이 튀어요.': ' to skip a stone! Harder swipes, more skips.',
   '자유 채팅은 없어요. 정해진 응원 한마디만 나눌 수 있는, 말없이 함께 해를 기다리는 곳이에요.': 'There’s no open chat. Just a few kind words, and the quiet company of waiting for the sun together.',
 
+  // ---------- 간편 로그인 · 해외 결제 ----------
+  '간편 로그인': 'Quick login',
+  '결제하려면 이메일로 간편 로그인해 주세요. 비밀번호는 없어요.': 'Log in with your email to pay. No password needed.',
+  '산 동전과 아이템을 어느 기기에서든 그대로 쓸 수 있어요.': 'Your coins and items will follow you to any device.',
+  '이메일 주소': 'Email address',
+  '🧪 테스트: 바로 로그인': '🧪 Test: log in now',
+  '로그인 링크 받기': 'Send me a login link',
+  '이메일은 로그인과 구매 확인에만 써요.': 'We only use your email for login and purchase records.',
+  '🧪 테스트 모드라 메일 대신 아래 버튼으로 로그인해요.': '🧪 Test mode: use the button below instead of an email.',
+  '📮 메일을 보냈어요. 메일함에서 "로그인하기"를 눌러 주세요. (15분 동안 유효, 스팸함도 확인해 주세요)': '📮 Email sent. Tap "Log in" in your inbox. (Valid for 15 minutes, check spam too)',
+  '이제 결제할 수 있어요': 'You can pay now',
+  '로그인이 필요해요': 'Please log in first',
+  '로그인 실패': 'Login failed',
+  '이메일 주소를 확인해 주세요': 'Please check your email address',
+  '링크가 만료됐어요. 다시 시도해 주세요': 'This link has expired. Please try again',
+  '메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요': 'Couldn’t send the email. Please try again shortly',
+
   // ---------- 유성우 ----------
   '사분의자리 유성우': 'Quadrantids',
   '거문고자리 유성우': 'Lyrids',
@@ -440,6 +457,12 @@ const PATTERNS = [
   [/^(.+) · (\d+)년 (\d+)월 (\d+)일 (\d+:\d+)$/, (m, p, y, mo, d, hm) => `${tr(p)} · ${mo}/${d}/${y} ${hm}`],
   [/^이불 밖은 추우니까 · (.+)$/, 'Too Cold to Leave the Blanket · $1'],
   [/^(.+)를$/, (m, x) => (tr(x) !== x ? tr(x) : m)],
+  [/^✅ 로그인했어요 · (.+)$/, '✅ Logged in · $1'],
+  [/^👤 (.+) 로 로그인됨$/, '👤 Logged in as $1'],
+  [/^개당 (\$[\d.]+)$/, '$1 each'],
+  [/^따로 사면 (\$[\d.]+) → (\d+)% 할인$/, '$1 if bought separately → $2% off'],
+  [/^(\$[\d.]+) · 기간 늘리기$/, '$1 · Extend'],
+  [/^(\$[\d.]+) · 구매하기$/, '$1 · Buy'],
   // 서버가 보내는 오류 문구 중 숫자가 든 것
   [/^(\d+)자까지 쓸 수 있어요$/, 'Up to $1 characters'],
   [/^그 말은 보낼 수 없어요$/, 'That can’t be sent'],

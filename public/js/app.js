@@ -877,6 +877,8 @@ function setWallet(w) {
   });
   $('wish-coins').textContent = myWallet.coins;
   $('shop-coins').textContent = myWallet.coins;
+  $('login-who').hidden = !myWallet.email;
+  if (myWallet.email) $('login-who').textContent = `👤 ${myWallet.email} 로 로그인됨`;
   const hh = myWallet.hearts;
   const hp = $('hud-hearts');
   if (hh) {
@@ -913,6 +915,13 @@ function fmtDate(ms) {
 let shopView = 'main';
 let shopPick = null;
 const won = (n) => `${n.toLocaleString('ko-KR')}원`;
+// 결제 통화: 한국어 화면은 원화(국내 결제), 그 밖의 언어는 달러(페이팔)
+const shopCurrency = () => (getLang() === 'ko' ? 'KRW' : 'USD');
+const usdText = (n) => `$${n.toFixed(2)}`;
+const priceOf = (p) => (shopCurrency() === 'USD' ? p.usd : p.price);
+const listOf = (p) => (shopCurrency() === 'USD' ? p.listUsd : p.list);
+const money = (n) => (shopCurrency() === 'USD' ? usdText(n) : won(n));
+const sellable = (p) => (shopCurrency() === 'USD' ? !!p.usd : true);
 const ITEM_ORDER = ['candle', 'flash', 'fireworks', 'bigfire', 'package'];
 
 function setShopView(v, pick = null) {
@@ -933,8 +942,8 @@ function renderProducts() {
   $('shopdlg').classList.toggle('sub', shopView !== 'main');
   $('shop-title').textContent = shopView === 'coins' ? '소원 동전 충전' : shopView === 'items' ? '아이템' : '상점';
 
-  const coinKeys = Object.keys(P).filter((k) => P[k].group === 'coins').sort((a, b) => P[a].price - P[b].price);
-  const off = (p) => (p.list ? Math.round((1 - p.price / p.list) * 100) : 0);
+  const coinKeys = Object.keys(P).filter((k) => P[k].group === 'coins' && sellable(P[k])).sort((a, b) => priceOf(P[a]) - priceOf(P[b]));
+  const off = (p) => (listOf(p) ? Math.max(0, Math.round((1 - priceOf(p) / listOf(p)) * 100)) : 0);
   if (shopView === 'main') {
     $('door-coins-n').textContent = myWallet.coins;
     $('door-max').textContent = Math.max(0, ...coinKeys.map((k) => off(P[k])));
@@ -954,13 +963,13 @@ function renderProducts() {
       row.innerHTML = `<div class="t-coins">🪙 <b></b>개</div><div class="t-info"><span class="t-desc"></span><span class="t-unit"></span></div><div class="t-buy"><span class="t-off"></span><s class="t-list"></s></div>`;
       row.querySelector('.t-coins b').textContent = p.coins;
       row.querySelector('.t-desc').textContent = p.desc;
-      row.querySelector('.t-unit').textContent = `개당 ${Math.round(p.price / p.coins)}원`;
+      row.querySelector('.t-unit').textContent = shopCurrency() === 'USD' ? `개당 ${usdText(priceOf(p) / p.coins)}` : `개당 ${Math.round(p.price / p.coins)}원`;
       row.querySelector('.t-off').textContent = d > 0 ? `${d}% 할인` : '';
       row.querySelector('.t-off').hidden = d <= 0;
-      row.querySelector('.t-list').textContent = d > 0 ? won(p.list) : '';
+      row.querySelector('.t-list').textContent = d > 0 ? money(listOf(p)) : '';
       const b = document.createElement('button');
       b.className = 'btn primary';
-      b.textContent = won(p.price);
+      b.textContent = money(priceOf(p));
       b.addEventListener('click', () => buy(k, b));
       row.querySelector('.t-buy').append(b);
       if (k === best) {
@@ -979,13 +988,13 @@ function renderProducts() {
     grid.innerHTML = '';
     for (const k of ITEM_ORDER) {
       const p = P[k];
-      if (!p) continue;
+      if (!p || !sellable(p)) continue;
       const own = k !== 'package' && owned(k);
       const b = document.createElement('button');
       b.className = 'item-card' + (shopPick === k ? ' on' : '') + (own ? ' own' : '') + (k === 'package' ? ' wide' : '');
       b.innerHTML = `<span class="ic-ico">${p.icon}</span><span class="ic-name"></span><span class="ic-price"></span>`;
       b.querySelector('.ic-name').textContent = p.name;
-      b.querySelector('.ic-price').textContent = own ? '✓ 사용 중' : won(p.price);
+      b.querySelector('.ic-price').textContent = own ? '✓ 사용 중' : money(priceOf(p));
       b.addEventListener('click', () => setShopView('items', shopPick === k ? null : k));
       grid.append(b);
     }
@@ -993,13 +1002,13 @@ function renderProducts() {
     if (shopPick) {
       const p = P[shopPick];
       const own = shopPick !== 'package' && owned(shopPick);
-      const sum = shopPick === 'package' ? p.items.reduce((t, k) => t + P[k].price, 0) : 0;
+      const sum = shopPick === 'package' ? p.items.reduce((t, k) => t + priceOf(P[k]), 0) : 0;
       det.innerHTML = `<div class="id-top"><span class="id-ico">${p.icon}</span><div><div class="id-name"></div><div class="id-desc"></div></div></div><ul class="id-facts"></ul>`;
       det.querySelector('.id-name').textContent = p.name;
       det.querySelector('.id-desc').textContent = p.desc;
       const facts = [`${shopInfo.itemDays || 30}일 동안 사용 · 다시 사면 기간이 늘어나요`];
       if (own) facts.unshift(`✓ ${fmtDate(myWallet.items[shopPick])}까지 사용 중`);
-      if (sum) facts.push(`따로 사면 ${won(sum)} → ${Math.round((1 - p.price / sum) * 100)}% 할인`);
+      if (sum) facts.push(`따로 사면 ${money(Math.round(sum * 100) / 100)} → ${Math.round((1 - priceOf(p) / sum) * 100)}% 할인`);
       for (const f of facts) {
         const li = document.createElement('li');
         li.textContent = f;
@@ -1007,7 +1016,7 @@ function renderProducts() {
       }
       const b = document.createElement('button');
       b.className = 'btn primary wide';
-      b.textContent = `${won(p.price)} ${own ? '· 기간 늘리기' : '· 구매하기'}`;
+      b.textContent = `${money(priceOf(p))} ${own ? '· 기간 늘리기' : '· 구매하기'}`;
       b.addEventListener('click', () => buy(shopPick, b));
       det.append(b);
       requestAnimationFrame(() => det.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
@@ -1028,12 +1037,111 @@ $('door-coins').addEventListener('click', () => setShopView('coins'));
 $('door-items').addEventListener('click', () => setShopView('items'));
 $('shop-back').addEventListener('click', () => setShopView('main'));
 
+// ---------- 이메일 간편 로그인 (결제할 때만 요청) ----------
+let afterLogin = null; // 로그인 뒤 이어서 할 일 (멈췄던 결제)
+const postJson = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ ok: r.ok, body: await r.json() }));
+function openLogin(next) {
+  afterLogin = next || null;
+  $('login-msg').hidden = true;
+  $('login-dev').hidden = true;
+  $('login-send').disabled = false;
+  if ($('shopdlg').open) $('shopdlg').close();
+  $('logindlg').showModal();
+  setTimeout(() => $('login-email').focus(), 50);
+}
+async function finishLogin(token) {
+  const r = await postJson('api/shop/verify', { token, visitor: net.visitor });
+  if (!r.ok) throw new Error(r.body.error || '로그인 실패');
+  if (r.body.visitor !== net.visitor) net.adoptVisitor(r.body.visitor);
+  setWallet(r.body.wallet);
+  toast(`✅ 로그인했어요 · ${r.body.email}`);
+  return r.body;
+}
+$('login-form').addEventListener('submit', async (e) => {
+  if (!(e.submitter && e.submitter.value === 'send')) return;
+  e.preventDefault();
+  const email = $('login-email').value.trim();
+  const msg = $('login-msg');
+  $('login-send').disabled = true;
+  const r = await postJson('api/shop/login', { email, visitor: net.visitor }).catch(() => ({ ok: false, body: {} }));
+  msg.hidden = false;
+  if (!r.ok) {
+    msg.textContent = r.body.error || '잠시 후 다시 시도해 주세요';
+    $('login-send').disabled = false;
+    return;
+  }
+  if (r.body.devLink) {
+    // 메일 서비스를 붙이기 전(테스트 모드): 링크를 바로 씀
+    msg.textContent = '🧪 테스트 모드라 메일 대신 아래 버튼으로 로그인해요.';
+    const btn = $('login-dev');
+    btn.hidden = false;
+    btn.onclick = async () => {
+      try {
+        await finishLogin(new URL(r.body.devLink).searchParams.get('login'));
+        $('logindlg').close();
+        const next = afterLogin;
+        afterLogin = null;
+        if (next) next();
+      } catch (err) {
+        msg.textContent = err.message;
+      }
+    };
+  } else {
+    msg.textContent = '📮 메일을 보냈어요. 메일함에서 "로그인하기"를 눌러 주세요. (15분 동안 유효, 스팸함도 확인해 주세요)';
+  }
+});
+// 메일의 로그인 링크로 들어왔을 때
+if (params.get('login')) {
+  finishLogin(params.get('login'))
+    .then(() => {
+      if (shopInfo && shopInfo.mode !== 'off') setTimeout(() => openShop('이제 결제할 수 있어요'), 600);
+    })
+    .catch((e) => toast(e.message));
+  history.replaceState(null, '', location.pathname);
+}
+
+// 해외 결제: 페이팔 결제창
+async function payWithPaypal(order, label) {
+  await loadScript(`https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(shopInfo.paypal.clientId)}&currency=USD&intent=capture`);
+  const box = $('paypal-buttons');
+  box.innerHTML = '';
+  $('paypal-what').textContent = `${label} · ${usdText(order.amount)}`;
+  if ($('shopdlg').open) $('shopdlg').close();
+  $('paypaldlg').showModal();
+  await window.paypal
+    .Buttons({
+      style: { layout: 'vertical', shape: 'pill' },
+      createOrder: async () => {
+        const r = await postJson('api/shop/paypal/create', { orderId: order.orderId });
+        if (!r.ok) throw new Error(r.body.error || '결제창을 불러오지 못했어요');
+        return r.body.id;
+      },
+      onApprove: async () => {
+        $('paypaldlg').close();
+        await confirmPayment({ orderId: order.orderId, amount: order.amount });
+      },
+      onCancel: () => toast('결제를 취소했어요'),
+      onError: () => toast('결제에 실패했어요'),
+    })
+    .render(box);
+}
+$('paypal-close').addEventListener('click', () => $('paypaldlg').close());
+
 async function buy(product, btn) {
+  // 결제는 로그인한 뒤에만: 로그인 창을 띄우고, 로그인하면 이어서 결제
+  if (!myWallet.email) return openLogin(() => openShop(null, shopView, shopPick));
   btn.disabled = true;
   try {
-    const r = await fetch('api/shop/order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visitor: net.visitor, product }) });
+    const currency = shopCurrency();
+    const r = await fetch('api/shop/order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visitor: net.visitor, product, currency }) });
     const order = await r.json();
+    if (order.needLogin) return openLogin(() => openShop(null, shopView, shopPick));
     if (!r.ok) throw new Error(order.error || '주문 실패');
+    if (currency === 'USD') {
+      if (shopInfo.mode === 'live' && shopInfo.paypal) return await payWithPaypal(order, shopInfo.products[product].name);
+      await confirmPayment({ orderId: order.orderId, paymentKey: 'test', amount: order.amount });
+      return;
+    }
     if (shopInfo.mode === 'live') {
       // 토스페이먼츠 결제창 (결제 후 이 페이지로 돌아와 확인)
       await loadScript('https://js.tosspayments.com/v2/standard');

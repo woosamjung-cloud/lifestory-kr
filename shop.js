@@ -15,18 +15,19 @@ import crypto from 'node:crypto';
 const DAY = 86400000;
 
 // 판매 상품 (가격은 서버에서만 정함 - 화면에서 바꿔도 소용없음)
-export const COIN_PRICE = 100; // 소원 동전 1개 정가
+export const COIN_PRICE = 100; // 소원 동전 1개 정가 (원)
+export const COIN_PRICE_USD = 0.1; // 해외(페이팔) 동전 1개 정가 (달러). 페이팔은 건당 수수료가 있어 해외는 2.99달러부터 묶음만 팝니다
 export const PRODUCTS = {
-  candle: { group: 'items', name: '촛불', price: 1000, grants: { items: ['candle'] }, icon: '🕯️', desc: '내 자리 앞에 촛불이 일렁여요. 켜고 끌 수 있어요.' },
-  flash: { group: 'items', name: '후레쉬', price: 1000, grants: { items: ['flash'] }, icon: '🔦', desc: '손전등으로 밤바다를 은은하게 비춰요.' },
-  fireworks: { group: 'items', name: '폭죽', price: 2000, grants: { items: ['fireworks'] }, icon: '🎆', desc: '하늘에 불꽃놀이! 함께 보는 모든 사람 화면에 보여요.' },
-  bigfire: { group: 'items', name: '큰 캠프파이어', price: 2900, grants: { items: ['bigfire'] }, icon: '🔥', desc: '내 모닥불이 더 크고 화려한 색으로 타올라요.' },
-  package: { group: 'items', name: '모두 담은 꾸러미', price: 4900, grants: { items: ['candle', 'flash', 'fireworks', 'bigfire'], coins: 5 }, icon: '🎁', desc: '네 가지 아이템을 한 번에 + 소원 동전 5개 덤.' },
+  candle: { group: 'items', name: '촛불', price: 1000, usd: 1.49, grants: { items: ['candle'] }, icon: '🕯️', desc: '내 자리 앞에 촛불이 일렁여요. 켜고 끌 수 있어요.' },
+  flash: { group: 'items', name: '후레쉬', price: 1000, usd: 1.49, grants: { items: ['flash'] }, icon: '🔦', desc: '손전등으로 밤바다를 은은하게 비춰요.' },
+  fireworks: { group: 'items', name: '폭죽', price: 2000, usd: 1.99, grants: { items: ['fireworks'] }, icon: '🎆', desc: '하늘에 불꽃놀이! 함께 보는 모든 사람 화면에 보여요.' },
+  bigfire: { group: 'items', name: '큰 캠프파이어', price: 2900, usd: 2.49, grants: { items: ['bigfire'] }, icon: '🔥', desc: '내 모닥불이 더 크고 화려한 색으로 타올라요.' },
+  package: { group: 'items', name: '모두 담은 꾸러미', price: 4900, usd: 3.99, grants: { items: ['candle', 'flash', 'fireworks', 'bigfire'], coins: 5 }, icon: '🎁', desc: '네 가지 아이템을 한 번에 + 소원 동전 5개 덤.' },
   coins5: { group: 'coins', name: '소원 동전 5개', price: 500, grants: { coins: 5 }, icon: '🪙', desc: '가볍게 한두 번' },
   coins10: { group: 'coins', name: '소원 동전 11개', price: 1000, grants: { coins: 11 }, icon: '🪙', desc: '10개 + 덤 1개' },
-  coins33: { group: 'coins', name: '소원 동전 35개', price: 3000, grants: { coins: 35 }, icon: '🪙', desc: '30개 + 덤 5개' },
-  coins60: { group: 'coins', name: '소원 동전 60개', price: 5000, grants: { coins: 60 }, icon: '🪙', desc: '50개 + 덤 10개' },
-  coins130: { group: 'coins', name: '소원 동전 130개', price: 10000, grants: { coins: 130 }, icon: '🪙', desc: '100개 + 덤 30개' },
+  coins33: { group: 'coins', name: '소원 동전 35개', price: 3000, usd: 2.99, grants: { coins: 35 }, icon: '🪙', desc: '30개 + 덤 5개' },
+  coins60: { group: 'coins', name: '소원 동전 60개', price: 5000, usd: 4.99, grants: { coins: 60 }, icon: '🪙', desc: '50개 + 덤 10개' },
+  coins130: { group: 'coins', name: '소원 동전 130개', price: 10000, usd: 8.99, grants: { coins: 130 }, icon: '🪙', desc: '100개 + 덤 30개' },
 };
 export const ITEM_KEYS = ['candle', 'flash', 'fireworks', 'bigfire'];
 export const ITEM_DAYS = 30;
@@ -82,14 +83,14 @@ export function shopMode() {
 }
 
 // ---------- 저장 ----------
-let db = { accounts: {}, orders: {}, codes: {} };
+let db = { accounts: {}, orders: {}, codes: {}, users: {}, tokens: {} };
 let file = null;
 let dirty = false;
 
 export function initShop(dataDir) {
   file = path.join(dataDir, 'shop.json');
   try {
-    db = { accounts: {}, orders: {}, codes: {}, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+    db = { accounts: {}, orders: {}, codes: {}, users: {}, tokens: {}, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
   } catch {
     /* 처음 실행 */
   }
@@ -131,6 +132,7 @@ export function wallet(visitor) {
     items,
     hasCode: !!(a && a.code),
     hearts: { received: a ? a.heartsIn || 0 : 0, given: a ? a.heartsOut || 0 : 0 },
+    email: a && a.email ? maskEmail(a.email) : null, // 로그인한 이메일 (가려서)
   };
 }
 
@@ -187,15 +189,77 @@ function grant(visitor, product) {
 }
 
 // ---------- 주문 ----------
-export function createOrder(visitor, product) {
+// currency: 'KRW'(국내, 키움페이) / 'USD'(해외, 페이팔)
+export function createOrder(visitor, product, currency = 'KRW') {
   if (!validVisitor(visitor)) return { error: '기기 정보가 올바르지 않아요' };
   const p = PRODUCTS[product];
   if (!p) return { error: '없는 상품이에요' };
-  account(visitor);
+  const usd = currency === 'USD';
+  if (usd && !p.usd) return { error: '없는 상품이에요' };
+  const a = account(visitor);
+  // 실제 결제는 로그인(이메일)한 사람만: 구매 기록을 어느 기기에서든 찾을 수 있게
+  if (shopMode() === 'live' && !a.email) return { error: '로그인이 필요해요', needLogin: true };
+  const amount = usd ? p.usd : p.price;
   const orderId = 'hd' + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
-  db.orders[orderId] = { visitor, product, amount: p.price, status: 'ready', created: Date.now() };
+  db.orders[orderId] = { visitor, product, amount, currency: usd ? 'USD' : 'KRW', status: 'ready', created: Date.now() };
   dirty = true;
-  return { orderId, amount: p.price, orderName: `이불 밖은 추우니까 ${p.name}`, customerKey: 'c_' + visitor };
+  return { orderId, amount, currency: usd ? 'USD' : 'KRW', orderName: `이불 밖은 추우니까 ${p.name}`, customerKey: 'c_' + visitor };
+}
+
+// ---------- 페이팔 (해외 결제) ----------
+// Render 환경변수: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_ENV(sandbox|live, 기본 sandbox)
+export function paypalReady() {
+  return !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_SECRET);
+}
+const paypalBase = () => (process.env.PAYPAL_ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com');
+async function paypalToken() {
+  const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString('base64');
+  const res = await fetch(`${paypalBase()}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials',
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.access_token) throw new Error('paypal auth');
+  return body.access_token;
+}
+// 우리 주문 → 페이팔 주문 만들기 (금액은 서버가 정함)
+export async function paypalCreate(orderId) {
+  const o = db.orders[orderId];
+  if (!o || o.currency !== 'USD' || o.status !== 'ready') return { error: '주문을 찾을 수 없어요' };
+  if (!paypalReady()) return { error: '결제창을 불러오지 못했어요' };
+  try {
+    const token = await paypalToken();
+    const res = await fetch(`${paypalBase()}/v2/checkout/orders`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'PayPal-Request-Id': orderId },
+      body: JSON.stringify({
+        intent: 'CAPTURE',
+        purchase_units: [{ custom_id: orderId, description: `Too Cold to Leave the Blanket - ${PRODUCTS[o.product].name}`, amount: { currency_code: 'USD', value: o.amount.toFixed(2) } }],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = await res.json();
+    if (!res.ok || !body.id) return { error: '결제창을 불러오지 못했어요' };
+    o.paypalId = body.id;
+    dirty = true;
+    return { id: body.id };
+  } catch {
+    return { error: '결제창을 불러오지 못했어요' };
+  }
+}
+async function paypalCapture(o) {
+  const token = await paypalToken();
+  const res = await fetch(`${paypalBase()}/v2/checkout/orders/${encodeURIComponent(o.paypalId)}/capture`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'PayPal-Request-Id': `cap-${o.paypalId}` },
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await res.json();
+  const cap = body?.purchase_units?.[0]?.payments?.captures?.[0];
+  const ok = res.ok && body.status === 'COMPLETED' && cap && cap.amount?.currency_code === 'USD' && Number(cap.amount.value) === o.amount;
+  return { ok, captureId: cap && cap.id, payer: body?.payer?.email_address };
 }
 
 // 결제 확인: 금액이 주문과 같은지 확인한 뒤 토스페이먼츠에 승인 요청 (테스트 모드는 바로 승인)
@@ -206,7 +270,23 @@ export async function confirmOrder({ orderId, paymentKey, amount }) {
   if (Number(amount) !== o.amount) return { error: '결제 금액이 주문과 달라요' };
   const mode = shopMode();
   if (mode === 'off') return { error: '상점이 닫혀 있어요' };
-  if (mode === 'live') {
+  if (o.currency === 'USD' && mode === 'live') {
+    // 해외: 페이팔 결제 확정 (금액·통화를 다시 확인)
+    if (!o.paypalId) return { error: '결제 정보가 올바르지 않아요' };
+    let r;
+    try {
+      r = await paypalCapture(o);
+    } catch {
+      return { error: '결제 확인 중 오류가 났어요. 잠시 후 다시 시도해 주세요' };
+    }
+    if (!r.ok) {
+      o.status = 'failed';
+      dirty = true;
+      return { error: '결제가 승인되지 않았어요' };
+    }
+    o.captureId = r.captureId;
+    o.method = 'paypal';
+  } else if (mode === 'live') {
     if (typeof paymentKey !== 'string' || paymentKey.length > 200) return { error: '결제 정보가 올바르지 않아요' };
     const auth = Buffer.from(process.env.TOSS_SECRET_KEY + ':').toString('base64');
     let res;
@@ -240,6 +320,84 @@ export async function confirmOrder({ orderId, paymentKey, amount }) {
   return { ok: true, wallet: wallet(o.visitor), test: mode === 'test' };
 }
 
+// ---------- 이메일 간편 로그인 (결제할 때만 요청) ----------
+// 메일로 보낸 링크를 누르면 로그인. 비밀번호 없음.
+// Render 환경변수: RESEND_API_KEY(메일 발송), MAIL_FROM(보내는 주소, 예: '이불 밖은 추우니까 <hello@도메인>')
+// 메일 키가 없고 테스트 모드면 링크를 화면에 바로 돌려줌 (흐름 확인용)
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/i;
+const LOGIN_TTL = 15 * 60 * 1000;
+const lastMail = new Map(); // email → 마지막 발송 시각 (1분에 한 번)
+function maskEmail(e) {
+  const [id, dom] = e.split('@');
+  return `${id.slice(0, 2)}${'*'.repeat(Math.max(1, Math.min(4, id.length - 2)))}@${dom}`;
+}
+export async function loginStart(rawEmail, visitor, origin) {
+  const email = String(rawEmail || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return { error: '이메일 주소를 확인해 주세요' };
+  if (!validVisitor(visitor)) return { error: '기기 정보가 올바르지 않아요' };
+  const now = Date.now();
+  if (now - (lastMail.get(email) || 0) < 60000) return { error: '잠시 후 다시 시도해 주세요' };
+  lastMail.set(email, now);
+  for (const [k, v] of Object.entries(db.tokens)) if (v.exp < now) delete db.tokens[k];
+  const token = crypto.randomBytes(24).toString('hex');
+  db.tokens[token] = { email, visitor, exp: now + LOGIN_TTL };
+  dirty = true;
+  const link = `${origin}/?login=${token}`;
+  const key = process.env.RESEND_API_KEY;
+  if (key) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: process.env.MAIL_FROM || '이불 밖은 추우니까 <onboarding@resend.dev>',
+          to: [email],
+          subject: '이불 밖은 추우니까 · 로그인 링크 (Login link)',
+          html: `<p>아래 버튼을 누르면 로그인돼요. (15분 동안 유효)</p><p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#b9574e;color:#fff;border-radius:10px;text-decoration:none">로그인하기 · Log in</a></p><p style="color:#888;font-size:12px">요청하지 않으셨다면 이 메일은 무시해 주세요. If you didn't request this, just ignore this email.</p>`,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error('mail');
+      return { sent: true };
+    } catch {
+      return { error: '메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요' };
+    }
+  }
+  if (shopMode() !== 'live') return { sent: false, devLink: link };
+  return { error: '메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요' };
+}
+// 다른 기기의 지갑을 계정으로 합치기
+function mergeInto(target, source) {
+  const t = account(target);
+  const s = account(source, false);
+  if (!s || target === source) return;
+  t.coins += s.coins || 0;
+  for (const [k, until] of Object.entries(s.items || {})) t.items[k] = Math.max(t.items[k] || 0, until);
+  t.heartsIn = (t.heartsIn || 0) + (s.heartsIn || 0);
+  t.heartsOut = (t.heartsOut || 0) + (s.heartsOut || 0);
+  s.coins = 0;
+  s.items = {};
+  s.mergedInto = target;
+  dirty = true;
+}
+export function loginVerify(token, visitor) {
+  const t = db.tokens[String(token || '')];
+  if (!t || t.exp < Date.now()) return { error: '링크가 만료됐어요. 다시 시도해 주세요' };
+  delete db.tokens[token];
+  const here = validVisitor(visitor) ? visitor : t.visitor;
+  let u = db.users[t.email];
+  if (!u) {
+    u = db.users[t.email] = { visitor: here, created: Date.now() };
+    account(here).email = t.email;
+  } else {
+    mergeInto(u.visitor, here);
+    if (here !== t.visitor) mergeInto(u.visitor, t.visitor);
+  }
+  dirty = true;
+  saveShop(true);
+  return { visitor: u.visitor, email: maskEmail(t.email), wallet: wallet(u.visitor) };
+}
+
 // ---------- 복구 코드 (다른 기기로 구매 내역 옮기기) ----------
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function recoveryCode(visitor) {
@@ -268,10 +426,12 @@ export function restore(code) {
 }
 
 export function shopPublicInfo() {
+  const paypal = paypalReady() ? { clientId: process.env.PAYPAL_CLIENT_ID, env: process.env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox' } : null;
   return {
     mode: shopMode(),
     clientKey: shopMode() === 'live' ? process.env.TOSS_CLIENT_KEY : null,
-    products: Object.fromEntries(Object.entries(PRODUCTS).map(([k, p]) => [k, { group: p.group, name: p.name, price: p.price, icon: p.icon, desc: p.desc, coins: p.grants.coins || 0, items: p.grants.items || [], list: p.group === 'coins' ? p.grants.coins * COIN_PRICE : 0 }])),
+    products: Object.fromEntries(Object.entries(PRODUCTS).map(([k, p]) => [k, { group: p.group, name: p.name, price: p.price, usd: p.usd || null, icon: p.icon, desc: p.desc, coins: p.grants.coins || 0, items: p.grants.items || [], list: p.group === 'coins' ? p.grants.coins * COIN_PRICE : 0, listUsd: p.group === 'coins' ? Math.round(p.grants.coins * COIN_PRICE_USD * 100) / 100 : 0 }])),
+    paypal,
     wishes: WISHES,
     letters: LETTERS,
     sayings: SAYINGS,

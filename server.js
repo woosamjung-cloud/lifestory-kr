@@ -495,6 +495,14 @@ function json(res, code, body) {
 const postHits = new Map(); // IP별 분당 요청 수 제한
 setInterval(() => postHits.clear(), 60000).unref();
 
+// 메일 링크에 넣을 사이트 주소 (도메인을 연결하면 PUBLIC_URL 환경변수로 고정)
+function publicOrigin(req) {
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
+  const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+  return `${proto === 'https' ? 'https' : 'http'}://${host.replace(/[^a-z0-9.:-]/gi, '')}`;
+}
+
 async function handleShop(req, res, url) {
   const route = url.pathname.slice('/api/shop'.length) || '/';
   if (req.method === 'GET' && route === '/') {
@@ -509,7 +517,10 @@ async function handleShop(req, res, url) {
   if (shop.shopMode() === 'off') return json(res, 403, { error: '상점이 닫혀 있어요' });
   const body = await readJson(req);
   let r;
-  if (route === '/order') r = shop.createOrder(body.visitor, body.product);
+  if (route === '/order') r = shop.createOrder(body.visitor, body.product, body.currency === 'USD' ? 'USD' : 'KRW');
+  else if (route === '/paypal/create') r = await shop.paypalCreate(body.orderId);
+  else if (route === '/login') r = await shop.loginStart(body.email, body.visitor, publicOrigin(req));
+  else if (route === '/verify') r = shop.loginVerify(body.token, body.visitor);
   else if (route === '/confirm') r = await shop.confirmOrder(body);
   else if (route === '/code') r = shop.recoveryCode(body.visitor);
   else if (route === '/restore') r = shop.restore(body.code);
