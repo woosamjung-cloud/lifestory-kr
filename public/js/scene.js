@@ -4,6 +4,7 @@
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
 import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS } from './characters.js';
 import { localizeCtx } from './i18n.js';
+import { cameraFor } from './camera.js';
 import { NightSky } from './nightsky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -243,7 +244,8 @@ export class Scene {
     this.shoreY = this.horizonY + h * (this.landscape ? 0.1 : 0.13);
     this.pxPerDeg = Math.max(w / 75, h / 48);
     // 월드 폭: 휴대폰 세로 2배, 가로 1.5배, 넓은 PC 1.3배
-    this.WW = Math.round(w * (w >= 900 ? 1.3 : this.landscape ? 1.5 : 2));
+    const cw = cameraFor(this.placeInfo).world;
+    this.WW = Math.round(w * (w >= 900 ? cw.wide : this.landscape ? cw.landscape : cw.phone));
     this.sunR = Math.max(16, h * 0.042);
     this.layoutSlots();
   }
@@ -252,9 +254,15 @@ export class Scene {
     this.place = placeKey;
     const p = PLACES[placeKey];
     this.placeInfo = p;
+    this.cam = cameraFor(p); // 공통 카메라 규칙 (+ 장소별로 바꾼 값)
     this.centerAz = solarPosition(eventTime, p.lat, p.lon).azimuth;
     this.baseAz = this.centerAz;
     this.effects = [];
+    // 장소마다 해변 폭 규칙을 다시 적용
+    if (this.W) {
+      const cw = this.cam.world;
+      this.WW = Math.round(this.W * (this.W >= 900 ? cw.wide : this.landscape ? cw.landscape : cw.phone));
+    }
     this.layoutSlots();
   }
 
@@ -342,6 +350,7 @@ export class Scene {
     if (this.camBase == null) this.camBase = this.camX;
     const standing = !!(me && (me.walking || this.selfUp));
     const now = performance.now();
+    const R = this.cam || cameraFor(this.placeInfo);
     // 기울기: 평소 들고 있는 각도를 기준(천천히 따라감)으로 삼아 그 차이만 씀
     const g = this.tiltG || 0;
     const bRaw = this.tiltB;
@@ -351,11 +360,11 @@ export class Scene {
     if (me) {
       // 걸을 때는 나를 따라가고
       if (standing) {
-        const left = this.camBase + this.W * 0.25;
-        const right = this.camBase + this.W * 0.75;
+        const left = this.camBase + this.W * R.standing.followBand[0];
+        const right = this.camBase + this.W * R.standing.followBand[1];
         if (me.x < left) this.camBase -= Math.min(left - me.x, this.W * 1.2 * dt + 0.5);
         else if (me.x > right) this.camBase += Math.min(me.x - right, this.W * 1.2 * dt + 0.5);
-      } else if (now - (this.lastPanAt || 0) > 6000) {
+      } else if (now - (this.lastPanAt || 0) > R.seated.returnAfterMs) {
         // 앉아서 가만히 있고 내가 화면 밖이면 천천히 돌아옴
         const want = clamp(me.x - this.W * 0.45, 0, max);
         const seen = me.x > this.camBase + this.W * 0.08 && me.x < this.camBase + this.W * 0.92;
@@ -370,19 +379,20 @@ export class Scene {
     // 기울기로 살짝 더 보여 주기 (서 있을 때만, 부드럽게)
     // 서 있을 때는 화면 폭의 18%까지, 앉아 있을 때는 6%까지만 살짝
     let leadT = 0;
-    if (Math.abs(g) > 4) leadT = Math.sign(g) * Math.min(1, (Math.abs(g) - 4) / 22) * this.W * (standing ? 0.18 : 0.06);
+    const dz = R.tilt.deadzone;
+    if (Math.abs(g) > dz) leadT = Math.sign(g) * Math.min(1, (Math.abs(g) - dz) / R.tilt.range) * this.W * (standing ? R.standing.leadMax : R.seated.leadMax);
     this.camLead = (this.camLead || 0) + (leadT - (this.camLead || 0)) * Math.min(1, dt * 3);
     let cam = this.camBase + this.camLead;
     // 내 캐릭터는 화면 안쪽(18%~82%)에 꼭 남게
-    if (me) cam = clamp(cam, me.x - this.W * 0.82, me.x - this.W * 0.18);
+    if (me) cam = clamp(cam, me.x - this.W * R.standing.keepIn[1], me.x - this.W * R.standing.keepIn[0]);
     this.camX = clamp(cam, 0, max);
 
     // 앉아 있을 때 앞뒤 기울기: 위아래로 살짝 (최대 9px)
-    const offT = standing ? 0 : clamp(db / 25, -1, 1) * 9;
+    const offT = standing ? 0 : clamp(db / 25, -1, 1) * R.seated.tiltYMax;
     this.camY = (this.camY || 0) + (offT - (this.camY || 0)) * Math.min(1, dt * 3);
 
     // 먼 하늘·바다는 천천히 (해의 방위를 살짝 돌려서)
-    this.farShift = (this.camX - max / 2) * 0.12;
+    this.farShift = (this.camX - max / 2) * R.farParallax;
     this.centerAz = (this.baseAz ?? this.centerAz) + this.farShift / this.pxPerDeg;
   }
 
