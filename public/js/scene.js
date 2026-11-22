@@ -695,31 +695,8 @@ export class Scene {
       ctx.restore();
     }
 
-    // 갈매기 (낮·여명)
-    if (light > 0.45) {
-      ctx.strokeStyle = `rgba(40,40,60,${(light - 0.45) * 1.2})`;
-      ctx.lineWidth = 1.6;
-      // 새가 하늘에 나타날 때(화면 왼쪽에서 다시 들어오거나, 날이 밝아 처음 보일 때) 울음소리 한 번
-      if (!this.birdsShown) {
-        this.birdsShown = true;
-        this.birdCue(nowMs);
-      }
-      for (const gl of this.gulls) {
-        const lapN = Math.floor((gl.x + (nowMs / 1000) * gl.v * 0.1) / 1.2);
-        if (gl.lap != null && lapN !== gl.lap) this.birdCue(nowMs);
-        gl.lap = lapN;
-        const gx = (((gl.x + (nowMs / 1000) * gl.v * 0.1) % 1.2) - 0.1) * W;
-        const gy = gl.y * horizonY + Math.sin(nowMs / 900 + gl.p) * 6;
-        const flap = Math.sin(nowMs / 160 + gl.p) * 4;
-        ctx.beginPath();
-        ctx.moveTo(gx - 8, gy - flap);
-        ctx.quadraticCurveTo(gx - 3, gy - 4, gx, gy);
-        ctx.quadraticCurveTo(gx + 3, gy - 4, gx + 8, gy - flap);
-        ctx.stroke();
-      }
-    }
-
-    else this.birdsShown = false;
+    // 기러기 떼: 가끔(40~100초마다) 흰 기러기들이 V자로 날아와 하늘을 가로질러 사라짐
+    this.drawGeese(ctx, nowMs, light, W, horizonY);
 
     // 서해 섬 실루엣 (정서진)
     if (this.place === 'west') {
@@ -1700,6 +1677,52 @@ export class Scene {
   }
 
   // 사람과 사람이 만나는 거리 (모닥불 불빛이 닿는 반경 정도): 나와 상대 사이
+  drawGeese(ctx, now, light, W, horizonY) {
+    if (light < 0.3) {
+      this.flock = null;
+      return;
+    }
+    if (this.nextFlock == null) this.nextFlock = now + 6000 + Math.random() * 20000;
+    if (!this.flock && now > this.nextFlock) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      this.flock = { t0: now, dir, y: 0.18 + Math.random() * 0.3, n: 5 + Math.floor(Math.random() * 5), dur: 22000 + Math.random() * 10000, sz: 0.85 + Math.random() * 0.4 };
+      this.birdCue(now);
+    }
+    const f = this.flock;
+    if (!f) return;
+    const u = (now - f.t0) / f.dur;
+    if (u > 1) {
+      this.flock = null;
+      this.nextFlock = now + 40000 + Math.random() * 60000;
+      return;
+    }
+    const lead = f.dir > 0 ? lerp(-0.15, 1.2, u) * W : lerp(1.15, -0.2, u) * W;
+    const ly = f.y * horizonY + Math.sin(now / 2500) * 6;
+    const a = Math.min(1, (light - 0.3) * 3);
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (let k = 0; k < f.n; k++) {
+      // V자: 맨 앞 한 마리, 뒤로 양쪽에 번갈아
+      const row = Math.ceil(k / 2);
+      const side = k === 0 ? 0 : k % 2 ? -1 : 1;
+      const gx = lead - f.dir * row * 22 * f.sz;
+      const gy = ly + side * row * 11 * f.sz + Math.sin(now / 700 + k) * 1.5;
+      const flap = Math.sin(now / 210 + k * 0.9) * 4.5 * f.sz;
+      const w = 9 * f.sz;
+      // 흰 몸 + 하늘과 구분되게 아주 옅은 테두리
+      for (const [col, lw] of [[`rgba(70,70,90,${0.35 * a})`, 3.2 * f.sz], [`rgba(255,255,255,${0.95 * a})`, 1.8 * f.sz]]) {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        ctx.moveTo(gx - w, gy - flap);
+        ctx.quadraticCurveTo(gx - w * 0.35, gy - 4 * f.sz, gx, gy);
+        ctx.quadraticCurveTo(gx + w * 0.35, gy - 4 * f.sz, gx + w, gy - flap);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   // 새 울음: 너무 잦지 않게 (25초에 한 번까지)
   birdCue(now) {
     if (now - (this.lastBirdCue || -1e9) < 25000) return;
