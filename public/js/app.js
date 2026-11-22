@@ -638,7 +638,24 @@ $('save-ticket').addEventListener('click', async () => {
   toast('📥 승차권을 저장했어요');
 });
 
+// 휴대폰 기울기로 화면이 흐르게 (조이스틱처럼)
+function onTilt(e) {
+  if (e.gamma == null) return;
+  const portrait = innerHeight >= innerWidth;
+  // 가로 화면이면 앞뒤 기울기(beta)가 좌우 방향
+  const g = portrait ? e.gamma : (screen.orientation && screen.orientation.angle === 90 ? 1 : -1) * e.beta;
+  scene.tiltG = scene.tiltG * 0.8 + g * 0.2;
+}
+function enableTilt() {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) return;
+  if (typeof DOE.requestPermission === 'function') {
+    DOE.requestPermission().then((r) => r === 'granted' && addEventListener('deviceorientation', onTilt)).catch(() => {});
+  } else addEventListener('deviceorientation', onTilt);
+}
+
 $('board').addEventListener('click', () => {
+  enableTilt();
   scene.self = { ...state.profile };
   // 나의 하루 기록 (미리보기·해외 장소는 세지 않음)
   if (state.event && (state.event.place === 'east' || state.event.place === 'west')) {
@@ -653,7 +670,7 @@ $('board').addEventListener('click', () => {
   // 처음 탑승하면 놀이 방법 안내
   if (!store.get('playHint', false)) {
     store.set('playHint', true);
-    setTimeout(() => toast('👆 모래를 누르면 걸어가요 · ↓ 아래로 쓸면 앉아요 · 🔥 불을 누르면 장작 · ↑ 위로 쓸면 물수제비'), 7000);
+    setTimeout(() => toast('👆 모래를 누르면 걸어가요 · ↔ 옆으로 끌면 해변 구경 · ↓ 아래로 쓸면 앉아요 · 🔥 불을 누르면 장작'), 7000);
   }
   if (store.get('sound', true)) ambience.start().then((ok) => ok && setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200));
   show('ride');
@@ -1316,7 +1333,15 @@ let lastWoodAt = 0;
 let lastStoneAt = 0;
 canvasEl.addEventListener('pointerdown', (e) => {
   if (state.screen !== 'ride') return;
-  pdown = { x: e.clientX, y: e.clientY, t: performance.now() };
+  pdown = { x: e.clientX, y: e.clientY, t: performance.now(), cam: scene.camX, drag: false };
+});
+// 옆으로 끌면 넓은 해변을 따라 화면 이동
+canvasEl.addEventListener('pointermove', (e) => {
+  if (!pdown) return;
+  const dx = e.clientX - pdown.x;
+  const dy = e.clientY - pdown.y;
+  if (!pdown.drag && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.3) pdown.drag = true;
+  if (pdown.drag) scene.panBy(pdown.cam - dx - scene.camX);
 });
 canvasEl.addEventListener('pointerup', (e) => {
   if (state.screen !== 'ride' || !pdown) return;
@@ -1326,13 +1351,15 @@ canvasEl.addEventListener('pointerup', (e) => {
   const dist = Math.hypot(dx, dy);
   const start = pdown;
   pdown = null;
+  if (start.drag) return; // 화면을 옆으로 끈 것
+  const wx = scene.toWorldX(e.clientX); // 넓은 해변 위의 위치
   if (dist < 14) {
     // 짧게 누름
-    if (scene.nearFire(e.clientX, e.clientY)) return addWood();
-    // 다른 사람을 누르면 하트 선물
-    const who = scene.personAt(e.clientX, e.clientY);
+    if (scene.nearFire(wx, e.clientY)) return addWood();
+    // 다른 사람을 누르면 한마디·하트
+    const who = scene.personAt(wx, e.clientY);
     if (who) return openPersonMenu(who, e.clientX, e.clientY);
-    const pos = scene.screenToPos(e.clientX, e.clientY);
+    const pos = scene.screenToPos(wx, e.clientY);
     if (!pos) return;
     if (scene.selfStanding) return toast('자리에 앉은 뒤에 움직일 수 있어요');
     const now = Date.now();

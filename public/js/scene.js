@@ -198,6 +198,10 @@ export class Scene {
     this.place = 'east';
     this.placeInfo = PLACES.east;
     this.centerAz = 115;
+    this.baseAz = 115;
+    // 넓은 해변: 월드 폭(WW)은 화면 폭보다 넓고, camX만큼 옆으로 옮겨서 보여 줌
+    this.camX = 0;
+    this.tiltG = 0; // 휴대폰 좌우 기울기 (도)
     this.time = new Date();
     this.people = []; // 다른 승객 [{id, seat, char, color}]
     this.self = null; // { char, color, name }
@@ -238,6 +242,8 @@ export class Scene {
     this.horizonY = h * (this.landscape ? 0.4 : 0.5);
     this.shoreY = this.horizonY + h * (this.landscape ? 0.1 : 0.13);
     this.pxPerDeg = Math.max(w / 75, h / 48);
+    // 월드 폭: 휴대폰 세로 2배, 가로 1.5배, 넓은 PC 1.3배
+    this.WW = Math.round(w * (w >= 900 ? 1.3 : this.landscape ? 1.5 : 2));
     this.sunR = Math.max(16, h * 0.042);
     this.layoutSlots();
   }
@@ -247,13 +253,15 @@ export class Scene {
     const p = PLACES[placeKey];
     this.placeInfo = p;
     this.centerAz = solarPosition(eventTime, p.lat, p.lon).azimuth;
+    this.baseAz = this.centerAz;
     this.effects = [];
     this.layoutSlots();
   }
 
   // 좌석(자리) 배치: 바다 가까운 줄부터, 가운데부터 채웁니다. 내 자리는 따로 둡니다.
   layoutSlots() {
-    const { W, H } = this;
+    const { H } = this;
+    const W = this.WW || this.W; // 자리는 넓은 해변 전체에
     // 맨 앞줄 머리 꼭대기가 파도 거품선(최대 shoreY+16px)보다 아래에 오도록
     // 캐릭터 크기 기준: 가로 화면은 높이가 낮으므로 조금 키움
     const unit = this.landscape ? H * 1.3 : H;
@@ -295,6 +303,8 @@ export class Scene {
     this.sMin = unit * 0.03;
     this.sMax = unit * 0.075;
     this.homeSlot = mine; // 원래 내 자리 (모닥불 위치 기준)
+    // 처음에는 내 자리가 화면 가운데쯤 오게
+    this.camX = clamp(mine.x - this.W * 0.45, 0, Math.max(0, W - this.W));
     const prev = this.mySlot;
     this.mySlot = { ...mine };
     if (this.selfPos) {
@@ -310,19 +320,48 @@ export class Scene {
     this.slots = slots.filter((sl) => sl !== mine);
   }
 
+  // ---------- 카메라 (넓은 해변 옆으로 보기) ----------
+  toWorldX(x) {
+    return x + this.camX;
+  }
+
+  panBy(dx) {
+    this.camX = clamp(this.camX + dx, 0, Math.max(0, this.WW - this.W));
+    this.camFollow = false;
+  }
+
+  // 매 프레임: 휴대폰 기울기로 조이스틱처럼 흐르기, 걸어가는 나를 따라가기
+  updateCamera(dt) {
+    const max = Math.max(0, this.WW - this.W);
+    const g = this.tiltG || 0;
+    const dead = 7;
+    if (Math.abs(g) > dead) this.camX += Math.sign(g) * Math.min(1, (Math.abs(g) - dead) / 20) * this.W * 0.55 * dt;
+    const me = this.mySlot;
+    if (me && (me.walking || this.camFollow)) {
+      const left = this.camX + this.W * 0.2;
+      const right = this.camX + this.W * 0.8;
+      if (me.x < left) this.camX -= Math.min(left - me.x, this.W * 1.2 * dt + 0.5);
+      else if (me.x > right) this.camX += Math.min(me.x - right, this.W * 1.2 * dt + 0.5);
+    }
+    this.camX = clamp(this.camX, 0, max);
+    // 먼 하늘·바다는 천천히 (해의 방위를 살짝 돌려서)
+    this.farShift = (this.camX - max / 2) * 0.12 + clamp(g / 30, -1, 1) * 10;
+    this.centerAz = (this.baseAz ?? this.centerAz) + this.farShift / this.pxPerDeg;
+  }
+
   // ---------- 해변 걷기 ----------
   // 0~1000 위치 → 화면 자리
   posToSlot(px, py) {
     const t = clamp(py / 1000);
-    return { x: (px / 1000) * this.W, y: lerp(this.rowTop, this.rowBottom, t ** 1.15), s: lerp(this.sMin, this.sMax, t), r: Math.round(t * 4) };
+    return { x: (px / 1000) * this.WW, y: lerp(this.rowTop, this.rowBottom, t ** 1.15), s: lerp(this.sMin, this.sMax, t), r: Math.round(t * 4) };
   }
 
-  // 화면 좌표 → 0~1000 위치 (해변 밖이면 null)
+  // 월드 좌표 → 0~1000 위치 (해변 밖이면 null)
   screenToPos(x, y) {
     if (y < this.shoreY + 6) return null;
     const f = clamp((y - this.rowTop) / (this.rowBottom - this.rowTop));
     const t = f ** (1 / 1.15);
-    return [Math.round(clamp(x / this.W, 0.05, 0.95) * 1000), Math.round(t * 1000)];
+    return [Math.round(clamp(x / this.WW, 0.03, 0.97) * 1000), Math.round(t * 1000)];
   }
 
   walkTo(slot, target) {
@@ -419,6 +458,9 @@ export class Scene {
 
   // ---------- 그리기 ----------
   render(nowMs) {
+    const dtc = this._camT ? Math.min(0.1, (nowMs - this._camT) / 1000) : 0;
+    this._camT = nowMs;
+    this.updateCamera(dtc);
     const { ctx, W, H, horizonY, shoreY } = this;
     const sun = this.sunInfo();
     const e = sun.elevation;
@@ -618,7 +660,7 @@ export class Scene {
     if (this.place === 'west') {
       ctx.fillStyle = rgb(mix(mix(mix(zen, [0, 0, 0], 0.4), hor, 0.25), [28, 12, 14], 0.85 * (this.sat || 0)));
       for (const is of this.islands) {
-        const ix = is.x * W;
+        const ix = is.x * W - (this.farShift || 0) * 1.6;
         ctx.beginPath();
         ctx.moveTo(ix - is.w * W * 0.5, horizonY + 1);
         ctx.quadraticCurveTo(ix, horizonY - is.h * H * 2.2, ix + is.w * W * 0.5, horizonY + 1);
@@ -695,6 +737,11 @@ export class Scene {
       ctx.stroke();
     }
 
+    // ---------- 여기부터 넓은 해변(월드): 카메라만큼 옆으로 옮겨서 그림 ----------
+    ctx.save();
+    ctx.translate(-this.camX, 0);
+    {
+    const W = this.WW;
     // 땅 (정동진: 모래사장 / 정서진: 나무 데크)
     // 밝기 필터 대신 색 자체를 어둡게 섞습니다 (필터는 매우 느림)
     const bright = 0.45 + 0.55 * light;
@@ -908,8 +955,11 @@ export class Scene {
     // 효과들
     this.renderEffects(nowMs, sun);
 
-    // 바람 자국, 날리는 먼지·낙엽
+    // 바람 자국, 날리는 먼지·낙엽 (화면 기준)
+    ctx.save();
+    ctx.translate(this.camX, 0);
     this.drawWind(ctx, nowMs, light);
+    ctx.restore();
 
     // 장작·물수제비·하트
     this.drawThrows(ctx, nowMs);
@@ -921,6 +971,9 @@ export class Scene {
     // 폭죽·동전 소원
     this.drawBursts(ctx, nowMs);
     this.drawWishes(ctx, nowMs);
+    }
+    ctx.restore();
+    // ---------- 월드 끝 ----------
 
     // 비·눈 (실제 날씨)
     if (wx) this.night.drawPrecip(ctx, this, wx.pty, nowMs);
@@ -977,7 +1030,7 @@ export class Scene {
   fireSpot() {
     const sl = this.homeSlot || this.mySlot;
     const fs = Math.min(sl.s * 1.5, this.W * 0.16) * (this.selfItems.bigfire ? 1.35 : 1);
-    return { x: Math.min(sl.x + this.W * 0.22, this.W - fs * 0.8), y: sl.y - sl.s * 0.1, s: fs };
+    return { x: Math.min(sl.x + this.W * 0.22, this.WW - fs * 0.8), y: sl.y - sl.s * 0.1, s: fs };
   }
 
   flicker(t, k = 0) {
@@ -1271,7 +1324,7 @@ export class Scene {
     for (let k = 0; k < 3; k++) {
       this.bursts.push({
         x0: x,
-        x: this.W * (0.15 + Math.random() * 0.7),
+        x: this.camX + this.W * (0.15 + Math.random() * 0.7),
         y: this.horizonY * (0.15 + Math.random() * 0.45),
         t0: now + k * 650,
         hue: Math.floor(Math.random() * 360),
@@ -1577,7 +1630,7 @@ export class Scene {
       ctx.font = `${Math.max(12, sl.s * 0.17)}px "Gowun Batang", serif`;
       const tw = ctx.measureText(b.text).width + 18;
       const h = Math.max(22, sl.s * 0.3);
-      const x = Math.max(6, Math.min(this.W - tw - 6, sl.x - tw / 2));
+      const x = Math.max(this.camX + 6, Math.min(this.camX + this.W - tw - 6, sl.x - tw / 2));
       const y = sl.y - sl.s * (b.self ? 2.05 : 1.55) - h - (1 - clamp(age / 0.3)) * 6; // 내 말풍선은 "나" 이름표 위로
       ctx.fillStyle = b.self ? 'rgba(255,243,214,0.95)' : 'rgba(255,255,255,0.95)';
       roundRect(ctx, x, y, tw, h, h / 2);
@@ -1934,7 +1987,8 @@ export class Scene {
         const dur = 18;
         const fly = 1.1;
         if (age > dur) return false;
-        const landX = lerp(fx.x, clamp(sun.x, this.W * 0.15, this.W * 0.85), 0.25) + Math.sin(fx.seed * 7) * this.W * 0.08;
+        const sunWX = sun.x + this.camX;
+        const landX = lerp(fx.x, clamp(sunWX, this.camX + this.W * 0.15, this.camX + this.W * 0.85), 0.25) + Math.sin(fx.seed * 7) * this.W * 0.08;
         const landY = lerp(this.shoreY, horizonY, 0.28);
         let x, y, s, tilt, inWater;
         if (age < fly) {
@@ -1947,7 +2001,7 @@ export class Scene {
         } else {
           const t = (age - fly) / (dur - fly);
           const ease = 1 - (1 - t) ** 1.6;
-          const tx = clamp(sun.x, this.W * 0.1, this.W * 0.9);
+          const tx = clamp(sun.x + this.camX, this.camX + this.W * 0.1, this.camX + this.W * 0.9);
           x = lerp(landX, lerp(landX, tx, 0.6), ease) + Math.sin(age * 0.9 + fx.seed) * 3;
           y = lerp(landY, horizonY + 4, ease) + Math.sin(age * 2.2 + fx.seed) * 1.2;
           s = fx.s * lerp(0.75, 0.1, ease);
