@@ -783,30 +783,33 @@ export class Scene {
       const sx = clamp(sun.x, -W * 0.3, W * 1.3);
       // 해 쪽 바다 표면에 넓게 번지는 따뜻한 빛
       const sheen = ctx.createRadialGradient(sx, horizonY, 0, sx, horizonY, W * 0.85);
-      sheen.addColorStop(0, `rgba(255,205,125,${0.32 * glit})`);
-      sheen.addColorStop(0.5, `rgba(255,175,105,${0.16 * glit})`);
+      sheen.addColorStop(0, `rgba(255,205,125,${0.24 * glit})`);
+      sheen.addColorStop(0.5, `rgba(255,175,105,${0.11 * glit})`);
       sheen.addColorStop(1, 'rgba(255,150,90,0)');
       ctx.fillStyle = sheen;
       ctx.fillRect(0, horizonY, W, shoreY - horizonY + 2);
-      // 반짝이는 물비늘 (자리는 고정, 깜빡임은 제각각)
+      // 물비늘: 잔물결 선 위에 올라타서 물결과 함께 해변 쪽으로 밀려오고 출렁임 (은은하게)
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const N = 300;
+      const LINES = 14;
+      const flow = (nowMs / 4000) % 1; // 잔물결과 같은 흐름
+      const N = 200;
       for (let k = 0; k < N; k++) {
-        const r1 = (Math.sin(k * 127.1) * 43758.5453) % 1;
-        const r2 = (Math.sin(k * 311.7) * 24634.6345) % 1;
-        const fx = Math.abs(r1);
-        const t = Math.abs(r2) ** 0.8; // 0 수평선 ~ 1 해변 쪽
-        const x = fx * W + Math.sin(nowMs / 1800 + k) * 4;
-        const y = horizonY + 2 + t * (shoreY - horizonY - 6);
+        const r1 = Math.abs((Math.sin(k * 127.1) * 43758.5453) % 1);
+        const li = k % LINES;
+        const t = (li + flow) / LINES; // 0 수평선 ~ 1 해변 쪽
+        const yy = horizonY + t * t * (shoreY - horizonY);
+        const x = r1 * W + Math.sin(nowMs / 2600 + k) * 5;
+        const y = yy + Math.sin(x / 40 + li * 2 + nowMs / 900) * (0.6 + t * 2) - 0.5;
         const near = 1 - clamp(Math.abs(x - sx) / (W * 0.75));
-        const tw = Math.sin(nowMs / (260 + (k % 9) * 55) + k * 12.9898);
-        if (tw < 0.2) continue;
-        const a = 1.7 * glit * (0.15 + 0.85 * near ** 1.3) * ((tw - 0.2) / 0.8) ** 1.6 * (0.6 + 0.4 * (1 - t));
+        const tw = Math.sin(nowMs / (700 + (k % 9) * 130) + k * 12.9898);
+        if (tw < 0.4) continue;
+        const edge = clamp(t / 0.08) * clamp((1 - t) / 0.12); // 수평선·해변 끝에서는 스르륵
+        const a = 0.75 * glit * (0.12 + 0.88 * near ** 1.5) * ((tw - 0.4) / 0.6) ** 2 * edge;
         if (a < 0.03) continue;
-        const len = (3 + 9 * t) * (0.6 + near);
-        ctx.fillStyle = `rgba(255,${Math.round(205 + 35 * clamp(e / 10))},${Math.round(130 + 60 * clamp(e / 10))},${Math.min(0.9, a)})`;
-        ctx.fillRect(x - len / 2, y, len, 1.2 + t * 1.3);
+        const len = (2 + 6 * t) * (0.6 + 0.6 * near);
+        ctx.fillStyle = `rgba(255,${Math.round(205 + 35 * clamp(e / 10))},${Math.round(130 + 60 * clamp(e / 10))},${Math.min(0.6, a)})`;
+        ctx.fillRect(x - len / 2, y, len, 1 + t);
       }
       ctx.restore();
     }
