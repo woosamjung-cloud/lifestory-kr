@@ -305,6 +305,7 @@ export class Scene {
     this.homeSlot = mine; // 원래 내 자리 (모닥불 위치 기준)
     // 처음에는 내 자리가 화면 가운데쯤 오게
     this.camX = clamp(mine.x - this.W * 0.45, 0, Math.max(0, W - this.W));
+    this.camBase = this.camX;
     const prev = this.mySlot;
     this.mySlot = { ...mine };
     if (this.selfPos) {
@@ -326,26 +327,61 @@ export class Scene {
   }
 
   panBy(dx) {
-    this.camX = clamp(this.camX + dx, 0, Math.max(0, this.WW - this.W));
-    this.camFollow = false;
+    this.camBase = clamp((this.camBase ?? this.camX) + dx, 0, Math.max(0, this.WW - this.W));
+    this.camX = this.camBase;
+    this.lastPanAt = performance.now();
   }
 
-  // 매 프레임: 휴대폰 기울기로 조이스틱처럼 흐르기, 걸어가는 나를 따라가기
+  // 매 프레임 카메라
+  // - 걷거나 서 있을 때: 좌우로 기울이면 그쪽을 조금 더 보여 줌 (내 캐릭터는 항상 화면 안에)
+  // - 앉아 있을 때: 옆으로는 그대로, 앞뒤로 기울이면 장면이 위아래로 살짝만
+  // - 손으로 끌어 구경하다가 앉은 채 6초 지나면 내 자리로 천천히 돌아옴
   updateCamera(dt) {
     const max = Math.max(0, this.WW - this.W);
-    const g = this.tiltG || 0;
-    const dead = 7;
-    if (Math.abs(g) > dead) this.camX += Math.sign(g) * Math.min(1, (Math.abs(g) - dead) / 20) * this.W * 0.55 * dt;
     const me = this.mySlot;
-    if (me && (me.walking || this.camFollow)) {
-      const left = this.camX + this.W * 0.2;
-      const right = this.camX + this.W * 0.8;
-      if (me.x < left) this.camX -= Math.min(left - me.x, this.W * 1.2 * dt + 0.5);
-      else if (me.x > right) this.camX += Math.min(me.x - right, this.W * 1.2 * dt + 0.5);
+    if (this.camBase == null) this.camBase = this.camX;
+    const standing = !!(me && (me.walking || this.selfUp));
+    const now = performance.now();
+    // 기울기: 평소 들고 있는 각도를 기준(천천히 따라감)으로 삼아 그 차이만 씀
+    const g = this.tiltG || 0;
+    const bRaw = this.tiltB;
+    if (bRaw != null) this.tiltBase = this.tiltBase == null ? bRaw : this.tiltBase + (bRaw - this.tiltBase) * Math.min(1, dt * 0.25);
+    const db = bRaw != null && this.tiltBase != null ? bRaw - this.tiltBase : 0;
+
+    if (me) {
+      // 걸을 때는 나를 따라가고
+      if (standing) {
+        const left = this.camBase + this.W * 0.25;
+        const right = this.camBase + this.W * 0.75;
+        if (me.x < left) this.camBase -= Math.min(left - me.x, this.W * 1.2 * dt + 0.5);
+        else if (me.x > right) this.camBase += Math.min(me.x - right, this.W * 1.2 * dt + 0.5);
+      } else if (now - (this.lastPanAt || 0) > 6000) {
+        // 앉아서 가만히 있고 내가 화면 밖이면 천천히 돌아옴
+        const want = clamp(me.x - this.W * 0.45, 0, max);
+        const seen = me.x > this.camBase + this.W * 0.08 && me.x < this.camBase + this.W * 0.92;
+        if (!seen || this.camReturning) {
+          this.camReturning = Math.abs(want - this.camBase) > 2;
+          this.camBase += (want - this.camBase) * Math.min(1, dt * 1.5);
+        }
+      }
     }
-    this.camX = clamp(this.camX, 0, max);
+    this.camBase = clamp(this.camBase, 0, max);
+
+    // 기울기로 살짝 더 보여 주기 (서 있을 때만, 부드럽게)
+    let leadT = 0;
+    if (standing && Math.abs(g) > 4) leadT = Math.sign(g) * Math.min(1, (Math.abs(g) - 4) / 22) * this.W * 0.18;
+    this.camLead = (this.camLead || 0) + (leadT - (this.camLead || 0)) * Math.min(1, dt * 3);
+    let cam = this.camBase + this.camLead;
+    // 내 캐릭터는 화면 안쪽(18%~82%)에 꼭 남게
+    if (me) cam = clamp(cam, me.x - this.W * 0.82, me.x - this.W * 0.18);
+    this.camX = clamp(cam, 0, max);
+
+    // 앉아 있을 때 앞뒤 기울기: 위아래로 살짝 (최대 9px)
+    const offT = standing ? 0 : clamp(db / 25, -1, 1) * 9;
+    this.camY = (this.camY || 0) + (offT - (this.camY || 0)) * Math.min(1, dt * 3);
+
     // 먼 하늘·바다는 천천히 (해의 방위를 살짝 돌려서)
-    this.farShift = (this.camX - max / 2) * 0.12 + clamp(g / 30, -1, 1) * 10;
+    this.farShift = (this.camX - max / 2) * 0.12;
     this.centerAz = (this.baseAz ?? this.centerAz) + this.farShift / this.pxPerDeg;
   }
 
@@ -462,6 +498,14 @@ export class Scene {
     this._camT = nowMs;
     this.updateCamera(dtc);
     const { ctx, W, H, horizonY, shoreY } = this;
+    // 앞뒤 기울기로 장면 전체가 위아래로 살짝: 위아래 가장자리에 빈틈이 보이지 않게 미리 칠함
+    const camY = this.camY || 0;
+    if (Math.abs(camY) > 0.2) {
+      ctx.fillStyle = '#0b1027';
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.save();
+    ctx.translate(0, camY);
     const sun = this.sunInfo();
     const e = sun.elevation;
     const [zen, hor] = skyColors(e);
@@ -991,6 +1035,7 @@ export class Scene {
       ctx.fillRect(0, 0, W, H);
     }
 
+    ctx.restore(); // 위아래 기울기
     return sun;
   }
 

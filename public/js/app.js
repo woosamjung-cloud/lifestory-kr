@@ -643,8 +643,11 @@ function onTilt(e) {
   if (e.gamma == null) return;
   const portrait = innerHeight >= innerWidth;
   // 가로 화면이면 앞뒤 기울기(beta)가 좌우 방향
-  const g = portrait ? e.gamma : (screen.orientation && screen.orientation.angle === 90 ? 1 : -1) * e.beta;
-  scene.tiltG = scene.tiltG * 0.8 + g * 0.2;
+  const sideways = screen.orientation && screen.orientation.angle === 90 ? 1 : -1;
+  const g = portrait ? e.gamma : sideways * e.beta; // 좌우
+  const b = portrait ? e.beta : -sideways * e.gamma; // 앞뒤
+  scene.tiltG = scene.tiltG * 0.85 + g * 0.15;
+  scene.tiltB = scene.tiltB == null ? b : scene.tiltB * 0.85 + b * 0.15;
 }
 function enableTilt() {
   const DOE = window.DeviceOrientationEvent;
@@ -1334,6 +1337,12 @@ let lastStoneAt = 0;
 canvasEl.addEventListener('pointerdown', (e) => {
   if (state.screen !== 'ride') return;
   pdown = { x: e.clientX, y: e.clientY, t: performance.now(), cam: scene.camX, drag: false };
+  // 쓸다가 버튼 위에서 손을 떼도 해변이 끝까지 받도록
+  try {
+    canvasEl.setPointerCapture(e.pointerId);
+  } catch {
+    /* 지원하지 않는 브라우저 */
+  }
 });
 // 옆으로 끌면 넓은 해변을 따라 화면 이동
 canvasEl.addEventListener('pointermove', (e) => {
