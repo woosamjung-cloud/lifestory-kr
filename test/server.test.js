@@ -313,7 +313,7 @@ test('해변 걷기 위치 전달, 장작은 모두 합산·연타 무시', asyn
   b.close();
 });
 
-test('하트: 마음껏 주고, 받은 사람에게 알림·집계, 같은 사람에게 연타는 무시, 한마디 무게 전달', async () => {
+test('하트: 한마디를 건넨 사이에만, 받은 사람에게 알림·집계, 연타 무시, 한마디 무게 전달', async () => {
   const [a, b] = await Promise.all([client(), client()]);
   a.send(JSON.stringify({ t: 'hello', visitor: 'hearttest01' }));
   b.send(JSON.stringify({ t: 'hello', visitor: 'hearttest02' }));
@@ -321,6 +321,16 @@ test('하트: 마음껏 주고, 받은 사람에게 알림·집계, 같은 사�
   b.send(JSON.stringify({ t: 'join', room: 'east', char: 'hood', color: 1, visitor: 'hearttest02' }));
   await wait(700);
   const bSeat = last(b, 'seat').seat;
+  // 한마디도 안 건넸으면 하트는 안 됨
+  a.send(JSON.stringify({ t: 'heart', seat: bSeat }));
+  await wait(400);
+  assert.equal(last(a, 'need').item, 'talk');
+  assert.equal(last(b, 'gotheart'), undefined);
+  // 한마디 건네기 → 상대에게만 전달
+  a.send(JSON.stringify({ t: 'whisper', seat: bSeat, i: 1 }));
+  await wait(400);
+  assert.equal(last(b, 'whisper').i, 1);
+  assert.equal(last(a, 'whisper').self, true);
   a.send(JSON.stringify({ t: 'heart', seat: bSeat }));
   a.send(JSON.stringify({ t: 'heart', seat: bSeat })); // 연타 → 무시
   a.send(JSON.stringify({ t: 'heart', seat: last(a, 'seat').seat })); // 나에게 → 무시

@@ -78,6 +78,7 @@ export class Net {
       else if (m.t === 'need' && this.h.onNeed) this.h.onNeed(m.item);
       else if (m.t === 'gotheart' && this.h.onGotHeart) this.h.onGotHeart(m);
       else if ((m.t === 'sayok' || m.t === 'sayno') && this.h.onSayResult) this.h.onSayResult(m);
+      else if (m.t === 'whisper' && this.h.onWhisper) this.h.onWhisper(m);
     };
     ws.onclose = () => {
       clearTimeout(giveUp);
@@ -140,6 +141,10 @@ export class Net {
 
   heart(seat) {
     this.send({ t: 'heart', seat });
+  }
+
+  whisper(seat, i) {
+    this.send({ t: 'whisper', seat, i });
   }
 
   say(i) {

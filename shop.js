@@ -60,6 +60,18 @@ export const LETTERS = [
   '💛 늘 응원할게요',
 ];
 
+// 가까이 온 사람에게 건네는 한마디 (두 사람에게만 보임, 정해진 문구라 안전)
+export const WHISPERS = [
+  '안녕하세요 😊',
+  '같이 봐서 좋아요',
+  '불 따뜻하죠? 🔥',
+  '오늘 하루 수고했어요',
+  '노을 진짜 예쁘네요',
+  '강아지(고양이) 귀여워요 🐾',
+  '내일 또 만나요 👋',
+  '좋은 밤 되세요 🌙',
+];
+
 // 응원 한마디 (자유 채팅 대신 고르는 문구 - 욕설·광고·개인정보 걱정 없음, 무료)
 export const SAYINGS = [
   '안녕하세요 👋',
@@ -433,6 +445,7 @@ export function shopPublicInfo() {
     products: Object.fromEntries(Object.entries(PRODUCTS).map(([k, p]) => [k, { group: p.group, name: p.name, price: p.price, usd: p.usd || null, icon: p.icon, desc: p.desc, coins: p.grants.coins || 0, items: p.grants.items || [], list: p.group === 'coins' ? p.grants.coins * COIN_PRICE : 0, listUsd: p.group === 'coins' ? Math.round(p.grants.coins * COIN_PRICE_USD * 100) / 100 : 0 }])),
     paypal,
     wishes: WISHES,
+    whispers: WHISPERS,
     letters: LETTERS,
     sayings: SAYINGS,
     itemDays: ITEM_DAYS,

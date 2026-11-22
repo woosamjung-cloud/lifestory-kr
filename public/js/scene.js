@@ -913,6 +913,8 @@ export class Scene {
 
     // 장작·물수제비·하트
     this.drawThrows(ctx, nowMs);
+    this.drawReach(ctx, nowMs);
+    this.drawBubbles(ctx, nowMs);
     this.drawSitHint(ctx, nowMs);
     this.drawHearts(ctx, nowMs);
 
@@ -1523,6 +1525,74 @@ export class Scene {
       if (d < Math.max(24, sl.s * 0.6) && (!best || d < best.d)) best = { d, seat: p.seat, slot: sl };
     }
     return best;
+  }
+
+  // 모닥불 불빛 안(마음을 건넬 수 있는 거리)에 있는지
+  isNear(slot) {
+    if (!slot) return false;
+    const f = this.fireSpot();
+    const R = f.s * 2.6;
+    const dx = (slot.x - f.x) / R;
+    const dy = (slot.y - f.y) / (R * 0.6);
+    return dx * dx + dy * dy <= 1;
+  }
+
+  // 불빛 범위를 잠깐 점선으로 보여 줌 (멀어서 마음을 못 건넬 때)
+  showReach(ms = 2200) {
+    this.reachUntil = performance.now() + ms;
+  }
+
+  drawReach(ctx, t) {
+    if (!this.reachUntil || t > this.reachUntil) return;
+    const f = this.fireSpot();
+    const R = f.s * 2.6;
+    const a = clamp((this.reachUntil - t) / 600) * 0.7;
+    ctx.save();
+    ctx.setLineDash([6, 6]);
+    ctx.lineDashOffset = -t / 60;
+    ctx.strokeStyle = `rgba(255,214,150,${a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(f.x, f.y, R, R * 0.6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 두 사람에게만 보이는 한마디 말풍선
+  bubbleAt(slot, text, self = false) {
+    if (!slot) return;
+    this.bubbles = (this.bubbles || []).filter((b) => b.slot !== slot);
+    this.bubbles.push({ slot, text, self, t0: performance.now() });
+  }
+
+  drawBubbles(ctx, t) {
+    if (!this.bubbles || !this.bubbles.length) return;
+    this.bubbles = this.bubbles.filter((b) => t - b.t0 < 6000);
+    for (const b of this.bubbles) {
+      const age = (t - b.t0) / 1000;
+      const a = clamp(age / 0.3) * clamp((6 - age) / 0.8);
+      const sl = b.slot;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.font = `${Math.max(12, sl.s * 0.17)}px "Gowun Batang", serif`;
+      const tw = ctx.measureText(b.text).width + 18;
+      const h = Math.max(22, sl.s * 0.3);
+      const x = Math.max(6, Math.min(this.W - tw - 6, sl.x - tw / 2));
+      const y = sl.y - sl.s * (b.self ? 2.05 : 1.55) - h - (1 - clamp(age / 0.3)) * 6; // 내 말풍선은 "나" 이름표 위로
+      ctx.fillStyle = b.self ? 'rgba(255,243,214,0.95)' : 'rgba(255,255,255,0.95)';
+      roundRect(ctx, x, y, tw, h, h / 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sl.x - 5, y + h - 1);
+      ctx.lineTo(sl.x, y + h + 7);
+      ctx.lineTo(sl.x + 5, y + h - 1);
+      ctx.fill();
+      ctx.fillStyle = '#3b2a20';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(b.text, x + 9, y + h / 2 + 1);
+      ctx.restore();
+    }
   }
 
   heartFrom(from, to, toMe = false, fromMe = false) {

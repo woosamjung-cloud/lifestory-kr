@@ -389,6 +389,21 @@ const TEXT = {
   '링크가 만료됐어요. 다시 시도해 주세요': 'This link has expired. Please try again',
   '메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요': 'Couldn’t send the email. Please try again shortly',
 
+  // ---------- 가까이 온 사람 ----------
+  '불빛 안에 함께 있는 사람': 'Someone in your firelight',
+  '💬 한마디 건네기': '💬 Say something',
+  '❤️ 하트 건네기': '❤️ Give a heart',
+  '❤️ 하트 (먼저 한마디 건네 보세요)': '❤️ Heart (say something first)',
+  '💬 먼저 한마디 건네 보세요. 이야기를 나눈 사이에만 하트를 줄 수 있어요': '💬 Say something first. Hearts are for people you’ve talked with',
+  '🔥 모닥불 불빛 안으로 들어와야 마음을 건넬 수 있어요': '🔥 Come into the firelight to reach out',
+  '안녕하세요 😊': 'Hi there 😊',
+  '같이 봐서 좋아요': 'Glad to watch with you',
+  '불 따뜻하죠? 🔥': 'Nice and warm, right? 🔥',
+  '노을 진짜 예쁘네요': 'What a beautiful sunset',
+  '강아지(고양이) 귀여워요 🐾': 'Your buddy is so cute 🐾',
+  '내일 또 만나요 👋': 'See you tomorrow 👋',
+  '좋은 밤 되세요 🌙': 'Have a good night 🌙',
+
   // ---------- 유성우 ----------
   '사분의자리 유성우': 'Quadrantids',
   '거문고자리 유성우': 'Lyrids',
@@ -458,6 +473,7 @@ const PATTERNS = [
   [/^이불 밖은 추우니까 · (.+)$/, 'Too Cold to Leave the Blanket · $1'],
   [/^(.+)를$/, (m, x) => (tr(x) !== x ? tr(x) : m)],
   [/^✅ 로그인했어요 · (.+)$/, '✅ Logged in · $1'],
+  [/^💬 누군가 말을 건넸어요: "(.+)" · 그 사람을 눌러 답해 보세요$/, (m, w) => `💬 Someone said: "${tr(w)}" · tap them to reply`],
   [/^👤 (.+) 로 로그인됨$/, '👤 Logged in as $1'],
   [/^개당 (\$[\d.]+)$/, '$1 each'],
   [/^따로 사면 (\$[\d.]+) → (\d+)% 할인$/, '$1 if bought separately → $2% off'],

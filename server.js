@@ -42,6 +42,9 @@ let countsDirty = false;
 
 // ---------- 하루 통계 (개인정보 없이 숫자만) ----------
 // visitors: 하루 동안 접속한 기기 수 (기기마다 만든 무작위 번호로 중복 제거, 번호 자체는 저장하지 않음)
+// 한마디를 주고받은 두 사람 (순서 상관없이 같은 짝) - 30분 동안 하트를 주고받을 수 있음
+const TALK_MS = 30 * 60 * 1000;
+const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink'];
 const dailyVisitors = new Map(); // dateKey -> Set(visitorId)  (메모리에만, 하루 지나면 지움)
 function today() {
@@ -381,11 +384,34 @@ function handle(c, msg) {
       room.dirty = true;
       return;
     }
+    case 'whisper': {
+      // 가까이 온 사람에게 한마디: 정해진 문구, 두 사람에게만. 3초에 하나
+      const to = Number(msg.seat);
+      const i = Number(msg.i);
+      const room = rooms[c.room];
+      if (c.seat == null || !Number.isInteger(to) || to === c.seat || !room || !room.seats[to]) return;
+      if (!Number.isInteger(i) || i < 0 || i >= shop.WHISPERS.length) return;
+      if (now - (c.lastWhisper || 0) < 3000) return;
+      c.lastWhisper = now;
+      const target = room.seats[to];
+      room.talks = room.talks || new Map();
+      room.talks.set(pairKey(c.visitor, target.visitor), now);
+      bump('whisper');
+      send(target.ws, { t: 'whisper', from: c.seat, i });
+      send(c.ws, { t: 'whisper', from: c.seat, to, i, self: true });
+      return;
+    }
     case 'heart': {
-      // 하트 선물: 같은 해변의 다른 사람에게 (1.5초에 하나, 같은 사람에게는 10초에 하나)
+      // 하트 선물: 가까이(모닥불 불빛 안) 와서 서로 한마디라도 건넨 사람에게만
+      // (1.5초에 하나, 같은 사람에게는 10초에 하나)
       const to = Number(msg.seat);
       const room = rooms[c.room];
       if (c.seat == null || !Number.isInteger(to) || to === c.seat || !room || !room.seats[to]) return;
+      const talked = room.talks && room.talks.get(pairKey(c.visitor, room.seats[to].visitor));
+      if (!talked || now - talked > TALK_MS) {
+        send(c.ws, { t: 'need', item: 'talk' });
+        return;
+      }
       if (now - (c.lastHeart || 0) < 1500) return;
       c.heartTo = c.heartTo || {};
       if (now - (c.heartTo[to] || 0) < 10000) return;

@@ -139,6 +139,19 @@ const net = new Net({
   onWallet(w) {
     setWallet(w);
   },
+  onWhisper(m) {
+    const text = shopInfo && shopInfo.whispers[m.i];
+    if (!text) return;
+    if (m.self) {
+      talked.set(m.to, Date.now());
+      scene.bubbleAt(scene.mySlot, text, true);
+      return;
+    }
+    talked.set(m.from, Date.now());
+    const slot = scene.slotForSeat(m.from);
+    scene.bubbleAt(slot, text);
+    toast(`💬 누군가 말을 건넸어요: "${text}" · 그 사람을 눌러 답해 보세요`);
+  },
   onSayResult(m) {
     if (m.t === 'sayok') {
       customNext = m.next ? Date.now() + (m.next - Date.now()) : Date.now() + CUSTOM_GAP;
@@ -159,6 +172,7 @@ const net = new Net({
     toast(`❤️ 하트를 선물 받았어요 (모두 ${m.total.toLocaleString('ko-KR')}개)`);
   },
   onNeed(item) {
+    if (item === 'talk') return toast('💬 먼저 한마디 건네 보세요. 이야기를 나눈 사이에만 하트를 줄 수 있어요');
     item === 'coins' ? openShop('소원 동전이 부족해요. 충전해 주세요', 'coins') : openShop('이 아이템은 기간이 끝났어요', 'items', item);
   },
   onFx(list) {
@@ -1317,7 +1331,7 @@ canvasEl.addEventListener('pointerup', (e) => {
     if (scene.nearFire(e.clientX, e.clientY)) return addWood();
     // 다른 사람을 누르면 하트 선물
     const who = scene.personAt(e.clientX, e.clientY);
-    if (who) return sendHeart(who);
+    if (who) return openPersonMenu(who, e.clientX, e.clientY);
     const pos = scene.screenToPos(e.clientX, e.clientY);
     if (!pos) return;
     if (scene.selfStanding) return toast('자리에 앉은 뒤에 움직일 수 있어요');
@@ -1365,6 +1379,58 @@ canvasEl.addEventListener('pointerup', (e) => {
 canvasEl.addEventListener('pointercancel', () => (pdown = null));
 
 let lastHeartAt = 0;
+// ---------- 가까이 온 사람: 한마디 건네기 → 하트 ----------
+const talked = new Map(); // 자리 번호 → 한마디를 주고받은 시각
+const TALK_MS = 30 * 60 * 1000;
+const hasTalked = (seat) => Date.now() - (talked.get(seat) || 0) < TALK_MS;
+function closePersonMenu() {
+  $('person-menu').hidden = true;
+}
+function openPersonMenu(who, x, y) {
+  if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 할 수 있어요');
+  if (!scene.isNear(who.slot)) {
+    scene.showReach();
+    return toast('🔥 모닥불 불빛 안으로 들어와야 마음을 건넬 수 있어요');
+  }
+  const box = $('person-menu');
+  box.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'pm-title';
+  title.textContent = '불빛 안에 함께 있는 사람';
+  const say = document.createElement('button');
+  say.textContent = '💬 한마디 건네기';
+  say.addEventListener('click', () => {
+    box.innerHTML = '';
+    (shopInfo ? shopInfo.whispers : []).forEach((text, i) => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.addEventListener('click', () => {
+        closePersonMenu();
+        net.whisper(who.seat, i);
+      });
+      box.append(b);
+    });
+  });
+  const heart = document.createElement('button');
+  heart.className = 'pm-heart' + (hasTalked(who.seat) ? '' : ' locked');
+  heart.textContent = hasTalked(who.seat) ? '❤️ 하트 건네기' : '❤️ 하트 (먼저 한마디 건네 보세요)';
+  heart.addEventListener('click', () => {
+    if (!hasTalked(who.seat)) return toast('💬 먼저 한마디 건네 보세요. 이야기를 나눈 사이에만 하트를 줄 수 있어요');
+    closePersonMenu();
+    sendHeart(who);
+  });
+  box.append(title, say, heart);
+  box.hidden = false;
+  const w = box.offsetWidth;
+  const h = box.offsetHeight;
+  box.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, x - w / 2))}px`;
+  box.style.top = `${Math.max(8, Math.min(innerHeight - h - 8, y - h - 16))}px`;
+}
+document.addEventListener('pointerdown', (e) => {
+  const box = $('person-menu');
+  if (!box.hidden && !box.contains(e.target)) closePersonMenu();
+});
+
 function sendHeart(who) {
   if (state.netStatus !== 'online' || state.seat == null) return toast('자리에 앉은 뒤에 하트를 보낼 수 있어요');
   const now = Date.now();
