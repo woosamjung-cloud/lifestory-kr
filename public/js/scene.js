@@ -753,15 +753,31 @@ export class Scene {
     // 물에 비친 햇빛 기둥
     if (e > -3) {
       const a = clamp((e + 3) / 4) * (1 - clamp((e - 25) / 20));
-      for (let i = 0; i < 26; i++) {
-        const t = i / 26;
+      // 금빛 물길: 막대마다 가운데는 진하고 양끝은 투명하게, 물결처럼 해변 쪽으로 천천히 흘러옴
+      // (수평선에서 서서히 생기고 해변 앞에서 서서히 스러져서 다시 시작하는 느낌이 없음)
+      const ROWS = 26;
+      const pflow = (nowMs / 6000) % 1;
+      const px = clamp(sun.x, -W, 2 * W);
+      const sat0 = this.sat || 0;
+      for (let i = 0; i < ROWS; i++) {
+        const t = (i + pflow) / ROWS;
+        const edge = clamp(t / 0.08) * clamp((1 - t) / 0.14);
+        if (edge <= 0) continue;
         const yy = horizonY + 2 + t * (shoreY - horizonY);
-        const wv = Math.sin(nowMs / 400 + i * 1.3) * 6 * (1 + t);
-        const ww = sunR * (0.6 + t * 2.6) * (0.6 + 0.4 * Math.sin(nowMs / 300 + i)) * (1 + 0.3 * wk);
-        // 지는 해의 금빛 물길: 해 바로 아래는 노랗게, 멀어지며 주황으로
-        const sat0 = this.sat || 0;
-        ctx.fillStyle = `rgba(255,${Math.round(170 + 70 * clamp(e / 10) + 40 * sat0 * (1 - t))},${Math.round(60 + 40 * clamp(e / 10))},${Math.min(0.95, a * (0.65 - t * 0.35) * (1 + 0.6 * wk))})`;
-        ctx.fillRect(clamp(sun.x, -W, 2 * W) - ww / 2 + wv, yy, ww, 1.6 + t * 1.5);
+        const wv = Math.sin(nowMs / 900 + i * 1.3) * 6 * (1 + t);
+        const ww = sunR * (0.6 + t * 2.6) * (0.75 + 0.25 * Math.sin(nowMs / 1100 + i)) * (1 + 0.3 * wk);
+        const alpha = Math.min(0.95, a * (0.65 - t * 0.35) * (1 + 0.6 * wk)) * edge;
+        const col = `255,${Math.round(170 + 70 * clamp(e / 10) + 40 * sat0 * (1 - t))},${Math.round(60 + 40 * clamp(e / 10))}`;
+        const x0 = px - ww / 2 + wv;
+        const lg = ctx.createLinearGradient(x0, 0, x0 + ww, 0);
+        lg.addColorStop(0, `rgba(${col},0)`);
+        lg.addColorStop(0.3, `rgba(${col},${alpha})`);
+        lg.addColorStop(0.7, `rgba(${col},${alpha})`);
+        lg.addColorStop(1, `rgba(${col},0)`);
+        ctx.fillStyle = lg;
+        const bh = 1.6 + t * 1.5;
+        roundRect(ctx, x0, yy, ww, bh, bh / 2);
+        ctx.fill();
       }
       // 오메가(Ω) 해넘이: 해가 수평선에 닿을 무렵, 해 아랫부분과 물에 비친 해가 이어져 보임
       const touch = clamp(1 - Math.abs(sun.y + sunR * 0.6 - horizonY) / (sunR * 1.6));
@@ -823,9 +839,13 @@ export class Scene {
     // 잔물결 (해가 낮을 때는 금빛을 띰)
     ctx.strokeStyle = glit > 0.02 ? `rgba(255,${Math.round(225 - 25 * glit)},${Math.round(200 - 60 * glit)},${0.06 + 0.12 * light + 0.12 * glit})` : `rgba(255,255,255,${0.06 + 0.12 * light})`;
     ctx.lineWidth = 1;
+    const rippleBase = ctx.strokeStyle;
     for (let i = 0; i < 14; i++) {
       const t = (i + ((nowMs / 4000) % 1)) / 14;
       const yy = horizonY + t * t * (shoreY - horizonY);
+      // 수평선에서 서서히 나타나 해변 앞에서 서서히 옅어짐 (뚝 끊기지 않게)
+      ctx.globalAlpha = clamp(t / 0.1) * clamp((1 - t) / 0.18);
+      ctx.strokeStyle = rippleBase;
       ctx.beginPath();
       for (let x = 0; x < W + 24; x += 24) {
         const yv = yy + Math.sin(x / 40 + i * 2 + nowMs / 900) * (0.6 + t * 2);
@@ -834,6 +854,7 @@ export class Scene {
       }
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
 
     // ---------- 여기부터 넓은 해변(월드): 카메라만큼 옆으로 옮겨서 그림 ----------
     ctx.save();
