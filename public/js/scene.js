@@ -753,31 +753,24 @@ export class Scene {
     // 물에 비친 햇빛 기둥
     if (e > -3) {
       const a = clamp((e + 3) / 4) * (1 - clamp((e - 25) / 20));
-      // 금빛 물길: 막대마다 가운데는 진하고 양끝은 투명하게, 물결처럼 해변 쪽으로 천천히 흘러옴
-      // (수평선에서 서서히 생기고 해변 앞에서 서서히 스러져서 다시 시작하는 느낌이 없음)
-      const ROWS = 26;
-      const pflow = (nowMs / 6000) % 1;
+      // 금빛 물길 (원래 어른거림 그대로, 막대 양끝만 부드럽게)
       const px = clamp(sun.x, -W, 2 * W);
       const sat0 = this.sat || 0;
-      for (let i = 0; i < ROWS; i++) {
-        const t = (i + pflow) / ROWS;
-        const edge = clamp(t / 0.08) * clamp((1 - t) / 0.14);
-        if (edge <= 0) continue;
+      for (let i = 0; i < 26; i++) {
+        const t = i / 26;
         const yy = horizonY + 2 + t * (shoreY - horizonY);
-        const wv = Math.sin(nowMs / 900 + i * 1.3) * 6 * (1 + t);
-        const ww = sunR * (0.6 + t * 2.6) * (0.75 + 0.25 * Math.sin(nowMs / 1100 + i)) * (1 + 0.3 * wk);
-        const alpha = Math.min(0.95, a * (0.65 - t * 0.35) * (1 + 0.6 * wk)) * edge;
+        const wv = Math.sin(nowMs / 400 + i * 1.3) * 6 * (1 + t);
+        const ww = sunR * (0.6 + t * 2.6) * (0.6 + 0.4 * Math.sin(nowMs / 300 + i)) * (1 + 0.3 * wk);
+        const alpha = Math.min(0.95, a * (0.65 - t * 0.35) * (1 + 0.6 * wk));
         const col = `255,${Math.round(170 + 70 * clamp(e / 10) + 40 * sat0 * (1 - t))},${Math.round(60 + 40 * clamp(e / 10))}`;
         const x0 = px - ww / 2 + wv;
         const lg = ctx.createLinearGradient(x0, 0, x0 + ww, 0);
         lg.addColorStop(0, `rgba(${col},0)`);
-        lg.addColorStop(0.3, `rgba(${col},${alpha})`);
-        lg.addColorStop(0.7, `rgba(${col},${alpha})`);
+        lg.addColorStop(0.2, `rgba(${col},${alpha})`);
+        lg.addColorStop(0.8, `rgba(${col},${alpha})`);
         lg.addColorStop(1, `rgba(${col},0)`);
         ctx.fillStyle = lg;
-        const bh = 1.6 + t * 1.5;
-        roundRect(ctx, x0, yy, ww, bh, bh / 2);
-        ctx.fill();
+        ctx.fillRect(x0, yy, ww, 1.6 + t * 1.5);
       }
       // 오메가(Ω) 해넘이: 해가 수평선에 닿을 무렵, 해 아랫부분과 물에 비친 해가 이어져 보임
       const touch = clamp(1 - Math.abs(sun.y + sunR * 0.6 - horizonY) / (sunR * 1.6));
@@ -804,35 +797,31 @@ export class Scene {
       sheen.addColorStop(1, 'rgba(255,150,90,0)');
       ctx.fillStyle = sheen;
       ctx.fillRect(0, horizonY, W, shoreY - horizonY + 2);
-      // 물비늘: 부드러운 타원 빛 조각이 제각각의 박자로 수평선에서 해변 쪽으로 천천히 떠내려오며
-      // 서서히 나타났다 스러짐 (끊김·깜빡임 없이 이어짐)
+      // 물비늘: 정해진 자리에서 제각각 반짝 (물결을 따라가지 않음)
+      // 켜지고 꺼질 때 부드럽게 (갑자기 생기거나 사라지지 않게)
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const spr = this.glintSprite();
-      const warmG = Math.round(205 + 35 * clamp(e / 10));
-      const N = 150;
+      const N = 140;
       for (let k = 0; k < N; k++) {
         const r1 = Math.abs((Math.sin(k * 127.1) * 43758.5453) % 1);
         const r2 = Math.abs((Math.sin(k * 311.7) * 24634.6345) % 1);
         const r3 = Math.abs((Math.sin(k * 74.7) * 9631.17) % 1);
-        const life = 9000 + r3 * 7000; // 한 번 떠내려오는 데 9~16초
-        const ph = (nowMs / life + r2) % 1; // 0 생겨남 ~ 1 사라짐
-        const t = 0.04 + ph * 0.9; // 수평선 → 해변 쪽
-        const yy = horizonY + t * t * (shoreY - horizonY);
-        const x = r1 * W + Math.sin(nowMs / 3000 + k) * 6 + (ph - 0.5) * 10;
-        const y = yy + Math.sin(x / 40 + nowMs / 900 + k) * (0.6 + t * 2);
+        const t = 0.05 + (r2 ** 0.8) * 0.88; // 수평선 ~ 해변 쪽 (자리 고정)
+        const x = r1 * W;
+        const y = horizonY + t * t * (shoreY - horizonY);
         const near = 1 - clamp(Math.abs(x - sx) / (W * 0.75));
-        const env = Math.sin(ph * Math.PI) ** 1.5; // 서서히 나타났다 서서히 스러짐
-        const shimmer = 0.55 + 0.45 * Math.sin(nowMs / (1400 + r3 * 900) + k * 2.1); // 부드럽게 일렁임
-        const a = 0.55 * glit * (0.1 + 0.9 * near ** 1.5) * env * shimmer;
+        // 반짝: 사인파의 꼭대기만 쓰고 세제곱으로 부드럽게 (주기 2~5초, 제각각)
+        const wave = Math.sin(nowMs / (2000 + r3 * 3000) * Math.PI * 2 + k * 2.39);
+        const blink = Math.max(0, wave) ** 3;
+        const a = 0.6 * glit * (0.1 + 0.9 * near ** 1.5) * blink;
         if (a < 0.02) continue;
-        const len = (4 + 12 * t) * (0.6 + 0.6 * near);
-        const h = 1.4 + 2.2 * t;
-        ctx.globalAlpha = Math.min(0.55, a);
+        const len = (3 + 9 * t) * (0.6 + 0.5 * near) * (0.7 + 0.3 * blink);
+        const h = 1.2 + 2 * t;
+        ctx.globalAlpha = Math.min(0.6, a);
         ctx.drawImage(spr, x - len / 2, y - h / 2, len, h);
       }
       ctx.globalAlpha = 1;
-      void warmG;
       ctx.restore();
     }
 
