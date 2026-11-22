@@ -1,7 +1,7 @@
 {
   "name": "이불 밖은 추우니까",
-  "short_name": "이불 밖은",
-  "description": "이불 밖은 추우니까, 방에서 같이 보는 해돋이",
+  "short_name": "이불 밖은 추우니까",
+  "description": "혼자 보면 추우니까, 방에서 같이 보는 해돋이와 노을",
   "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
@@ -9,7 +9,17 @@
   "theme_color": "#16204a",
   "lang": "ko",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "./"
 }
