@@ -777,8 +777,42 @@ export class Scene {
       }
     }
 
-    // 잔물결
-    ctx.strokeStyle = `rgba(255,255,255,${0.06 + 0.12 * light})`;
+    // 윤슬: 해가 낮을 때 바다 전체 물결 위에 햇빛이 반짝임 (해 아래가 가장 진하고 양옆으로 옅어짐)
+    const glit = e > -2.5 ? clamp((e + 2.5) / 4) * (1 - clamp((e - 14) / 14)) * (1 - 0.75 * clamp((cover - 0.3) / 0.6)) : 0;
+    if (glit > 0.02) {
+      const sx = clamp(sun.x, -W * 0.3, W * 1.3);
+      // 해 쪽 바다 표면에 넓게 번지는 따뜻한 빛
+      const sheen = ctx.createRadialGradient(sx, horizonY, 0, sx, horizonY, W * 0.85);
+      sheen.addColorStop(0, `rgba(255,205,125,${0.32 * glit})`);
+      sheen.addColorStop(0.5, `rgba(255,175,105,${0.16 * glit})`);
+      sheen.addColorStop(1, 'rgba(255,150,90,0)');
+      ctx.fillStyle = sheen;
+      ctx.fillRect(0, horizonY, W, shoreY - horizonY + 2);
+      // 반짝이는 물비늘 (자리는 고정, 깜빡임은 제각각)
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const N = 300;
+      for (let k = 0; k < N; k++) {
+        const r1 = (Math.sin(k * 127.1) * 43758.5453) % 1;
+        const r2 = (Math.sin(k * 311.7) * 24634.6345) % 1;
+        const fx = Math.abs(r1);
+        const t = Math.abs(r2) ** 0.8; // 0 수평선 ~ 1 해변 쪽
+        const x = fx * W + Math.sin(nowMs / 1800 + k) * 4;
+        const y = horizonY + 2 + t * (shoreY - horizonY - 6);
+        const near = 1 - clamp(Math.abs(x - sx) / (W * 0.75));
+        const tw = Math.sin(nowMs / (260 + (k % 9) * 55) + k * 12.9898);
+        if (tw < 0.2) continue;
+        const a = 1.7 * glit * (0.15 + 0.85 * near ** 1.3) * ((tw - 0.2) / 0.8) ** 1.6 * (0.6 + 0.4 * (1 - t));
+        if (a < 0.03) continue;
+        const len = (3 + 9 * t) * (0.6 + near);
+        ctx.fillStyle = `rgba(255,${Math.round(205 + 35 * clamp(e / 10))},${Math.round(130 + 60 * clamp(e / 10))},${Math.min(0.9, a)})`;
+        ctx.fillRect(x - len / 2, y, len, 1.2 + t * 1.3);
+      }
+      ctx.restore();
+    }
+
+    // 잔물결 (해가 낮을 때는 금빛을 띰)
+    ctx.strokeStyle = glit > 0.02 ? `rgba(255,${Math.round(225 - 25 * glit)},${Math.round(200 - 60 * glit)},${0.06 + 0.12 * light + 0.12 * glit})` : `rgba(255,255,255,${0.06 + 0.12 * light})`;
     ctx.lineWidth = 1;
     for (let i = 0; i < 14; i++) {
       const t = (i + ((nowMs / 4000) % 1)) / 14;
