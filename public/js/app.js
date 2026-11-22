@@ -1516,6 +1516,7 @@ scene.onWood = (self) => {
 }
 scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick());
 scene.onRock = () => ambience.on && ambience.knock && ambience.knock();
+scene.onBird = () => ambience.on && ambience.honk && ambience.honk();
 
 // ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------
 let lastSay = 0;

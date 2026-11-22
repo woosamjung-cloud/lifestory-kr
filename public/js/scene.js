@@ -699,7 +699,15 @@ export class Scene {
     if (light > 0.45) {
       ctx.strokeStyle = `rgba(40,40,60,${(light - 0.45) * 1.2})`;
       ctx.lineWidth = 1.6;
+      // 새가 하늘에 나타날 때(화면 왼쪽에서 다시 들어오거나, 날이 밝아 처음 보일 때) 울음소리 한 번
+      if (!this.birdsShown) {
+        this.birdsShown = true;
+        this.birdCue(nowMs);
+      }
       for (const gl of this.gulls) {
+        const lapN = Math.floor((gl.x + (nowMs / 1000) * gl.v * 0.1) / 1.2);
+        if (gl.lap != null && lapN !== gl.lap) this.birdCue(nowMs);
+        gl.lap = lapN;
         const gx = (((gl.x + (nowMs / 1000) * gl.v * 0.1) % 1.2) - 0.1) * W;
         const gy = gl.y * horizonY + Math.sin(nowMs / 900 + gl.p) * 6;
         const flap = Math.sin(nowMs / 160 + gl.p) * 4;
@@ -710,6 +718,8 @@ export class Scene {
         ctx.stroke();
       }
     }
+
+    else this.birdsShown = false;
 
     // 서해 섬 실루엣 (정서진)
     if (this.place === 'west') {
@@ -1690,6 +1700,13 @@ export class Scene {
   }
 
   // 사람과 사람이 만나는 거리 (모닥불 불빛이 닿는 반경 정도): 나와 상대 사이
+  // 새 울음: 너무 잦지 않게 (25초에 한 번까지)
+  birdCue(now) {
+    if (now - (this.lastBirdCue || -1e9) < 25000) return;
+    this.lastBirdCue = now;
+    if (this.onBird) this.onBird();
+  }
+
   // 윤슬 빛 조각: 가장자리가 부드럽게 퍼지는 금빛 타원 (한 번만 만들어 둠)
   glintSprite() {
     if (this._glint) return this._glint;

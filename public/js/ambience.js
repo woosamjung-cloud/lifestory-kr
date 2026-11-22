@@ -224,6 +224,37 @@ export class Ambience {
     o.stop(t + 0.35);
   }
 
+  // 기러기 울음: 멀리서 들리는 '끼룩 끼룩' (콧소리 섞인 짧은 소리 2~3번)
+  honk() {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const n = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < n; i++) {
+      const t = ctx.currentTime + 0.05 + i * (0.32 + Math.random() * 0.12);
+      const f0 = 560 + Math.random() * 60;
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0 * 0.85, t);
+      o.frequency.linearRampToValueAtTime(f0 * 1.08, t + 0.05);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.78, t + 0.2);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1300;
+      bp.Q.value = 2.2;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 2600; // 멀리서 들리게
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+      g.gain.setValueAtTime(0.2, t + 0.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      o.connect(bp).connect(lp).connect(g).connect(this.master);
+      o.start(t);
+      o.stop(t + 0.26);
+    }
+  }
+
   // 돌이 바위에 '탁' 부딪히는 소리
   knock() {
     if (!this.on) return;
