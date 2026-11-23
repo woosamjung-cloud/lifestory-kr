@@ -97,6 +97,10 @@ export class Ambience {
   // 파도 한 번: 밀려오고(3~4초) 부서지고 빠짐(4~6초)
   scheduleWave() {
     if (!this.on) return;
+    if (this.bedsOff) {
+      this.timers.push(setTimeout(() => this.scheduleWave(), 4000));
+      return;
+    }
     const t = this.ctx.currentTime;
     const rise = 1.8 + Math.random() * 1.2;
     const fall = 3 + Math.random() * 2;
@@ -480,6 +484,20 @@ export class Ambience {
     this.timers.forEach(clearTimeout);
     this.timers = [];
     this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
+  }
+
+  // 파도·바람·모닥불 바탕 소리만 끄고 켬 (효과음은 그대로)
+  setBeds(on) {
+    this.bedsOff = !on;
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const v = on ? 1 : 0;
+    for (const [g, val] of [[this.waveGain, 0.05], [this.foamGain, 0], [this.windGain, 0.05], [this.fireGain, 0.07], [this.crackleBus, 0.5]]) {
+      if (g) {
+        g.gain.cancelScheduledValues(t);
+        g.gain.setTargetAtTime(val * v, t, 0.4);
+      }
+    }
   }
 
   // 화면을 떠나면 잠시 멈춤 (배터리 절약)

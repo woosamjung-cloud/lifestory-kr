@@ -683,7 +683,10 @@ $('board').addEventListener('click', () => {
     store.set('playHint', true);
     setTimeout(() => toast('👆 모래를 누르면 걸어가요 · ↔ 옆으로 끌면 해변 구경 · ↓ 아래로 쓸면 앉아요 · 🔥 불을 누르면 장작'), 7000);
   }
-  if (store.get('sound', true)) ambience.start().then((ok) => ok && setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200));
+  if (store.get('sound', true)) ambience.start().then((ok) => {
+    syncIosBed();
+    if (ok) setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200);
+  });
   show('ride');
   playTrain(state.event);
 });
@@ -1705,7 +1708,40 @@ $('toggle-sound').addEventListener('click', async () => {
     store.set('sound', true);
   }
   soundButton();
+  syncIosBed();
 });
+// ---------- 아이폰: 화면을 꺼도 들리게 (음원 파일로 재생) ----------
+// 아이폰은 브라우저가 직접 만드는 소리를 앱을 벗어나면 멈춤 → 미리 만든 4분 음원(파도·바람·모닥불)을 반복 재생
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let bedAudio = null;
+function syncIosBed() {
+  if (!IS_IOS) return;
+  const want = owned('bgsound') && keepSound && ambience.on;
+  if (want) {
+    if (!bedAudio) {
+      bedAudio = new Audio('audio/ambience.m4a');
+      bedAudio.loop = true;
+      bedAudio.preload = 'auto';
+    }
+    if (bedAudio.paused) bedAudio.play().catch(() => {});
+    ambience.setBeds(false); // 같은 소리가 두 번 나지 않게
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: '이불 밖은 추우니까', artist: '파도·바람·모닥불 소리', artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }] });
+        navigator.mediaSession.setActionHandler('play', () => bedAudio && bedAudio.play());
+        navigator.mediaSession.setActionHandler('pause', () => bedAudio && bedAudio.pause());
+      } catch {
+        /* 지원하지 않음 */
+      }
+    }
+  } else {
+    if (bedAudio && !bedAudio.paused) bedAudio.pause();
+    ambience.setBeds(true);
+  }
+}
+// 아이폰은 사용자가 누를 때만 재생을 시작할 수 있어서, 화면을 누를 때마다 맞춰 둠
+document.addEventListener('pointerup', () => IS_IOS && syncIosBed(), { passive: true });
+
 // ---------- 잠들 때까지 소리 켜두기 (유료) ----------
 // 산 사람은 다른 창으로 옮기거나 화면을 꺼도 소리가 계속 (무료는 배터리를 위해 멈춤)
 let keepSound = store.get('keepSound', true);
@@ -1731,6 +1767,7 @@ function setSleep(min) {
     store.set('music', false);
     soundButton();
     musicButton();
+    syncIosBed();
     toast('🌙 잘 자요. 소리를 껐어요');
   }, min * 60000);
   toast(`⏲ ${min >= 60 ? `${min / 60}시간` : `${min}분`} 뒤에 소리가 서서히 꺼져요`);
@@ -1748,6 +1785,7 @@ function openSleepMenu(anchor) {
     keepSound = !keepSound;
     store.set('keepSound', keepSound);
     box.hidden = true;
+    syncIosBed();
     toast(keepSound ? '🎧 다른 창으로 옮겨도 소리가 계속 나와요' : '🎧 창을 나가면 소리가 멈춰요');
   });
   box.append(title, keep);

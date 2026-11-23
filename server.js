@@ -523,6 +523,10 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.webmanifest': 'application/manifest+json',
   '.txt': 'text/plain; charset=utf-8',
+  '.m4a': 'audio/mp4',
+  '.mp3': 'audio/mpeg',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
 };
 
 // POST 본문(JSON) 읽기 (최대 4KB)
@@ -652,6 +656,34 @@ const server = http.createServer((req, res) => {
   if (!filePath.startsWith(PUBLIC_DIR + path.sep)) {
     res.writeHead(403);
     res.end();
+    return;
+  }
+  // 음원은 부분 요청(Range)을 지원해야 아이폰에서 재생됨
+  const ext0 = path.extname(filePath);
+  if (ext0 === '.m4a' || ext0 === '.mp3') {
+    fs.stat(filePath, (err, st) => {
+      if (err) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      const type = MIME[ext0];
+      const m = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+      if (m) {
+        const start = m[1] ? Number(m[1]) : Math.max(0, st.size - Number(m[2]));
+        const end = m[1] && m[2] ? Math.min(Number(m[2]), st.size - 1) : st.size - 1;
+        if (start >= st.size || start > end) {
+          res.writeHead(416, { 'Content-Range': `bytes */${st.size}` });
+          res.end();
+          return;
+        }
+        res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Cache-Control': 'public, max-age=86400' });
+        fs.createReadStream(filePath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': st.size, 'Cache-Control': 'public, max-age=86400' });
+        fs.createReadStream(filePath).pipe(res);
+      }
+    });
     return;
   }
   fs.readFile(filePath, (err, data) => {

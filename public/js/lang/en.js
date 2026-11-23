@@ -414,7 +414,7 @@ const TEXT = {
   '잠들 때까지 소리 켜두기': 'Sound until I fall asleep',
   '노란 우비 (비·눈 오는 날)': 'Yellow raincoat (rain & snow days)',
   '실제로 비나 눈이 오는 날, 나와 함께 온 강아지·고양이가 노란 우비를 입어요. 모자는 귀까지 폭, 빗방울은 톡톡 튕겨요. 다른 사람에게도 보여요.': 'On real rainy or snowy days, you and your buddy wear yellow raincoats, hoods over the ears, raindrops bouncing off. Everyone can see it.',
-  '다른 창으로 옮기거나 화면을 꺼도 파도·모닥불 소리와 음악이 계속 나와요. 잠자기 타이머(30분·1시간·2시간) 포함. (PC·안드로이드)': 'Waves, campfire and music keep playing even when you switch tabs or turn off the screen. Includes a sleep timer (30 min, 1 or 2 hours). (PC & Android)',
+  '다른 창으로 옮기거나 화면을 꺼도 파도·모닥불 소리와 음악이 계속 나와요. 잠자기 타이머(30분·1시간·2시간) 포함. 아이폰도 화면을 꺼도 들려요.': 'Waves, campfire and music keep playing even when you switch tabs or turn off the screen. Includes a sleep timer (30 min, 1 or 2 hours). Works on iPhone too.',
   '🎧 잠들 때까지 소리 켜두기': '🎧 Sound until I fall asleep',
   '✅ 창을 나가도 소리 계속 (켜짐)': '✅ Keep playing in background (on)',
   '⬜ 창을 나가도 소리 계속 (꺼짐)': '⬜ Keep playing in background (off)',
