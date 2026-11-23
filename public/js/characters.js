@@ -1667,25 +1667,39 @@ export function drawPetRaincoat(ctx, o) {
   ctx.fillStyle = Y;
   if (walking) {
     const by = y - k * 0.4 + k * 0.2 * (1 - (B.legs || 1));
+    if (o.face === 'front') {
+      // 앞모습: 망토는 턱 아래부터 (얼굴을 가리지 않게)
+      const chin = y - k * 0.7 + k * 0.2 * (1 - (B.legs || 1)) + k * 0.22 * 0.98;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x - k, chin, k * 2, k);
+      ctx.clip();
+    }
     ctx.beginPath();
     ctx.ellipse(x, by - k * 0.03, k * 0.29 * W, k * 0.17, 0, Math.PI, 0);
     ctx.lineTo(x + k * 0.29 * W, by + k * 0.04);
     ctx.quadraticCurveTo(x, by + k * 0.1, x - k * 0.29 * W, by + k * 0.04);
     ctx.fill();
+    if (o.face === 'front') ctx.restore();
     // 귀까지 덮는 모자 (앞모습이면 얼굴은 보이게 위쪽만)
     const hy = y - k * 0.7 + k * 0.2 * (1 - (B.legs || 1));
     const hr = k * 0.22;
     ctx.save();
-    if (o.face === 'front') {
-      ctx.beginPath();
-      ctx.rect(x - k, hy - k, k * 2, k * 0.92);
-      ctx.clip();
-    }
+    ctx.fillStyle = Y;
+    petEars(ctx, B, x, hy, hr * 1.05, 0, Y, Y, null);
     ctx.fillStyle = Y;
     ctx.beginPath();
-    ctx.arc(x, hy, hr * 1.08, 0, Math.PI * 2);
-    ctx.fill();
-    petEars(ctx, B, x, hy, hr * 1.05, 0, Y, Y, null);
+    ctx.arc(x, hy, hr * 1.12, 0, Math.PI * 2);
+    if (o.face === 'front') {
+      // 앞모습: 얼굴 자리는 비워서 눈·코·입이 모자 앞으로 보이게
+      ctx.ellipse(x, hy + hr * 0.18, hr * 0.84, hr * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill('evenodd');
+      ctx.strokeStyle = D;
+      ctx.lineWidth = Math.max(0.7, k * 0.02);
+      ctx.beginPath();
+      ctx.ellipse(x, hy + hr * 0.18, hr * 0.86, hr * 0.82, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else ctx.fill();
     ctx.restore();
   } else {
     const by = y - hop * k * 0.55;
