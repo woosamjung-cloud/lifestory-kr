@@ -44,6 +44,17 @@ let countsDirty = false;
 // visitors: 하루 동안 접속한 기기 수 (기기마다 만든 무작위 번호로 중복 제거, 번호 자체는 저장하지 않음)
 // 한마디를 주고받은 두 사람 (순서 상관없이 같은 짝) - 30분 동안 하트를 주고받을 수 있음
 const TALK_MS = 30 * 60 * 1000;
+// 별명: 빈 값이면 지움, 걸러지면 그대로 둠
+function setNick(c, raw) {
+  if (raw == null || raw === '') {
+    c.nick = '';
+    return true;
+  }
+  const r = cleanCustom(String(raw).slice(0, 20));
+  if (r.error || [...r.text].length > 10) return false;
+  c.nick = r.text;
+  return true;
+}
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink'];
 const dailyVisitors = new Map(); // dateKey -> Set(visitorId)  (메모리에만, 하루 지나면 지움)
@@ -281,7 +292,24 @@ function handle(c, msg) {
       c.hair = Number.isInteger(msg.hair) ? Math.abs(msg.hair) % 6 : 0;
       c.pet = Number.isInteger(msg.pet) ? Math.abs(msg.pet) % 10 : 0; // 0 없음, 1~9 품종 (characters.js BREEDS)
       if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
+      setNick(c, msg.nick);
       joinRoom(c, msg.room);
+      return;
+    }
+    case 'nick': {
+      // 별명 바꾸기 (10자, 욕설·연락처 거름)
+      if (now - (c.lastNick || 0) < 3000) return;
+      c.lastNick = now;
+      const ok = setNick(c, msg.nick);
+      send(c.ws, { t: 'nickok', nick: c.nick || '', error: ok ? null : '그 별명은 쓸 수 없어요' });
+      return;
+    }
+    case 'who': {
+      // 가까이 온 사람을 눌렀을 때 그 사람 별명
+      const to = Number(msg.seat);
+      const room = rooms[c.room];
+      if (c.seat == null || !Number.isInteger(to) || !room || !room.seats[to]) return;
+      send(c.ws, { t: 'who', seat: to, nick: room.seats[to].nick || '' });
       return;
     }
     case 'hello': {
@@ -558,6 +586,24 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname.startsWith('/api/shop')) {
     handleShop(req, res, url).catch(() => json(res, 500, { error: '서버 오류' }));
+    return;
+  }
+  // 소셜 간편 로그인: /auth/kakao/start?visitor=… → 각 회사 로그인 → /auth/kakao/callback → /?login=토큰
+  const am = url.pathname.match(/^\/auth\/(kakao|google|naver)\/(start|callback)$/);
+  if (am) {
+    const origin = publicOrigin(req);
+    const go = (loc) => {
+      res.writeHead(302, { Location: loc, 'Cache-Control': 'no-store' });
+      res.end();
+    };
+    if (am[2] === 'start') {
+      const to = shop.oauthStart(am[1], url.searchParams.get('visitor'), origin);
+      return go(to || '/?loginerr=1');
+    }
+    shop
+      .oauthCallback(am[1], url.searchParams.get('code'), url.searchParams.get('state'), origin)
+      .then((token) => go(token ? `/?login=${token}` : '/?loginerr=1'))
+      .catch(() => go('/?loginerr=1'));
     return;
   }
   if (url.pathname === '/api/status') {

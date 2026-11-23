@@ -242,6 +242,36 @@ test('해외 결제: 달러 가격은 서버가 정하고, 소액 묶음은 달�
   assert.equal(ok.body.wallet.coins, 35);
 });
 
+test('별명: 가까이 온 사람이 물으면 알려 주고, 바꿀 수 있고, 나쁜 말은 거름', async () => {
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'join', room: 'west', char: 'coat', color: 0, nick: '노을이' }));
+  b.send(JSON.stringify({ t: 'join', room: 'west', char: 'hood', color: 1, nick: '010-1234-5678' }));
+  await wait(600);
+  const aSeat = last(a, 'seat').seat;
+  const bSeat = last(b, 'seat').seat;
+  b.send(JSON.stringify({ t: 'who', seat: aSeat }));
+  a.send(JSON.stringify({ t: 'who', seat: bSeat }));
+  await wait(300);
+  assert.equal(last(b, 'who').nick, '노을이');
+  assert.equal(last(a, 'who').nick, ''); // 연락처 별명은 안 받음
+  a.send(JSON.stringify({ t: 'nick', nick: '해돋이' }));
+  await wait(300);
+  assert.equal(last(a, 'nickok').nick, '해돋이');
+  b.send(JSON.stringify({ t: 'who', seat: aSeat }));
+  await wait(300);
+  assert.equal(last(b, 'who').nick, '해돋이');
+  a.close();
+  b.close();
+});
+
+test('소셜 로그인: 키가 없으면 버튼도 없고, 시작 주소는 오류로 돌아감', async () => {
+  const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=oauthtest01`)).json();
+  assert.deepEqual(info.auth, []);
+  const r = await fetch(`http://localhost:${PORT}/auth/kakao/start?visitor=oauthtest01`, { redirect: 'manual' });
+  assert.equal(r.status, 302);
+  assert.match(r.headers.get('location'), /loginerr/);
+});
+
 test('정서진 유리병 편지: 공개 문구는 그리운 이에게 보내는 말 목록', async () => {
   const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=lettertest01`)).json();
   assert.ok(info.letters.length >= 5);

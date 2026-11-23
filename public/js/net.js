@@ -79,6 +79,8 @@ export class Net {
       else if (m.t === 'gotheart' && this.h.onGotHeart) this.h.onGotHeart(m);
       else if ((m.t === 'sayok' || m.t === 'sayno') && this.h.onSayResult) this.h.onSayResult(m);
       else if (m.t === 'whisper' && this.h.onWhisper) this.h.onWhisper(m);
+      else if (m.t === 'who' && this.h.onWho) this.h.onWho(m);
+      else if (m.t === 'nickok' && this.h.onNickOk) this.h.onNickOk(m);
     };
     ws.onclose = () => {
       clearTimeout(giveUp);
@@ -99,8 +101,8 @@ export class Net {
     if (this.ws && this.connected) this.ws.send(JSON.stringify(msg));
   }
 
-  join(room, char, color, hair = 0, pet = 0) {
-    this.want = { room, char, color, hair, pet };
+  join(room, char, color, hair = 0, pet = 0, nick = '') {
+    this.want = { room, char, color, hair, pet, nick };
     this.send({ t: 'join', ...this.want, visitor: this.visitor });
   }
 
@@ -141,6 +143,15 @@ export class Net {
 
   heart(seat) {
     this.send({ t: 'heart', seat });
+  }
+
+  who(seat) {
+    this.send({ t: 'who', seat });
+  }
+
+  nick(nick) {
+    if (this.want) this.want.nick = nick;
+    this.send({ t: 'nick', nick });
   }
 
   whisper(seat, i) {

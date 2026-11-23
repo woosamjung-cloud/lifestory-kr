@@ -139,6 +139,14 @@ const net = new Net({
   onWallet(w) {
     setWallet(w);
   },
+  onWho(m) {
+    const t = document.querySelector(`#person-menu .pm-nick[data-seat="${m.seat}"]`);
+    if (t) t.textContent = m.nick ? `🙂 ${m.nick}` : '🙂 이름 없는 여행자';
+  },
+  onNickOk(m) {
+    if (m.error) return toast(m.error);
+    toast(m.nick ? `🙂 별명을 "${m.nick}"(으)로 바꿨어요` : '🙂 별명을 지웠어요');
+  },
   onWhisper(m) {
     const text = shopInfo && shopInfo.whispers[m.i];
     if (!text) return;
@@ -341,7 +349,7 @@ function applyEvent(ev, { animate = false } = {}) {
   if (placeChanged) {
     state.room = null;
     scene.people = [];
-    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet);
+    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name);
     if (animate && state.screen === 'ride') playTrain(ev);
   }
   renderEventTexts();
@@ -615,7 +623,7 @@ $('board-form').addEventListener('submit', async (e) => {
 
   // 승차권에 실제 좌석 번호를 넣기 위해 먼저 자리를 잡습니다.
   state.joined = true;
-  net.join(state.event.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet);
+  net.join(state.event.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name);
   await waitForSeat(1500);
 
   ticketCanvas = await makeTicket({
@@ -1074,8 +1082,19 @@ $('shop-back').addEventListener('click', () => setShopView('main'));
 // ---------- 이메일 간편 로그인 (결제할 때만 요청) ----------
 let afterLogin = null; // 로그인 뒤 이어서 할 일 (멈췄던 결제)
 const postJson = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ ok: r.ok, body: await r.json() }));
+const SOCIAL = { kakao: ['kakao', '💬 카카오로 시작하기'], google: ['google', 'G  구글로 시작하기'], naver: ['naver', 'N  네이버로 시작하기'] };
 function openLogin(next) {
   afterLogin = next || null;
+  const box = $('social-login');
+  box.innerHTML = '';
+  for (const p of (shopInfo && shopInfo.auth) || []) {
+    const a = document.createElement('a');
+    a.className = SOCIAL[p][0];
+    a.textContent = SOCIAL[p][1];
+    a.href = `auth/${p}/start?visitor=${encodeURIComponent(net.visitor)}`;
+    box.append(a);
+  }
+  $('or-line').hidden = !box.children.length;
   $('login-msg').hidden = true;
   $('login-dev').hidden = true;
   $('login-send').disabled = false;
@@ -1088,6 +1107,13 @@ async function finishLogin(token) {
   if (!r.ok) throw new Error(r.body.error || '로그인 실패');
   if (r.body.visitor !== net.visitor) net.adoptVisitor(r.body.visitor);
   setWallet(r.body.wallet);
+  // 소셜 계정의 별명을 받아옴 (내가 정해 둔 별명이 없을 때만)
+  if (r.body.nick && !state.profile.name) {
+    state.profile.name = r.body.nick.slice(0, 10);
+    store.set('name', state.profile.name);
+    $('nick').value = state.profile.name;
+    net.nick(state.profile.name);
+  }
   toast(`✅ 로그인했어요 · ${r.body.email}`);
   return r.body;
 }
@@ -1124,6 +1150,10 @@ $('login-form').addEventListener('submit', async (e) => {
     msg.textContent = '📮 메일을 보냈어요. 메일함에서 "로그인하기"를 눌러 주세요. (15분 동안 유효, 스팸함도 확인해 주세요)';
   }
 });
+if (params.get('loginerr')) {
+  toast('로그인하지 못했어요. 다시 시도해 주세요');
+  history.replaceState(null, '', location.pathname);
+}
 // 메일의 로그인 링크로 들어왔을 때
 if (params.get('login')) {
   finishLogin(params.get('login'))
@@ -1433,8 +1463,10 @@ function openPersonMenu(who, x, y) {
   const box = $('person-menu');
   box.innerHTML = '';
   const title = document.createElement('div');
-  title.className = 'pm-title';
+  title.className = 'pm-title pm-nick';
   title.textContent = '가까이 있는 사람';
+  title.dataset.seat = who.seat;
+  net.who(who.seat); // 그 사람 별명을 받아서 맨 위에
   const say = document.createElement('button');
   say.textContent = '💬 한마디 건네기';
   say.addEventListener('click', () => {
@@ -1812,6 +1844,21 @@ function openMusicList(focus) {
   $('musicdlg').showModal();
 }
 $('menu-music').addEventListener('click', () => openMusicList(null));
+$('menu-nick').addEventListener('click', () => {
+  $('menu').close();
+  $('nick-input').value = state.profile.name || '';
+  $('nickdlg').showModal();
+});
+$('nick-form').addEventListener('submit', (e) => {
+  if (!(e.submitter && e.submitter.value === 'save')) return;
+  const v = $('nick-input').value.trim().slice(0, 10);
+  state.profile.name = v;
+  store.set('name', v);
+  $('nick').value = v;
+  if (scene.self) scene.self.name = v;
+  net.nick(v);
+  if (state.netStatus !== 'online') toast(v ? `🙂 별명을 "${v}"(으)로 바꿨어요` : '🙂 별명을 지웠어요');
+});
 $('music-close').addEventListener('click', () => $('musicdlg').close());
 // 곡 정보가 있을 때만 메뉴에 보임
 setTimeout(function checkTracks() {

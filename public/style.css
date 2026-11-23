@@ -151,7 +151,7 @@ h3 { font-size: 32px; }
 
 /* 입력 */
 .field-label { display: block; font-size: 15px; margin: 14px 0 8px; }
-#nick, #petname, textarea {
+#nick, #petname, #nick-input, textarea {
   width: 100%;
   border: 2px solid var(--line);
   background: var(--paper-2);
@@ -780,3 +780,12 @@ html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }
 .person-menu button { border: 2px solid var(--line); background: var(--paper-2); color: var(--ink); border-radius: 12px; padding: 9px 10px; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
 .person-menu .pm-heart.locked { opacity: 0.5; }
 .person-menu .pm-title { font-size: 12.5px; color: var(--muted); padding: 2px 4px; }
+
+/* 간편 로그인 버튼 */
+.social { display: grid; gap: 8px; margin: 8px 0 4px; }
+.social a { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 15px; }
+.social .kakao { background: #fee500; color: #191600; }
+.social .google { background: #fff; color: #222; border: 1px solid #ddd; }
+.social .naver { background: #03c75a; color: #fff; }
+.or-line { text-align: center; font-size: 12.5px; color: var(--muted); margin: 8px 0; }
+.person-menu .pm-nick { font-size: 16px; font-weight: 700; color: var(--ink); padding: 4px 6px 6px; }

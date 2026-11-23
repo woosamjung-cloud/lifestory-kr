@@ -61,7 +61,7 @@
       <div class="home-form">
 
       <form id="board-form" autocomplete="off">
-        <label class="field-label" for="nick"><span data-i18n="form.name">승객 이름</span> <span class="muted" data-i18n="form.nameHint">(선택, 승차권에만 써요)</span></label>
+        <label class="field-label" for="nick"><span data-i18n="form.name">별명</span> <span class="muted" data-i18n="form.nameHint">(선택, 승차권과 가까이 온 사람에게 보여요)</span></label>
         <input id="nick" name="nick" maxlength="10" placeholder="예) 잠꾸러기" data-i18n-ph="form.namePh">
 
         <span class="field-label" id="char-label" data-i18n="form.look">나의 모습</span>
@@ -186,6 +186,7 @@
     </div>
     <button class="btn wide" id="preview-start">⏩ 해돋이 장면 60초 미리보기</button>
     <button class="btn wide" id="menu-shop">🎁 상점 · 내 아이템</button>
+    <button class="btn wide" id="menu-nick">🙂 별명 바꾸기</button>
     <button class="btn wide" id="menu-music" hidden>🎵 우리 음악</button>
     <button class="btn wide" id="show-help">이용 안내</button>
     <button class="btn wide ghost" id="menu-close">닫기</button>
@@ -288,11 +289,26 @@
     <button class="btn wide ghost" id="shop-close">닫기</button>
   </dialog>
 
+  <!-- 별명 바꾸기 -->
+  <dialog id="nickdlg" class="modal">
+    <form method="dialog" id="nick-form">
+      <h3>별명 바꾸기</h3>
+      <p class="muted small">가까이 다가온 사람이 나를 누르면 이 별명이 보여요. 승차권에도 적혀요.</p>
+      <input id="nick-input" maxlength="10" placeholder="예) 잠꾸러기" autocomplete="off">
+      <div class="btn-row">
+        <button class="btn ghost" value="cancel">취소</button>
+        <button class="btn primary" value="save">바꾸기</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- 이메일 간편 로그인 (결제할 때만) -->
   <dialog id="logindlg" class="modal">
     <form method="dialog" id="login-form">
       <h3>간편 로그인</h3>
       <p class="muted small">결제하려면 이메일로 간편 로그인해 주세요. 비밀번호는 없어요.<br>산 동전과 아이템을 어느 기기에서든 그대로 쓸 수 있어요.</p>
+      <div class="social" id="social-login"></div>
+      <p class="or-line" id="or-line" hidden>또는 이메일로</p>
       <input id="login-email" type="email" inputmode="email" autocomplete="email" maxlength="120" placeholder="이메일 주소">
       <p class="login-msg" id="login-msg" hidden></p>
       <button type="button" class="btn wide" id="login-dev" hidden>🧪 테스트: 바로 로그인</button>

@@ -395,6 +395,14 @@ function mergeInto(target, source) {
   s.mergedInto = target;
   dirty = true;
 }
+// 소셜 로그인으로 받은 사람: 이메일(없으면 '카카오:번호' 같은 고유 키)과 별명으로 로그인 토큰을 만듦
+export function socialToken({ key, email, nick, visitor }) {
+  const token = crypto.randomBytes(24).toString('hex');
+  db.tokens[token] = { email: key, realEmail: email || null, nick: nick || '', visitor, exp: Date.now() + LOGIN_TTL };
+  dirty = true;
+  return token;
+}
+
 export function loginVerify(token, visitor) {
   const t = db.tokens[String(token || '')];
   if (!t || t.exp < Date.now()) return { error: '링크가 만료됐어요. 다시 시도해 주세요' };
@@ -403,14 +411,76 @@ export function loginVerify(token, visitor) {
   let u = db.users[t.email];
   if (!u) {
     u = db.users[t.email] = { visitor: here, created: Date.now() };
-    account(here).email = t.email;
+    account(here).email = t.realEmail || t.email;
   } else {
     mergeInto(u.visitor, here);
     if (here !== t.visitor) mergeInto(u.visitor, t.visitor);
   }
   dirty = true;
   saveShop(true);
-  return { visitor: u.visitor, email: maskEmail(t.email), wallet: wallet(u.visitor) };
+  const shown = t.realEmail || t.email;
+  if (t.nick) account(u.visitor).nick = t.nick;
+  return { visitor: u.visitor, email: shown.includes('@') ? maskEmail(shown) : shown.split(':')[0], nick: t.nick || account(u.visitor).nick || '', wallet: wallet(u.visitor) };
+}
+
+// ---------- 소셜 로그인 설정 (Render 환경변수에 키를 넣은 곳만 버튼이 보임) ----------
+// 카카오: KAKAO_REST_KEY (+ 선택 KAKAO_SECRET) / 구글: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET / 네이버: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
+// 각 개발자 콘솔에 등록할 콜백 주소: https://(사이트 주소)/auth/kakao/callback (google, naver도 같은 모양)
+export const OAUTH = {
+  kakao: {
+    ready: () => !!process.env.KAKAO_REST_KEY,
+    authUrl: (redirect, state) => `https://kauth.kakao.com/oauth/authorize?${new URLSearchParams({ client_id: process.env.KAKAO_REST_KEY, redirect_uri: redirect, response_type: 'code', state, scope: 'profile_nickname,account_email' })}`,
+    async profile(code, redirect) {
+      const body = new URLSearchParams({ grant_type: 'authorization_code', client_id: process.env.KAKAO_REST_KEY, redirect_uri: redirect, code });
+      if (process.env.KAKAO_SECRET) body.set('client_secret', process.env.KAKAO_SECRET);
+      const tk = await (await fetch('https://kauth.kakao.com/oauth/token', { method: 'POST', body, signal: AbortSignal.timeout(15000) })).json();
+      if (!tk.access_token) throw new Error('kakao token');
+      const me = await (await fetch('https://kapi.kakao.com/v2/user/me', { headers: { Authorization: `Bearer ${tk.access_token}` }, signal: AbortSignal.timeout(15000) })).json();
+      const acc = me.kakao_account || {};
+      return { key: acc.email || `kakao:${me.id}`, email: acc.email || null, nick: (acc.profile && acc.profile.nickname) || (me.properties && me.properties.nickname) || '' };
+    },
+  },
+  google: {
+    ready: () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    authUrl: (redirect, state) => `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, redirect_uri: redirect, response_type: 'code', scope: 'openid email profile', state, prompt: 'select_account' })}`,
+    async profile(code, redirect) {
+      const body = new URLSearchParams({ grant_type: 'authorization_code', client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, redirect_uri: redirect, code });
+      const tk = await (await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body, signal: AbortSignal.timeout(15000) })).json();
+      if (!tk.access_token) throw new Error('google token');
+      const me = await (await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tk.access_token}` }, signal: AbortSignal.timeout(15000) })).json();
+      if (!me.email) throw new Error('google email');
+      return { key: me.email.toLowerCase(), email: me.email.toLowerCase(), nick: me.given_name || me.name || '' };
+    },
+  },
+  naver: {
+    ready: () => !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET),
+    authUrl: (redirect, state) => `https://nid.naver.com/oauth2.0/authorize?${new URLSearchParams({ client_id: process.env.NAVER_CLIENT_ID, redirect_uri: redirect, response_type: 'code', state })}`,
+    async profile(code, redirect, state) {
+      const q = new URLSearchParams({ grant_type: 'authorization_code', client_id: process.env.NAVER_CLIENT_ID, client_secret: process.env.NAVER_CLIENT_SECRET, code, state, redirect_uri: redirect });
+      const tk = await (await fetch(`https://nid.naver.com/oauth2.0/token?${q}`, { signal: AbortSignal.timeout(15000) })).json();
+      if (!tk.access_token) throw new Error('naver token');
+      const me = await (await fetch('https://openapi.naver.com/v1/nid/me', { headers: { Authorization: `Bearer ${tk.access_token}` }, signal: AbortSignal.timeout(15000) })).json();
+      const r = me.response || {};
+      return { key: r.email ? r.email.toLowerCase() : `naver:${r.id}`, email: r.email ? r.email.toLowerCase() : null, nick: r.nickname || r.name || '' };
+    },
+  },
+};
+const oauthStates = new Map(); // state → { provider, visitor, exp }
+export function oauthStart(provider, visitor, origin) {
+  const p = OAUTH[provider];
+  if (!p || !p.ready() || !validVisitor(visitor)) return null;
+  const now = Date.now();
+  for (const [k, v] of oauthStates) if (v.exp < now) oauthStates.delete(k);
+  const state = crypto.randomBytes(16).toString('hex');
+  oauthStates.set(state, { provider, visitor, exp: now + 10 * 60 * 1000 });
+  return p.authUrl(`${origin}/auth/${provider}/callback`, state);
+}
+export async function oauthCallback(provider, code, state, origin) {
+  const st = oauthStates.get(String(state || ''));
+  oauthStates.delete(String(state || ''));
+  if (!st || st.provider !== provider || st.exp < Date.now() || !code) return null;
+  const prof = await OAUTH[provider].profile(String(code), `${origin}/auth/${provider}/callback`, state);
+  return socialToken({ ...prof, nick: String(prof.nick || '').slice(0, 10), visitor: st.visitor });
 }
 
 // ---------- 복구 코드 (다른 기기로 구매 내역 옮기기) ----------
@@ -449,6 +519,7 @@ export function shopPublicInfo() {
     paypal,
     wishes: WISHES,
     whispers: WHISPERS,
+    auth: ['kakao', 'google', 'naver'].filter((p) => OAUTH[p].ready()),
     letters: LETTERS,
     sayings: SAYINGS,
     itemDays: ITEM_DAYS,
