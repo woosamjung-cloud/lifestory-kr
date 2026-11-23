@@ -34,6 +34,9 @@ export const HAIRS = [
 ];
 // 반려동물: 0 없음, 1 강아지, 2 고양이
 const SKIN = '#e9c8b0';
+// 우비 색
+const RAIN_YELLOW = '#f2c230';
+const RAIN_EDGE = '#c9971c';
 
 // ---------- 색 도우미 ----------
 function hexRgb(h) {
@@ -358,7 +361,7 @@ function getSprite(type, color, s, dpr, bright = 1, lightX = -1, hair = null) {
  */
 export function drawCritterFast(ctx, o) {
   const { x, s, type = 'blanket', color = 0, arms = 0, hop = 0, rim, t = 0, steam = false, dpr = 1, bright = 1, hair = null } = o;
-  const [base] = BLANKETS[color % BLANKETS.length];
+  const base = o.coat ? RAIN_YELLOW : BLANKETS[color % BLANKETS.length][0];
   const phase = (Math.abs(x * 7 + color * 13) % 100) / 100;
   const breathe = Math.sin(t / 1300 + phase * 6.28);
   const y = o.y - hop * s * 0.25;
@@ -1501,7 +1504,7 @@ function drawWalkerSide(ctx, o) {
 export function drawPettingArm(ctx, o) {
   const { x, y, s, color = 0, bright = 1, reach = 0, stroke = 0, t = 0, petSize = 1 } = o;
   if (reach <= 0.01) return;
-  const [base] = BLANKETS[color % BLANKETS.length];
+  const base = o.coat ? RAIN_YELLOW : BLANKETS[color % BLANKETS.length][0];
   const g = geom(x, y, s);
   const ax0 = x + g.sw * 0.75;
   const ay0 = g.shY + s * 0.05;
@@ -1542,8 +1545,6 @@ export function drawPettingArm(ctx, o) {
 }
 
 // ---------- 우비 (비 오는 날) ----------
-const RAIN_YELLOW = '#f2c230';
-const RAIN_EDGE = '#c9971c';
 // 앉은 뒷모습 사람: 모자 달린 노란 우비 (머리·어깨·등을 덮음)
 export function drawRaincoatSeated(ctx, o) {
   const { x, y, s, bright = 1 } = o;
@@ -1573,12 +1574,16 @@ export function drawRaincoatSeated(ctx, o) {
   ctx.moveTo(x - g.sw * 0.7, g.shY + s * 0.08);
   ctx.quadraticCurveTo(x - g.bw * 0.85, y - s * 0.3, x - g.bw * 0.8, y - s * 0.12);
   ctx.stroke();
-  // 모자
+  // 모자: 머리 전체를 감싸고 목까지 내려와 망토와 이어짐 (머리카락이 비치지 않게)
   ctx.fillStyle = Y;
   ctx.beginPath();
-  ctx.arc(x, g.headY, g.headR * 1.22, 0, Math.PI * 2);
+  ctx.arc(x, g.headY, g.headR * 1.24, Math.PI, 0);
+  ctx.lineTo(x + g.headR * 1.3, g.shY + s * 0.04);
+  ctx.quadraticCurveTo(x, g.shY + s * 0.1, x - g.headR * 1.3, g.shY + s * 0.04);
+  ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = D;
+  ctx.lineWidth = Math.max(0.8, s * 0.015);
   ctx.beginPath();
   ctx.arc(x, g.headY + g.headR * 0.1, g.headR * 1.0, Math.PI * 1.15, Math.PI * 1.85);
   ctx.stroke();
@@ -1586,8 +1591,12 @@ export function drawRaincoatSeated(ctx, o) {
 }
 // 서 있는(걷는) 사람: 모자와 무릎까지 오는 우비
 export function drawRaincoatStanding(ctx, o) {
-  const { x, y, s, bright = 1, front = false } = o;
-  const shY = y - s * 1.12;
+  const { x, y, s, bright = 1, front = false, type = 'blanket', still = false } = o;
+  const t = still ? 0 : o.t || 0;
+  const ph = t / 150;
+  const bob = Math.abs(Math.sin(ph)) * s * 0.03;
+  const shY = y - s * 1.12 - bob;
+  const sw = s * (type === 'blanket' ? 0.3 : 0.24);
   const hr = s * 0.17;
   const hy = shY - s * 0.17;
   const Y = tone(RAIN_YELLOW, (bright - 1) * 0.6);
@@ -1607,13 +1616,42 @@ export function drawRaincoatStanding(ctx, o) {
   ctx.moveTo(x, shY + s * 0.03);
   ctx.lineTo(x, y - s * 0.3);
   ctx.stroke();
+  // 소매: 걸을 때 흔드는 팔을 그대로 덮음
+  ctx.strokeStyle = Y;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = s * 0.115;
+  for (const [sg, off] of [[-1, Math.PI], [1, 0]]) {
+    const sw2 = Math.sin(ph + off) * s * 0.07;
+    ctx.beginPath();
+    ctx.moveTo(x + sg * sw * 0.95, shY + s * 0.1);
+    ctx.lineTo(x + sg * sw * 1.05 + sw2 * 0.4, shY + s * 0.45);
+    ctx.stroke();
+  }
   // 모자 (앞모습이면 얼굴 둘레만 감싸 얼굴이 보이게)
   ctx.fillStyle = Y;
   ctx.beginPath();
   if (front) {
-    ctx.arc(x, hy, hr * 1.25, Math.PI * 0.95, Math.PI * 2.05);
-    ctx.arc(x, hy + hr * 0.12, hr * 0.86, Math.PI * 2.05, Math.PI * 0.95, true);
-  } else ctx.arc(x, hy, hr * 1.22, 0, Math.PI * 2);
+    // 앞모습: 머리 둘레를 어깨까지 감싸고 얼굴 자리만 동그랗게 비움
+    ctx.arc(x, hy, hr * 1.26, Math.PI, 0);
+    ctx.lineTo(x + hr * 1.32, shY + s * 0.05);
+    ctx.quadraticCurveTo(x, shY + s * 0.12, x - hr * 1.32, shY + s * 0.05);
+    ctx.closePath();
+    ctx.ellipse(x, hy + hr * 0.12, hr * 0.84, hr * 0.82, 0, 0, Math.PI * 2);
+    ctx.fill('evenodd');
+    ctx.strokeStyle = D;
+    ctx.lineWidth = Math.max(0.8, s * 0.012);
+    ctx.beginPath();
+    ctx.ellipse(x, hy + hr * 0.12, hr * 0.86, hr * 0.84, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  } else {
+    // 뒷모습: 머리 전체를 감싸고 목까지
+    ctx.arc(x, hy, hr * 1.24, Math.PI, 0);
+    ctx.lineTo(x + hr * 1.3, shY + s * 0.04);
+    ctx.quadraticCurveTo(x, shY + s * 0.1, x - hr * 1.3, shY + s * 0.04);
+    ctx.closePath();
+  }
   ctx.fill();
   ctx.restore();
 }
@@ -1634,6 +1672,21 @@ export function drawPetRaincoat(ctx, o) {
     ctx.lineTo(x + k * 0.29 * W, by + k * 0.04);
     ctx.quadraticCurveTo(x, by + k * 0.1, x - k * 0.29 * W, by + k * 0.04);
     ctx.fill();
+    // 귀까지 덮는 모자 (앞모습이면 얼굴은 보이게 위쪽만)
+    const hy = y - k * 0.7 + k * 0.2 * (1 - (B.legs || 1));
+    const hr = k * 0.22;
+    ctx.save();
+    if (o.face === 'front') {
+      ctx.beginPath();
+      ctx.rect(x - k, hy - k, k * 2, k * 0.92);
+      ctx.clip();
+    }
+    ctx.fillStyle = Y;
+    ctx.beginPath();
+    ctx.arc(x, hy, hr * 1.08, 0, Math.PI * 2);
+    ctx.fill();
+    petEars(ctx, B, x, hy, hr * 1.05, 0, Y, Y, null);
+    ctx.restore();
   } else {
     const by = y - hop * k * 0.55;
     ctx.beginPath();
@@ -1649,13 +1702,19 @@ export function drawPetRaincoat(ctx, o) {
     ctx.moveTo(x, by - k * 0.62);
     ctx.lineTo(x, by - k * 0.12);
     ctx.stroke();
-    // 모자: 머리 위쪽만 덮음
+    // 모자: 머리 전체와 귀까지 덮음 (뒷모습)
     const hy = by - k * 0.82;
+    const hr = k * 0.26;
     ctx.fillStyle = Y;
     ctx.beginPath();
-    ctx.arc(x, hy, k * 0.29, Math.PI * 1.05, Math.PI * 1.95);
-    ctx.quadraticCurveTo(x, hy - k * 0.02, x - k * 0.28, hy - k * 0.05);
+    ctx.arc(x, hy, hr * 1.08, 0, Math.PI * 2);
     ctx.fill();
+    petEars(ctx, B, x, hy, hr * 1.05, 0, Y, Y, null);
+    ctx.strokeStyle = D;
+    ctx.lineWidth = Math.max(0.7, k * 0.02);
+    ctx.beginPath();
+    ctx.arc(x, hy + hr * 0.05, hr * 0.85, Math.PI * 1.2, Math.PI * 1.8);
+    ctx.stroke();
   }
   ctx.restore();
 }

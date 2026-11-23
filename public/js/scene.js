@@ -985,11 +985,11 @@ export class Scene {
         const pet = () => {
           if (!p.pet) return;
           drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, walking: true, still, face });
-          if (raining && face !== 'left' && face !== 'right') drawPetRaincoat(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, bright: critterBright, walking: true });
+          if (raining && face !== 'left' && face !== 'right') drawPetRaincoat(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, bright: critterBright, walking: true, face });
         };
         if (!petFirst) pet();
         drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.phase, bright: critterBright, still, face });
-        if (raining && face !== 'left' && face !== 'right') drawRaincoatStanding(ctx, { x: sl.x, y: sl.y, s: sl.s, bright: critterBright, front: face === 'front' });
+        if (raining && face !== 'left' && face !== 'right') drawRaincoatStanding(ctx, { x: sl.x, y: sl.y, s: sl.s, bright: critterBright, front: face === 'front', type: p.char, t: nowMs + sl.phase, still });
         if (raining) this.rainHits(sl, sl.y - sl.s * 1.45, nowMs);
         if (petFirst) pet();
         continue;
@@ -1008,6 +1008,7 @@ export class Scene {
         dpr: this.dpr,
         bright: critterBright,
         hair: p.hair ?? null,
+        coat: raining,
       });
       const hopNow = Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5);
       if (raining) {
@@ -1019,7 +1020,7 @@ export class Scene {
         const pt = this.pettingAt(sl, nowMs, hopT <= 0 && !celebrating);
         drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5), petted: pt.pet });
         if (raining && pt.pet < 0.3) drawPetRaincoat(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, bright: critterBright, hop: hopNow });
-        if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs, petSize: (BREEDS[p.pet] || BREEDS[1]).size });
+        if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs, petSize: (BREEDS[p.pet] || BREEDS[1]).size, coat: raining });
         // 내 친구 이름 (내 화면에만)
         if (p.me && p.petName) {
           const sz = (BREEDS[p.pet] || BREEDS[1]).size;
