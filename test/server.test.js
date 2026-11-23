@@ -272,6 +272,22 @@ test('소셜 로그인: 키가 없으면 버튼도 없고, 시작 주소는 오�
   assert.match(r.headers.get('location'), /loginerr/);
 });
 
+test('우비 아이템: 산 사람은 방 정보에 우비 표시(8)가 붙어 다른 사람에게도 보임', async () => {
+  const visitor = 'raincoat0001';
+  const o = await post('/api/shop/order', { visitor, product: 'raincoat' });
+  await post('/api/shop/confirm', { orderId: o.body.orderId, paymentKey: 'test', amount: o.body.amount });
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'hello', visitor }));
+  a.send(JSON.stringify({ t: 'join', room: 'east', char: 'coat', color: 0, visitor }));
+  b.send(JSON.stringify({ t: 'join', room: 'east', char: 'hood', color: 1 }));
+  await wait(1500);
+  const aSeat = last(a, 'seat').seat;
+  const me = last(b, 'room').people.find((x) => x[0] === aSeat);
+  assert.ok(me && (me[2] & 8));
+  a.close();
+  b.close();
+});
+
 test('정서진 유리병 편지: 공개 문구는 그리운 이에게 보내는 말 목록', async () => {
   const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=lettertest01`)).json();
   assert.ok(info.letters.length >= 5);

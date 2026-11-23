@@ -227,7 +227,8 @@ function roomSnapshot(room, withPeople = true) {
       const c = room.seats[i];
       if (c) {
         // 지금 켜 둔 아이템 표시: 촛불 1, 후레쉬 2, 큰 캠프파이어 4
-        const flags = (c.show.candle && shop.hasItem(c.visitor, 'candle') ? 1 : 0) | (c.show.bigfire && shop.hasItem(c.visitor, 'bigfire') ? 4 : 0);
+        // 우비 8 (비·눈 오는 날 화면에서 입음)
+        const flags = (c.show.candle && shop.hasItem(c.visitor, 'candle') ? 1 : 0) | (c.show.bigfire && shop.hasItem(c.visitor, 'bigfire') ? 4 : 0) | (shop.hasItem(c.visitor, 'raincoat') ? 8 : 0);
         // 모습 코드 = 반려동물*384 + 머리색*64 + 모습*8 + 옷색
         const code = (c.pet || 0) * 384 + (c.hair || 0) * 64 + CHARS.indexOf(c.char) * 8 + c.color;
         // [좌석, 모습 코드, 아이템 표시, 걸어간 x, 걸어간 y(0~1000)]

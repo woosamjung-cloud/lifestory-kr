@@ -912,6 +912,7 @@ function setWallet(w) {
   myWallet = w;
   scene.selfItems.candle = owned('candle') && itemShow.candle;
   scene.selfItems.bigfire = owned('bigfire') && itemShow.bigfire;
+  scene.selfItems.raincoat = owned('raincoat');
   document.querySelectorAll('.item-btn[data-item]').forEach((b) => {
     const k = b.dataset.item;
     b.hidden = !owned(k);
@@ -964,7 +965,7 @@ const priceOf = (p) => (shopCurrency() === 'USD' ? p.usd : p.price);
 const listOf = (p) => (shopCurrency() === 'USD' ? p.listUsd : p.list);
 const money = (n) => (shopCurrency() === 'USD' ? usdText(n) : won(n));
 const sellable = (p) => (shopCurrency() === 'USD' ? !!p.usd : true);
-const ITEM_ORDER = ['candle', 'flash', 'fireworks', 'bigfire', 'bgsound', 'package'];
+const ITEM_ORDER = ['candle', 'flash', 'fireworks', 'bigfire', 'raincoat', 'bgsound', 'package'];
 
 function setShopView(v, pick = null) {
   shopView = v;

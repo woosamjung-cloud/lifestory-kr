@@ -22,6 +22,7 @@ export const PRODUCTS = {
   flash: { group: 'items', name: '후레쉬', price: 1000, usd: 1.49, grants: { items: ['flash'] }, icon: '🔦', desc: '손전등으로 밤바다를 은은하게 비춰요.' },
   fireworks: { group: 'items', name: '폭죽', price: 2000, usd: 1.99, grants: { items: ['fireworks'] }, icon: '🎆', desc: '하늘에 불꽃놀이! 함께 보는 모든 사람 화면에 보여요.' },
   bigfire: { group: 'items', name: '큰 캠프파이어', price: 2900, usd: 2.49, grants: { items: ['bigfire'] }, icon: '🔥', desc: '내 모닥불이 더 크고 화려한 색으로 타올라요.' },
+  raincoat: { group: 'items', name: '노란 우비 (비·눈 오는 날)', price: 1500, usd: 1.99, grants: { items: ['raincoat'] }, icon: '☔', desc: '실제로 비나 눈이 오는 날, 나와 함께 온 강아지·고양이가 노란 우비를 입어요. 모자는 귀까지 폭, 빗방울은 톡톡 튕겨요. 다른 사람에게도 보여요.' },
   bgsound: { group: 'items', name: '잠들 때까지 소리 켜두기', price: 1000, usd: 1.49, grants: { items: ['bgsound'] }, icon: '🎧', desc: '다른 창으로 옮기거나 화면을 꺼도 파도·모닥불 소리와 음악이 계속 나와요. 잠자기 타이머(30분·1시간·2시간) 포함. (PC·안드로이드)' },
   package: { group: 'items', name: '모두 담은 꾸러미', price: 4900, usd: 3.99, grants: { items: ['candle', 'flash', 'fireworks', 'bigfire'], coins: 5 }, icon: '🎁', desc: '네 가지 아이템을 한 번에 + 소원 동전 5개 덤.' },
   coins5: { group: 'coins', name: '소원 동전 5개', price: 500, grants: { coins: 5 }, icon: '🪙', desc: '가볍게 한두 번' },
@@ -30,7 +31,7 @@ export const PRODUCTS = {
   coins60: { group: 'coins', name: '소원 동전 60개', price: 5000, usd: 4.99, grants: { coins: 60 }, icon: '🪙', desc: '50개 + 덤 10개' },
   coins130: { group: 'coins', name: '소원 동전 130개', price: 10000, usd: 8.99, grants: { coins: 130 }, icon: '🪙', desc: '100개 + 덤 30개' },
 };
-export const ITEM_KEYS = ['candle', 'flash', 'fireworks', 'bigfire', 'bgsound'];
+export const ITEM_KEYS = ['candle', 'flash', 'fireworks', 'bigfire', 'bgsound', 'raincoat'];
 // 한마디 무게에 들어가는 꾸미기 아이템 (소리 켜두기는 제외)
 export const SHOW_ITEMS = ['candle', 'flash', 'fireworks', 'bigfire'];
 export const ITEM_DAYS = 30;

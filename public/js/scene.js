@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS, drawRaincoatSeated, drawRaincoatStanding, drawPetRaincoat } from './characters.js';
+import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS, drawRaincoatSeated } from './characters.js';
 import { localizeCtx } from './i18n.js';
 import { cameraFor } from './camera.js';
 import { NightSky } from './nightsky.js';
@@ -212,7 +212,7 @@ export class Scene {
     this.celebrateAt = 0;
     const rnd = seeded(7);
     this.night = new NightSky();
-    this.selfItems = { candle: false, bigfire: false }; // 내가 켜 둔 유료 아이템
+    this.selfItems = { candle: false, bigfire: false, raincoat: false }; // 내가 켜 둔 유료 아이템
     this.bursts = []; // 폭죽
     this.flashes = new Map(); // 후레쉬 흔들기
     this.wishFx = []; // 동전 소원
@@ -927,8 +927,9 @@ export class Scene {
       }
     }
 
-    // 비 오는 날(비·소나기·진눈깨비)에는 모두 우비
-    const raining = !!(wx && [1, 2, 4, 5, 6].includes(wx.pty));
+    // 비·눈 오는 날: 우비 아이템이 있는 사람과 그 강아지·고양이가 우비를 입음
+    const wet = !!(wx && wx.pty > 0);
+    const rainy = !!(wx && [1, 2, 4, 5, 6].includes(wx.pty));
     // 승객들 (먼 줄부터) - 이불 색이 탁해지지 않도록 땅보다 덜 어둡게
     const critterBright = 0.72 + 0.28 * light;
     const rim = { x: sun.x > W / 2 ? 1 : -1, color: 'rgb(255,190,120)', a: clamp(1 - Math.abs(e - 2) / 8) * 0.9 };
@@ -975,6 +976,7 @@ export class Scene {
       if (fl) this.drawFlash(ctx, sl, nowMs, fl);
       // 사람마다 고정된 박자 차이 (위치에 묶으면 왼쪽으로 걸을 때 시간이 멈춰 보임)
       if (sl.phase == null) sl.phase = Math.random() * 10000;
+      const raining = wet && (p.me ? !!this.selfItems.raincoat : !!(p.flags & 8));
       const standing = sl.walking || (p.me ? this.selfUp : p.up);
       if (standing) {
         // 걷는 중이거나 서 있는 중 (아래로 쓸면 앉음)
@@ -982,15 +984,10 @@ export class Scene {
         const face = sl.walking ? sl.face || 'back' : 'back';
         const petX = sl.x + sl.s * (face === 'left' ? -0.55 : 0.55);
         const petFirst = face === 'front';
-        const pet = () => {
-          if (!p.pet) return;
-          drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, walking: true, still, face });
-          if (raining && face !== 'left' && face !== 'right') drawPetRaincoat(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, bright: critterBright, walking: true, face });
-        };
+        const pet = () => p.pet && drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, walking: true, still, face, coat: raining });
         if (!petFirst) pet();
-        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.phase, bright: critterBright, still, face });
-        if (raining && face !== 'left' && face !== 'right') drawRaincoatStanding(ctx, { x: sl.x, y: sl.y, s: sl.s, bright: critterBright, front: face === 'front', type: p.char, t: nowMs + sl.phase, still });
-        if (raining) this.rainHits(sl, sl.y - sl.s * 1.45, nowMs);
+        drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.phase, bright: critterBright, still, face, coat: raining });
+        if (raining && rainy) this.rainHits(sl, sl.y - sl.s * 1.45, nowMs);
         if (petFirst) pet();
         continue;
       }
@@ -1013,13 +1010,12 @@ export class Scene {
       const hopNow = Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5);
       if (raining) {
         drawRaincoatSeated(ctx, { x: sl.x, y: sl.y - hopNow * sl.s * 0.25, s: sl.s, bright: critterBright });
-        this.rainHits(sl, sl.y - sl.s * 1.15, nowMs);
+        if (rainy) this.rainHits(sl, sl.y - sl.s * 1.15, nowMs);
       }
       // 함께 온 강아지·고양이 (오른쪽 옆) + 가끔 머리 쓰다듬기
       if (p.pet) {
         const pt = this.pettingAt(sl, nowMs, hopT <= 0 && !celebrating);
-        drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5), petted: pt.pet });
-        if (raining && pt.pet < 0.3) drawPetRaincoat(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, bright: critterBright, hop: hopNow });
+        drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: hopNow, petted: pt.pet, coat: raining });
         if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs, petSize: (BREEDS[p.pet] || BREEDS[1]).size, coat: raining });
         // 내 친구 이름 (내 화면에만)
         if (p.me && p.petName) {
