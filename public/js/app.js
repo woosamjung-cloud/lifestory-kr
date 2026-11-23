@@ -956,7 +956,7 @@ const priceOf = (p) => (shopCurrency() === 'USD' ? p.usd : p.price);
 const listOf = (p) => (shopCurrency() === 'USD' ? p.listUsd : p.list);
 const money = (n) => (shopCurrency() === 'USD' ? usdText(n) : won(n));
 const sellable = (p) => (shopCurrency() === 'USD' ? !!p.usd : true);
-const ITEM_ORDER = ['candle', 'flash', 'fireworks', 'bigfire', 'package'];
+const ITEM_ORDER = ['candle', 'flash', 'fireworks', 'bigfire', 'bgsound', 'package'];
 
 function setShopView(v, pick = null) {
   shopView = v;
@@ -1290,6 +1290,7 @@ document.querySelectorAll('.item-btn[data-item]').forEach((b) =>
   b.addEventListener('click', () => {
     const k = b.dataset.item;
     if (!owned(k)) return openShop(null, 'items', k);
+    if (k === 'bgsound') return openSleepMenu(b);
     if (k === 'candle' || k === 'bigfire') {
       itemShow[k] = !itemShow[k];
       store.set('show.' + k, itemShow[k]);
@@ -1481,7 +1482,7 @@ function sendHeart(who) {
 function myWeight() {
   const got = myWallet.hearts ? myWallet.hearts.received + myWallet.hearts.given * 0.5 : 0;
   let w = got >= 200 ? 4 : got >= 50 ? 3 : got >= 10 ? 2 : 1;
-  if (['candle', 'flash', 'fireworks', 'bigfire'].some((k) => owned(k))) w += 1;
+  if (['candle', 'flash', 'fireworks', 'bigfire'].some((k) => owned(k))) w += 1; // 소리 켜두기는 무게에 안 들어감
   return Math.min(5, w);
 }
 
@@ -1672,9 +1673,68 @@ $('toggle-sound').addEventListener('click', async () => {
   }
   soundButton();
 });
+// ---------- 잠들 때까지 소리 켜두기 (유료) ----------
+// 산 사람은 다른 창으로 옮기거나 화면을 꺼도 소리가 계속 (무료는 배터리를 위해 멈춤)
+let keepSound = store.get('keepSound', true);
+let sleepTimer = null;
+let sleepAt = 0;
+const keepOn = () => owned('bgsound') && keepSound;
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden && keepOn()) return;
   ambience.setHidden(document.hidden);
   music.setHidden(document.hidden);
+});
+function setSleep(min) {
+  clearTimeout(sleepTimer);
+  sleepTimer = null;
+  sleepAt = 0;
+  if (!min) return toast('⏲ 잠자기 타이머를 껐어요');
+  sleepAt = Date.now() + min * 60000;
+  sleepTimer = setTimeout(() => {
+    sleepAt = 0;
+    ambience.stop();
+    music.stop();
+    store.set('sound', false);
+    store.set('music', false);
+    soundButton();
+    musicButton();
+    toast('🌙 잘 자요. 소리를 껐어요');
+  }, min * 60000);
+  toast(`⏲ ${min >= 60 ? `${min / 60}시간` : `${min}분`} 뒤에 소리가 서서히 꺼져요`);
+}
+function openSleepMenu(anchor) {
+  const box = $('sleep-menu');
+  if (!box.hidden) return (box.hidden = true);
+  box.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'pm-title';
+  title.textContent = sleepAt ? `⏲ ${Math.ceil((sleepAt - Date.now()) / 60000)}분 뒤 꺼짐` : '🎧 잠들 때까지 소리 켜두기';
+  const keep = document.createElement('button');
+  keep.textContent = keepSound ? '✅ 창을 나가도 소리 계속 (켜짐)' : '⬜ 창을 나가도 소리 계속 (꺼짐)';
+  keep.addEventListener('click', () => {
+    keepSound = !keepSound;
+    store.set('keepSound', keepSound);
+    box.hidden = true;
+    toast(keepSound ? '🎧 다른 창으로 옮겨도 소리가 계속 나와요' : '🎧 창을 나가면 소리가 멈춰요');
+  });
+  box.append(title, keep);
+  for (const [m, label] of [[30, '⏲ 30분 뒤 끄기'], [60, '⏲ 1시간 뒤 끄기'], [120, '⏲ 2시간 뒤 끄기'], [0, '타이머 없음']]) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', () => {
+      box.hidden = true;
+      setSleep(m);
+    });
+    box.append(b);
+  }
+  box.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  box.style.left = `${Math.max(8, Math.min(innerWidth - box.offsetWidth - 8, r.right - box.offsetWidth))}px`;
+  box.style.top = `${Math.max(8, r.top - box.offsetHeight - 10)}px`;
+}
+document.addEventListener('pointerdown', (e) => {
+  const box = $('sleep-menu');
+  if (!box.hidden && !box.contains(e.target) && !e.target.closest('[data-item="bgsound"]')) box.hidden = true;
 });
 
 // ---------- 음악 (기본은 꺼짐, 시간대에 맞는 분위기) ----------

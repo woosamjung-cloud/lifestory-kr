@@ -410,6 +410,21 @@ const TEXT = {
   '내일 또 만나요 👋': 'See you tomorrow 👋',
   '좋은 밤 되세요 🌙': 'Have a good night 🌙',
 
+  // ---------- 잠들 때까지 소리 켜두기 ----------
+  '잠들 때까지 소리 켜두기': 'Sound until I fall asleep',
+  '다른 창으로 옮기거나 화면을 꺼도 파도·모닥불 소리와 음악이 계속 나와요. 잠자기 타이머(30분·1시간·2시간) 포함. (PC·안드로이드)': 'Waves, campfire and music keep playing even when you switch tabs or turn off the screen. Includes a sleep timer (30 min, 1 or 2 hours). (PC & Android)',
+  '🎧 잠들 때까지 소리 켜두기': '🎧 Sound until I fall asleep',
+  '✅ 창을 나가도 소리 계속 (켜짐)': '✅ Keep playing in background (on)',
+  '⬜ 창을 나가도 소리 계속 (꺼짐)': '⬜ Keep playing in background (off)',
+  '⏲ 30분 뒤 끄기': '⏲ Stop in 30 min',
+  '⏲ 1시간 뒤 끄기': '⏲ Stop in 1 hour',
+  '⏲ 2시간 뒤 끄기': '⏲ Stop in 2 hours',
+  '타이머 없음': 'No timer',
+  '⏲ 잠자기 타이머를 껐어요': '⏲ Sleep timer off',
+  '🌙 잘 자요. 소리를 껐어요': '🌙 Sleep well. Sound off',
+  '🎧 다른 창으로 옮겨도 소리가 계속 나와요': '🎧 Sound keeps playing in the background',
+  '🎧 창을 나가면 소리가 멈춰요': '🎧 Sound stops when you leave',
+
   // ---------- 유성우 ----------
   '사분의자리 유성우': 'Quadrantids',
   '거문고자리 유성우': 'Lyrids',
@@ -479,6 +494,9 @@ const PATTERNS = [
   [/^이불 밖은 추우니까 · (.+)$/, 'Too Cold to Leave the Blanket · $1'],
   [/^(.+)를$/, (m, x) => (tr(x) !== x ? tr(x) : m)],
   [/^✅ 로그인했어요 · (.+)$/, '✅ Logged in · $1'],
+  [/^⏲ (\d+)분 뒤 꺼짐$/, '⏲ Stops in $1 min'],
+  [/^⏲ (\d+)시간 뒤에 소리가 서서히 꺼져요$/, '⏲ Sound fades out in $1 h'],
+  [/^⏲ (\d+)분 뒤에 소리가 서서히 꺼져요$/, '⏲ Sound fades out in $1 min'],
   [/^💬 누군가 말을 건넸어요: "(.+)" · 그 사람을 눌러 답해 보세요$/, (m, w) => `💬 Someone said: "${tr(w)}" · tap them to reply`],
   [/^👤 (.+) 로 로그인됨$/, '👤 Logged in as $1'],
   [/^개당 (\$[\d.]+)$/, '$1 each'],

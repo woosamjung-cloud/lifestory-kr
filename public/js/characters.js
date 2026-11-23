@@ -1540,3 +1540,122 @@ export function drawPettingArm(ctx, o) {
   }
   ctx.restore();
 }
+
+// ---------- 우비 (비 오는 날) ----------
+const RAIN_YELLOW = '#f2c230';
+const RAIN_EDGE = '#c9971c';
+// 앉은 뒷모습 사람: 모자 달린 노란 우비 (머리·어깨·등을 덮음)
+export function drawRaincoatSeated(ctx, o) {
+  const { x, y, s, bright = 1 } = o;
+  const g = geom(x, y, s);
+  const Y = tone(RAIN_YELLOW, (bright - 1) * 0.6);
+  const D = tone(RAIN_EDGE, (bright - 1) * 0.6);
+  ctx.save();
+  // 망토: 어깨에서 엉덩이까지 넓게
+  ctx.fillStyle = Y;
+  ctx.beginPath();
+  ctx.moveTo(x - g.sw * 1.05, g.shY);
+  ctx.quadraticCurveTo(x, g.shY - s * 0.08, x + g.sw * 1.05, g.shY);
+  ctx.lineTo(x + g.bw * 1.08, y - s * 0.06);
+  ctx.quadraticCurveTo(x, y + s * 0.02, x - g.bw * 1.08, y - s * 0.06);
+  ctx.closePath();
+  ctx.fill();
+  // 등 가운데 솔기, 반짝이는 비닐 느낌
+  ctx.strokeStyle = D;
+  ctx.lineWidth = Math.max(0.8, s * 0.015);
+  ctx.beginPath();
+  ctx.moveTo(x, g.shY + s * 0.02);
+  ctx.lineTo(x, y - s * 0.08);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = Math.max(1, s * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(x - g.sw * 0.7, g.shY + s * 0.08);
+  ctx.quadraticCurveTo(x - g.bw * 0.85, y - s * 0.3, x - g.bw * 0.8, y - s * 0.12);
+  ctx.stroke();
+  // 모자
+  ctx.fillStyle = Y;
+  ctx.beginPath();
+  ctx.arc(x, g.headY, g.headR * 1.22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = D;
+  ctx.beginPath();
+  ctx.arc(x, g.headY + g.headR * 0.1, g.headR * 1.0, Math.PI * 1.15, Math.PI * 1.85);
+  ctx.stroke();
+  ctx.restore();
+}
+// 서 있는(걷는) 사람: 모자와 무릎까지 오는 우비
+export function drawRaincoatStanding(ctx, o) {
+  const { x, y, s, bright = 1, front = false } = o;
+  const shY = y - s * 1.12;
+  const hr = s * 0.17;
+  const hy = shY - s * 0.17;
+  const Y = tone(RAIN_YELLOW, (bright - 1) * 0.6);
+  const D = tone(RAIN_EDGE, (bright - 1) * 0.6);
+  ctx.save();
+  ctx.fillStyle = Y;
+  ctx.beginPath();
+  ctx.moveTo(x - s * 0.27, shY + s * 0.04);
+  ctx.quadraticCurveTo(x, shY - s * 0.06, x + s * 0.27, shY + s * 0.04);
+  ctx.lineTo(x + s * 0.33, y - s * 0.3);
+  ctx.quadraticCurveTo(x, y - s * 0.26, x - s * 0.33, y - s * 0.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = D;
+  ctx.lineWidth = Math.max(0.8, s * 0.015);
+  ctx.beginPath();
+  ctx.moveTo(x, shY + s * 0.03);
+  ctx.lineTo(x, y - s * 0.3);
+  ctx.stroke();
+  // 모자 (앞모습이면 얼굴 둘레만 감싸 얼굴이 보이게)
+  ctx.fillStyle = Y;
+  ctx.beginPath();
+  if (front) {
+    ctx.arc(x, hy, hr * 1.25, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.arc(x, hy + hr * 0.12, hr * 0.86, Math.PI * 2.05, Math.PI * 0.95, true);
+  } else ctx.arc(x, hy, hr * 1.22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+// 강아지·고양이 우비: 등을 덮는 노란 망토와 귀 구멍 난 모자
+export function drawPetRaincoat(ctx, o) {
+  const { x, y, s, kind = 1, bright = 1, hop = 0, walking = false } = o;
+  const B = breedOf(kind);
+  const k = s * 0.42 * B.size;
+  const W = B.wide || 1;
+  const Y = tone(RAIN_YELLOW, (bright - 1) * 0.6);
+  const D = tone(RAIN_EDGE, (bright - 1) * 0.6);
+  ctx.save();
+  ctx.fillStyle = Y;
+  if (walking) {
+    const by = y - k * 0.4 + k * 0.2 * (1 - (B.legs || 1));
+    ctx.beginPath();
+    ctx.ellipse(x, by - k * 0.03, k * 0.29 * W, k * 0.17, 0, Math.PI, 0);
+    ctx.lineTo(x + k * 0.29 * W, by + k * 0.04);
+    ctx.quadraticCurveTo(x, by + k * 0.1, x - k * 0.29 * W, by + k * 0.04);
+    ctx.fill();
+  } else {
+    const by = y - hop * k * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(x - k * 0.22 * W, by - k * 0.6);
+    ctx.quadraticCurveTo(x, by - k * 0.68, x + k * 0.22 * W, by - k * 0.6);
+    ctx.quadraticCurveTo(x + k * 0.4 * W, by - k * 0.3, x + k * 0.36 * W, by - k * 0.14);
+    ctx.quadraticCurveTo(x, by - k * 0.06, x - k * 0.36 * W, by - k * 0.14);
+    ctx.quadraticCurveTo(x - k * 0.4 * W, by - k * 0.3, x - k * 0.22 * W, by - k * 0.6);
+    ctx.fill();
+    ctx.strokeStyle = D;
+    ctx.lineWidth = Math.max(0.7, k * 0.02);
+    ctx.beginPath();
+    ctx.moveTo(x, by - k * 0.62);
+    ctx.lineTo(x, by - k * 0.12);
+    ctx.stroke();
+    // 모자: 머리 위쪽만 덮음
+    const hy = by - k * 0.82;
+    ctx.fillStyle = Y;
+    ctx.beginPath();
+    ctx.arc(x, hy, k * 0.29, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.quadraticCurveTo(x, hy - k * 0.02, x - k * 0.28, hy - k * 0.05);
+    ctx.fill();
+  }
+  ctx.restore();
+}

@@ -318,7 +318,7 @@ function handle(c, msg) {
     case 'use': {
       // 유료 아이템 사용: 폭죽·후레쉬는 순간 효과, 촛불·큰 캠프파이어는 켜고 끄기
       const item = msg.item;
-      if (!shop.ITEM_KEYS.includes(item) || c.seat == null) return;
+      if (!shop.SHOW_ITEMS.includes(item) || c.seat == null) return;
       if (!shop.hasItem(c.visitor, item)) {
         send(c.ws, { t: 'need', item });
         return;

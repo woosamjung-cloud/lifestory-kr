@@ -2,7 +2,7 @@
 // 실제 해의 고도와 방위각에 맞춰 하늘색이 바뀌고 해가 뜨고 집니다.
 
 import { solarPosition, PLACES, HORIZON_ELEVATION } from './sun.js';
-import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS } from './characters.js';
+import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS, drawRaincoatSeated, drawRaincoatStanding, drawPetRaincoat } from './characters.js';
 import { localizeCtx } from './i18n.js';
 import { cameraFor } from './camera.js';
 import { NightSky } from './nightsky.js';
@@ -927,6 +927,8 @@ export class Scene {
       }
     }
 
+    // 비 오는 날(비·소나기·진눈깨비)에는 모두 우비
+    const raining = !!(wx && [1, 2, 4, 5, 6].includes(wx.pty));
     // 승객들 (먼 줄부터) - 이불 색이 탁해지지 않도록 땅보다 덜 어둡게
     const critterBright = 0.72 + 0.28 * light;
     const rim = { x: sun.x > W / 2 ? 1 : -1, color: 'rgb(255,190,120)', a: clamp(1 - Math.abs(e - 2) / 8) * 0.9 };
@@ -980,9 +982,15 @@ export class Scene {
         const face = sl.walking ? sl.face || 'back' : 'back';
         const petX = sl.x + sl.s * (face === 'left' ? -0.55 : 0.55);
         const petFirst = face === 'front';
-        const pet = () => p.pet && drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, walking: true, still, face });
+        const pet = () => {
+          if (!p.pet) return;
+          drawPet(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, walking: true, still, face });
+          if (raining && face !== 'left' && face !== 'right') drawPetRaincoat(ctx, { x: petX, y: sl.y, s: sl.s, kind: p.pet, bright: critterBright, walking: true });
+        };
         if (!petFirst) pet();
         drawWalker(ctx, { x: sl.x, y: sl.y, s: sl.s, type: p.char, color: p.color, hair: p.hair ?? null, t: nowMs + sl.phase, bright: critterBright, still, face });
+        if (raining && face !== 'left' && face !== 'right') drawRaincoatStanding(ctx, { x: sl.x, y: sl.y, s: sl.s, bright: critterBright, front: face === 'front' });
+        if (raining) this.rainHits(sl, sl.y - sl.s * 1.45, nowMs);
         if (petFirst) pet();
         continue;
       }
@@ -1001,10 +1009,16 @@ export class Scene {
         bright: critterBright,
         hair: p.hair ?? null,
       });
+      const hopNow = Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5);
+      if (raining) {
+        drawRaincoatSeated(ctx, { x: sl.x, y: sl.y - hopNow * sl.s * 0.25, s: sl.s, bright: critterBright });
+        this.rainHits(sl, sl.y - sl.s * 1.15, nowMs);
+      }
       // 함께 온 강아지·고양이 (오른쪽 옆) + 가끔 머리 쓰다듬기
       if (p.pet) {
         const pt = this.pettingAt(sl, nowMs, hopT <= 0 && !celebrating);
         drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5), petted: pt.pet });
+        if (raining && pt.pet < 0.3) drawPetRaincoat(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, bright: critterBright, hop: hopNow });
         if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs, petSize: (BREEDS[p.pet] || BREEDS[1]).size });
         // 내 친구 이름 (내 화면에만)
         if (p.me && p.petName) {
@@ -1058,6 +1072,7 @@ export class Scene {
 
     // 장작·물수제비·하트
     this.drawThrows(ctx, nowMs);
+    this.drawSplashes(ctx, nowMs);
     this.drawReach(ctx, nowMs);
     this.drawBubbles(ctx, nowMs);
     this.drawSitHint(ctx, nowMs);
@@ -1720,6 +1735,35 @@ export class Scene {
         ctx.stroke();
       }
     }
+    ctx.restore();
+  }
+
+  // 우비 위로 빗방울이 톡 튕겨 나감 (사람마다 가끔, 머리·어깨 위)
+  rainHits(sl, topY, now) {
+    if (!this.splashes) this.splashes = [];
+    if (this.splashes.length < 160 && Math.random() < 0.06) {
+      const x = sl.x + (Math.random() - 0.5) * sl.s * 0.5;
+      for (let j = 0; j < 3; j++) {
+        this.splashes.push({ x, y: topY + Math.random() * sl.s * 0.15, vx: (Math.random() - 0.5) * sl.s * 1.6, vy: -(sl.s * (0.8 + Math.random() * 0.8)), t0: now, s: sl.s });
+      }
+    }
+  }
+
+  drawSplashes(ctx, now) {
+    if (!this.splashes || !this.splashes.length) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(210,230,255,0.85)';
+    this.splashes = this.splashes.filter((d) => {
+      const a = (now - d.t0) / 1000;
+      if (a > 0.45) return false;
+      const x = d.x + d.vx * a;
+      const y = d.y + d.vy * a + 0.5 * d.s * 9 * a * a;
+      ctx.globalAlpha = 1 - a / 0.45;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(0.8, d.s * 0.018), 0, Math.PI * 2);
+      ctx.fill();
+      return true;
+    });
     ctx.restore();
   }
 
