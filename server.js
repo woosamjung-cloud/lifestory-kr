@@ -782,6 +782,11 @@ function route(req, res) {
 }
 
 
+// 아주 느리게 보내며 연결을 붙잡는 요청 막기 (헤더 15초, 전체 30초)
+server.headersTimeout = 15000;
+server.requestTimeout = 30000;
+server.keepAliveTimeout = 65000; // Render 앞단보다 길게 (끊김 방지)
+
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 2048 });
 
 wss.on('connection', (ws, req) => {
