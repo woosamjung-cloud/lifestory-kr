@@ -1038,7 +1038,8 @@ function renderProducts() {
       const own = k !== 'package' && owned(k);
       const b = document.createElement('button');
       b.className = 'item-card' + (shopPick === k ? ' on' : '') + (own ? ' own' : '') + (k === 'package' ? ' wide' : '');
-      b.innerHTML = `<span class="ic-ico">${p.icon}</span><span class="ic-name"></span><span class="ic-price"></span>`;
+      b.innerHTML = '<span class="ic-ico"></span><span class="ic-name"></span><span class="ic-price"></span>';
+      b.querySelector('.ic-ico').textContent = p.icon;
       b.querySelector('.ic-name').textContent = p.name;
       b.querySelector('.ic-price').textContent = own ? '✓ 사용 중' : money(priceOf(p));
       b.addEventListener('click', () => setShopView('items', shopPick === k ? null : k));
@@ -1049,7 +1050,8 @@ function renderProducts() {
       const p = P[shopPick];
       const own = shopPick !== 'package' && owned(shopPick);
       const sum = shopPick === 'package' ? p.items.reduce((t, k) => t + priceOf(P[k]), 0) : 0;
-      det.innerHTML = `<div class="id-top"><span class="id-ico">${p.icon}</span><div><div class="id-name"></div><div class="id-desc"></div></div></div><ul class="id-facts"></ul>`;
+      det.innerHTML = '<div class="id-top"><span class="id-ico"></span><div><div class="id-name"></div><div class="id-desc"></div></div></div><ul class="id-facts"></ul>';
+      det.querySelector('.id-ico').textContent = p.icon;
       det.querySelector('.id-name').textContent = p.name;
       det.querySelector('.id-desc').textContent = p.desc;
       const facts = [`${shopInfo.itemDays || 30}일 동안 사용 · 다시 사면 기간이 늘어나요`];

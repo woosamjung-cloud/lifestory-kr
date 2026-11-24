@@ -288,6 +288,31 @@ test('우비 아이템: 산 사람은 방 정보에 우비 표시(8)가 붙어 �
   b.close();
 });
 
+test('보안: 깨진 주소에도 서버가 살아 있고, 보안 헤더가 붙고, 폴더 밖 파일은 못 읽음', async () => {
+  const bad = await fetch(`http://localhost:${PORT}/%E0%A4%A`);
+  assert.equal(bad.status, 400);
+  const ok = await fetch(`http://localhost:${PORT}/healthz`);
+  assert.equal(ok.status, 200);
+  const home = await fetch(`http://localhost:${PORT}/`);
+  assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(home.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  const trav = await fetch(`http://localhost:${PORT}/..%2f..%2fpackage.json`);
+  assert.ok([403, 404].includes(trav.status));
+  const trav2 = await fetch(`http://localhost:${PORT}/%2e%2e/server.js`);
+  assert.ok([403, 404].includes(trav2.status));
+});
+
+test('보안: 메시지를 폭탄처럼 보내는 연결은 끊김', async () => {
+  const a = await client();
+  let closed = false;
+  a.on('close', () => (closed = true));
+  for (let s = 0; s < 5 && !closed; s++) {
+    for (let i = 0; i < 60; i++) a.send(JSON.stringify({ t: 'stat', k: 'x' }));
+    await wait(1050);
+  }
+  assert.ok(closed);
+});
+
 test('정서진 유리병 편지: 공개 문구는 그리운 이에게 보내는 말 목록', async () => {
   const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=lettertest01`)).json();
   assert.ok(info.letters.length >= 5);

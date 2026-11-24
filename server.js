@@ -535,7 +535,10 @@ function readJson(req) {
     let data = '';
     req.on('data', (ch) => {
       data += ch;
-      if (data.length > 4096) req.destroy();
+      if (data.length > 4096) {
+        req.destroy();
+        resolve({});
+      }
     });
     req.on('end', () => {
       try {
@@ -557,9 +560,11 @@ setInterval(() => postHits.clear(), 60000).unref();
 // 메일 링크에 넣을 사이트 주소 (도메인을 연결하면 PUBLIC_URL 환경변수로 고정)
 function publicOrigin(req) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
-  const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
-  return `${proto === 'https' ? 'https' : 'http'}://${host.replace(/[^a-z0-9.:-]/gi, '')}`;
+  // Host는 Render가 이 서비스로 보낸 주소라 믿을 수 있음 (x-forwarded-host는 누구나 넣을 수 있어 쓰지 않음)
+  const host = String(req.headers.host || 'localhost').split(',')[0].trim().toLowerCase();
+  const safe = /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) ? host : 'localhost';
+  const proto = String(req.headers['x-forwarded-proto'] || '').startsWith('https') || safe.endsWith('.onrender.com') ? 'https' : 'http';
+  return `${proto}://${safe}`;
 }
 
 async function handleShop(req, res, url) {
@@ -587,7 +592,32 @@ async function handleShop(req, res, url) {
   return json(res, r.error ? 400 : 200, r);
 }
 
+// 보안 헤더: 다른 사이트에 끼워 넣기·내용 추측·주소 새기 막기, 불러올 수 있는 곳을 정해 둠
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://js.tosspayments.com https://www.paypal.com https://*.paypal.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+  "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' blob:",
+  "connect-src 'self' ws: wss: https://*.paypal.com https://*.tosspayments.com",
+  "frame-src https://*.paypal.com https://*.tosspayments.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join('; ');
+function securityHeaders(req, res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), accelerometer=(self), gyroscope=(self)');
+  res.setHeader('Content-Security-Policy', CSP);
+  if (String(req.headers['x-forwarded-proto'] || '').startsWith('https')) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+}
+
 const server = http.createServer((req, res) => {
+  securityHeaders(req, res);
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname.startsWith('/api/shop')) {
     handleShop(req, res, url).catch(() => json(res, 500, { error: '서버 오류' }));
@@ -650,7 +680,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  let rel = decodeURIComponent(url.pathname);
+  let rel;
+  try {
+    rel = decodeURIComponent(url.pathname);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('잘못된 주소예요');
+    return;
+  }
+  if (rel.includes('\0')) {
+    res.writeHead(400);
+    res.end();
+    return;
+  }
   if (rel.endsWith('/')) rel += 'index.html';
   const filePath = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!filePath.startsWith(PUBLIC_DIR + path.sep)) {
@@ -689,7 +731,7 @@ const server = http.createServer((req, res) => {
   fs.readFile(filePath, (err, data) => {
     if (!err && filePath.endsWith('index.html')) {
       const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0];
-      const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').replace(/[^a-zA-Z0-9.:-]/g, '');
+      const host = String(req.headers.host || '').replace(/[^a-zA-Z0-9.:-]/g, '');
       if (host) data = Buffer.from(String(data).replace('content="og.png"', `content="${proto}://${host}/og.png"`));
     }
     if (err) {
@@ -743,7 +785,21 @@ wss.on('connection', (ws, req) => {
   ws.on('pong', () => {
     c.alive = true;
   });
+  let burst = 0;
+  let burstAt = Date.now();
+  let strikes = 0;
   ws.on('message', (raw) => {
+    const t = Date.now();
+    if (t - burstAt > 1000) {
+      strikes = burst > 20 ? strikes + 1 : 0;
+      burst = 0;
+      burstAt = t;
+      if (strikes >= 3) {
+        ws.close(1008, 'too many messages');
+        return;
+      }
+    }
+    if (++burst > 40) return; // 1초에 40개 넘는 건 버림
     let msg;
     try {
       msg = JSON.parse(raw);
