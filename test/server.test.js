@@ -302,6 +302,13 @@ test('보안: 깨진 주소에도 서버가 살아 있고, 보안 헤더가 붙�
   assert.ok([403, 404].includes(trav2.status));
 });
 
+test('보안: 너무 큰 요청은 413, 배열·이상한 본문은 400', async () => {
+  const big = await fetch(`http://localhost:${PORT}/api/shop/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(10000) });
+  assert.equal(big.status, 413);
+  const arr = await fetch(`http://localhost:${PORT}/api/shop/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '[1,2]' });
+  assert.equal(arr.status, 400);
+});
+
 test('보안: 메시지를 폭탄처럼 보내는 연결은 끊김', async () => {
   const a = await client();
   let closed = false;

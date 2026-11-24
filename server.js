@@ -541,13 +541,15 @@ function readJson(req) {
   return new Promise((resolve) => {
     let data = '';
     req.on('data', (ch) => {
+      if (data === null) return;
       data += ch;
       if (data.length > 4096) {
-        req.destroy();
-        resolve({});
+        data = null; // 너무 큼: 더 모으지 않고 413으로 답함
+        resolve(null);
       }
     });
     req.on('end', () => {
+      if (data === null) return;
       try {
         resolve(JSON.parse(data || '{}'));
       } catch {
@@ -587,6 +589,12 @@ async function handleShop(req, res, url) {
   if (hits > 40) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
   if (shop.shopMode() === 'off') return json(res, 403, { error: '상점이 닫혀 있어요' });
   const body = await readJson(req);
+  if (body === null) {
+    res.writeHead(413, { 'Content-Type': MIME['.json'], Connection: 'close' });
+    res.end(JSON.stringify({ error: '요청이 너무 커요' }));
+    return;
+  }
+  if (typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: '잘못된 요청이에요' });
   let r;
   if (route === '/order') r = shop.createOrder(body.visitor, body.product, body.currency === 'USD' ? 'USD' : 'KRW');
   else if (route === '/paypal/create') r = await shop.paypalCreate(body.orderId);
