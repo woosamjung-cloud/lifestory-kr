@@ -313,6 +313,18 @@ test('보안: 메시지를 폭탄처럼 보내는 연결은 끊김', async () =>
   assert.ok(closed);
 });
 
+test('안정성: 이상한 메시지를 마구 보내도 서버는 멀쩡함', async () => {
+  const a = await client();
+  const junk = ['', 'null', '[]', '123', '{"t":5}', '{"t":"join","room":{"x":1}}', '{"t":"move","x":"NaN","y":1e309}', '{"t":"heart","seat":-1}', '{"t":"whisper","seat":1e9,"i":-5}', '{"t":"say","text":{"a":1}}', '{"t":"nick","nick":["a"]}', '{"t":"ritual","i":"__proto__"}', '{"t":"use","item":"constructor"}', '{"__proto__":{"t":"x"}}', '{"t":"' + 'x'.repeat(100) + '"}'];
+  for (const j of junk) a.send(j);
+  a.send(JSON.stringify({ t: 'join', room: 'east', char: 'coat', color: 0 }));
+  await wait(600);
+  assert.ok(last(a, 'seat'));
+  const ok = await fetch(`http://localhost:${PORT}/healthz`);
+  assert.equal(ok.status, 200);
+  a.close();
+});
+
 test('정서진 유리병 편지: 공개 문구는 그리운 이에게 보내는 말 목록', async () => {
   const info = await (await fetch(`http://localhost:${PORT}/api/shop?visitor=lettertest01`)).json();
   assert.ok(info.letters.length >= 5);

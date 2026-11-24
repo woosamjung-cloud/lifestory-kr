@@ -34,8 +34,15 @@ const WITNESS_AFTER_MS = 20 * 60 * 1000; // 이벤트 20분 후까지 자리에 
 let counts = { cheers: {}, witnesses: {}, daily: {}, wood: {} };
 try {
   counts = { cheers: {}, witnesses: {}, daily: {}, wood: {}, ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) };
-} catch {
-  /* 처음 실행이면 파일이 없습니다 */
+} catch (err) {
+  // 처음 실행이면 파일이 없음. 깨져 있으면 옆에 보관
+  if (err.code !== 'ENOENT') {
+    try {
+      fs.copyFileSync(DATA_FILE, `${DATA_FILE}.broken-${Date.now()}`);
+    } catch {
+      /* 보관 실패 */
+    }
+  }
 }
 const witnessSets = new Map(); // eventKey -> Set(visitorId)
 let countsDirty = false;
@@ -617,8 +624,25 @@ function securityHeaders(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  try {
+    route(req, res);
+  } catch (err) {
+    console.error('요청 처리 오류:', err && err.message);
+    if (!res.headersSent) res.writeHead(500);
+    res.end();
+  }
+});
+
+function route(req, res) {
   securityHeaders(req, res);
-  const url = new URL(req.url, 'http://localhost');
+  let url;
+  try {
+    url = new URL(req.url, 'http://localhost');
+  } catch {
+    res.writeHead(400);
+    res.end();
+    return;
+  }
   if (url.pathname.startsWith('/api/shop')) {
     handleShop(req, res, url).catch(() => json(res, 500, { error: '서버 오류' }));
     return;
@@ -747,7 +771,8 @@ const server = http.createServer((req, res) => {
     });
     res.end(data);
   });
-});
+}
+
 
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 2048 });
 
@@ -806,7 +831,12 @@ wss.on('connection', (ws, req) => {
     } catch {
       return;
     }
-    if (msg && typeof msg.t === 'string') handle(c, msg);
+    if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string' || msg.t.length > 20) return;
+    try {
+      handle(c, msg);
+    } catch (err) {
+      console.error('메시지 처리 오류:', msg.t, err && err.message);
+    }
   });
   ws.on('close', () => {
     leaveRoom(c);
@@ -816,6 +846,15 @@ wss.on('connection', (ws, req) => {
     else perIp.set(ip, n);
   });
 });
+
+// 한마디 나눈 짝 기록은 30분 지나면 지움 (오래 켜 둬도 쌓이지 않게)
+setInterval(() => {
+  const now = Date.now();
+  for (const room of Object.values(rooms)) {
+    if (!room.talks) continue;
+    for (const [k, t] of room.talks) if (now - t > TALK_MS) room.talks.delete(k);
+  }
+}, 5 * 60 * 1000).unref();
 
 // 응답 없는 연결 정리
 setInterval(() => {
@@ -835,6 +874,18 @@ function shutdown() {
   shop.saveShop(true);
   process.exit(0);
 }
+process.on('unhandledRejection', (err) => console.error('처리되지 않은 오류:', err && err.message));
+process.on('uncaughtException', (err) => {
+  console.error('예상 못 한 오류, 저장 후 재시작:', err && err.stack);
+  try {
+    countsDirty = true;
+    saveCounts();
+    shop.saveShop(true);
+  } catch {
+    /* 저장 실패 */
+  }
+  process.exit(1);
+});
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 

@@ -105,12 +105,35 @@ let dirty = false;
 
 export function initShop(dataDir) {
   file = path.join(dataDir, 'shop.json');
+  let raw = null;
   try {
-    db = { accounts: {}, orders: {}, codes: {}, users: {}, tokens: {}, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+    raw = fs.readFileSync(file, 'utf8');
   } catch {
     /* 처음 실행 */
   }
+  if (raw != null) {
+    try {
+      db = { accounts: {}, orders: {}, codes: {}, users: {}, tokens: {}, ...JSON.parse(raw) };
+    } catch {
+      // 깨진 파일은 지우지 않고 옆에 보관한 뒤 새로 시작 (나중에 손으로 살릴 수 있게)
+      const keep = `${file}.broken-${Date.now()}`;
+      try {
+        fs.copyFileSync(file, keep);
+      } catch {
+        /* 보관 실패 */
+      }
+      console.error('상점 파일이 깨져 있어 보관했어요:', keep);
+    }
+  }
   setInterval(saveShop, 5000).unref();
+  // 오래된 것 정리: 15분 지난 로그인 링크, 하루 지난 미결제 주문
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of Object.entries(db.tokens)) if (v.exp < now) delete db.tokens[k];
+    for (const [k, o] of Object.entries(db.orders)) if (o.status === 'ready' && now - o.created > 86400000) delete db.orders[k];
+    for (const [k, t] of lastMail) if (now - t > 60000) lastMail.delete(k);
+    dirty = true;
+  }, 10 * 60 * 1000).unref();
 }
 
 export function saveShop(force = false) {
