@@ -13,7 +13,7 @@ import {
 import { Scene, FUEL_SECONDS } from './scene.js';
 import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait, renderPetPortrait } from './characters.js';
 import { Net } from './net.js';
-import { makeTicket, makeProofCard, saveOrShare, downloadCanvas, shareImage } from './cards.js';
+import { makeTicket, makeProofCard, downloadCanvas, shareImage } from './cards.js';
 import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
 import { t, tOr, getLang, setLang, applyI18n, startAutoTranslate, LANGS, L } from './i18n.js';
 import { COUNTRIES, DESTINATIONS } from './countries.js';
@@ -798,14 +798,6 @@ const shareText = () => {
   const what = ev && PLACES[ev.place].kind === 'sunset' ? '노을' : '해돋이';
   return `이불 밖은 추우니까, 방에서 오늘의 ${what}를 함께 봤어요 🌅`;
 };
-async function copyLink() {
-  try {
-    await navigator.clipboard.writeText(`${shareText()} ${shareUrl()}`);
-    return true;
-  } catch {
-    return false;
-  }
-}
 $('card-save').addEventListener('click', async () => {
   if (!cardCanvas) return;
   net.stat('save');

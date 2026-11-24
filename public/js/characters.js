@@ -166,22 +166,6 @@ function grain(ctx, x0, y0, w, h, seed) {
   ctx.restore();
 }
 
-function drawSteam(ctx, x, y, s, t, phase, alpha = 0.4, rgb = '255,255,255') {
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(0.8, s * 0.022);
-  for (let i = 0; i < 2; i++) {
-    const p = (((t / 2600 + phase + i * 0.5) % 1) + 1) % 1;
-    ctx.strokeStyle = `rgba(${rgb},${alpha * (1 - p) * Math.min(1, p * 4)})`;
-    const bx = x + i * s * 0.05;
-    const by = y - p * s * 0.3;
-    ctx.beginPath();
-    ctx.moveTo(bx, by);
-    ctx.bezierCurveTo(bx - s * 0.04, by - s * 0.05, bx + s * 0.04, by - s * 0.09, bx, by - s * 0.14);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
 
 /**
  * 사람 뒷모습 그리기 (몸통만, 움직이는 부분 제외)
@@ -360,7 +344,7 @@ function getSprite(type, color, s, dpr, bright = 1, lightX = -1, hair = null) {
  * 장면용: 캐시한 몸통 + 실시간 움직임(숨쉬기, 만세, 역광, 음료 김)
  */
 export function drawCritterFast(ctx, o) {
-  const { x, s, type = 'blanket', color = 0, arms = 0, hop = 0, rim, t = 0, steam = false, dpr = 1, bright = 1, hair = null } = o;
+  const { x, s, type = 'blanket', color = 0, arms = 0, hop = 0, rim, t = 0, dpr = 1, bright = 1, hair = null } = o;
   const base = o.coat ? RAIN_YELLOW : BLANKETS[color % BLANKETS.length][0];
   const phase = (Math.abs(x * 7 + color * 13) % 100) / 100;
   const breathe = Math.sin(t / 1300 + phase * 6.28);
@@ -577,6 +561,40 @@ export const BREEDS = [
 export const PET_COUNT = BREEDS.length;
 export const PETS = [['없음', ''], ...BREEDS.slice(1).map((b) => [b.name, b.dog ? '🐶' : '🐱'])];
 const breedOf = (kind) => BREEDS[kind] || BREEDS[1];
+
+// ---------- 밝기 낮추기 (ctx.filter는 매우 느려서 색 자체를 어둡게) ----------
+function dimHex(c, a) {
+  if (typeof c !== 'string' || a >= 0.999) return c;
+  let m = /^#([0-9a-f]{6})$/i.exec(c);
+  if (m) {
+    const n = parseInt(m[1], 16);
+    const f = (v) => Math.round(v * a);
+    return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+  }
+  m = /^#([0-9a-f]{3})$/i.exec(c);
+  if (m) return dimHex('#' + [...m[1]].map((h) => h + h).join(''), a);
+  m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(c);
+  if (m) {
+    const f = (v) => Math.round(Number(v) * a);
+    return m[4] != null ? `rgba(${f(m[1])},${f(m[2])},${f(m[3])},${m[4]})` : `rgb(${f(m[1])},${f(m[2])},${f(m[3])})`;
+  }
+  return c;
+}
+// 이 그림을 그리는 동안만 fillStyle/strokeStyle에 넣는 색을 어둡게 (ctx.restore 때 원래대로)
+const FILL = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'fillStyle');
+const STROKE = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'strokeStyle');
+function dimStyles(ctx, a) {
+  if (Object.prototype.hasOwnProperty.call(ctx, 'fillStyle')) return;
+  Object.defineProperty(ctx, 'fillStyle', { configurable: true, get: () => FILL.get.call(ctx), set: (v) => FILL.set.call(ctx, dimHex(v, a)) });
+  Object.defineProperty(ctx, 'strokeStyle', { configurable: true, get: () => STROKE.get.call(ctx), set: (v) => STROKE.set.call(ctx, dimHex(v, a)) });
+  const restore = ctx.restore;
+  ctx.restore = function () {
+    delete ctx.fillStyle;
+    delete ctx.strokeStyle;
+    delete ctx.restore;
+    restore.call(ctx);
+  };
+}
 function shadeHex(c, a) {
   const n = parseInt(c.slice(1), 16);
   const f = (v) => Math.min(255, Math.round(v * a));
@@ -652,10 +670,48 @@ function curlPlume(ctx, x, y, k, rot, F, D) {
   ctx.restore();
 }
 
+// 가만히 앉아 있을 때(꼬리·고개·점프·쓰다듬기 없음)는 그려 둔 그림을 다시 씀 (150마리도 가볍게)
+const petCache = new Map();
+function petStill(o) {
+  if (o.hop > 0.001 || o.petted > 0.001) return false;
+  const B = breedOf(o.kind);
+  const seed = Math.round(Math.abs(o.x)) % 997;
+  const t = o.t || 0;
+  const wag = B.dog ? episode(t, seed, 6000, 1100, 0.3) : episode(t, seed, 9000, 1600, 0.35);
+  const tilt = episode(t, seed + 41, B.dog ? 5600 : 7400, B.dog ? 1300 : 1700, 0.35);
+  return wag === 0 && tilt === 0;
+}
+
 export function drawPet(ctx, o) {
   const { x, y, s, kind = 1, t = 0, bright = 1, hop = 0, walking = false, petted = 0 } = o;
   if (!kind) return;
   if (walking) return drawPetWalk(ctx, o);
+  if (!o.noCache && petStill(o)) {
+    const dpr = Math.min(3, ctx.getTransform().a || 1);
+    const sz = Math.max(4, Math.round(s * 2) / 2);
+    const key = `${kind}|${sz}|${Math.round(bright * 20)}|${o.coat ? 1 : 0}|${dpr}`;
+    let c = petCache.get(key);
+    if (!c) {
+      const k = sz * 0.42 * breedOf(kind).size;
+      const w = Math.ceil(k * 1.6);
+      const h = Math.ceil(k * 1.5);
+      c = document.createElement('canvas');
+      c.width = Math.ceil(w * dpr);
+      c.height = Math.ceil(h * dpr);
+      const g = c.getContext('2d');
+      g.scale(dpr, dpr);
+      // 꼬리·고개가 멈춘 시각(t=0이 아닌, 이 자리의 정지 상태)으로 그림
+      drawPet(g, { ...o, x: w / 2, y: h - k * 0.12, s: sz, noCache: true, frozen: true, bright: Math.round(bright * 20) / 20 });
+      c.ox = w / 2;
+      c.oy = h - k * 0.12;
+      c.w = w;
+      c.h = h;
+      if (petCache.size > 600) petCache.clear();
+      petCache.set(key, c);
+    }
+    ctx.drawImage(c, x - c.ox, y - c.oy, c.w, c.h);
+    return;
+  }
   const B = breedOf(kind);
   const dog = B.dog;
   const k = s * 0.42 * B.size; // 사람의 절반쯤 크기 (품종마다 다름)
@@ -689,7 +745,7 @@ export function drawPet(ctx, o) {
     }
   }
   // 쓰다듬어 주면 꼬리를 살랑살랑 (평소엔 가끔)
-  const wag = petted > 0.02 ? Math.sin(t / (dog ? 150 : 220)) * Math.min(1, petted * 1.4) : dog ? episode(t, seed, 6000, 1100, 0.3) : episode(t, seed, 9000, 1600, 0.35);
+  const wag = o.frozen ? 0 : petted > 0.02 ? Math.sin(t / (dog ? 150 : 220)) * Math.min(1, petted * 1.4) : dog ? episode(t, seed, 6000, 1100, 0.3) : episode(t, seed, 9000, 1600, 0.35);
   // 풍성한 털 (몸 뒤에서, 우비 입으면 우비 속에)
   if (B.fluff && !o.coat) {
     ctx.fillStyle = F;
@@ -791,7 +847,7 @@ export function drawPet(ctx, o) {
   const hy = by - k * 0.82;
   const hr = k * 0.26;
   const look = Math.min(1, petted * 1.5);
-  const tilt = (dog ? 0.28 : 0.22) * episode(t, seed + 41, dog ? 5600 : 7400, dog ? 1300 : 1700, 0.35) * (1 - look) - 0.38 * look;
+  const tilt = o.frozen ? 0 : (dog ? 0.28 : 0.22) * episode(t, seed + 41, dog ? 5600 : 7400, dog ? 1300 : 1700, 0.35) * (1 - look) - 0.38 * look;
   ctx.save();
   ctx.translate(x, hy + k * 0.2);
   ctx.rotate(tilt);
@@ -1282,7 +1338,7 @@ function drawWalkerBackOrFront(ctx, o, front) {
   const bob = Math.abs(Math.sin(ph)) * s * 0.03;
   const lean = dir * 0.06;
   ctx.save();
-  if (bright < 0.999) ctx.filter = `brightness(${bright.toFixed(2)})`;
+  if (bright < 0.999) dimStyles(ctx, bright); // 느린 필터 대신 색을 직접 어둡게 (ctx.restore로 원래대로)
   // 그림자
   ctx.fillStyle = 'rgba(30,18,12,0.18)';
   ctx.beginPath();
@@ -1317,8 +1373,8 @@ function drawWalkerBackOrFront(ctx, o, front) {
   const kind = { blanket: 'long', scarf: 'bob', coat: 'bun', beanie: 'short', hood: 'short' }[type] || 'short';
   if (front && type !== 'hood') hair(ctx, kind, x, gm, s, hairColor);
   const g = ctx.createLinearGradient(x - s * 0.3, shY, x + s * 0.3, hemY);
-  g.addColorStop(0, base);
-  g.addColorStop(1, `color-mix(in srgb, ${base} 80%, black)`);
+  g.addColorStop(0, dimHex(base, bright));
+  g.addColorStop(1, dimHex(base, bright * 0.8));
   ctx.fillStyle = g;
   const sw = s * (type === 'blanket' ? 0.3 : 0.24);
   const hw = s * (type === 'blanket' ? 0.34 : 0.26);
@@ -1445,7 +1501,7 @@ function drawWalkerSide(ctx, o) {
   const ph = t / 130;
   const bob = Math.abs(Math.sin(ph)) * s * 0.03;
   ctx.save();
-  if (bright < 0.999) ctx.filter = `brightness(${bright.toFixed(2)})`;
+  if (bright < 0.999) dimStyles(ctx, bright); // 느린 필터 대신 색을 직접 어둡게 (ctx.restore로 원래대로)
   ctx.fillStyle = 'rgba(30,18,12,0.18)';
   ctx.beginPath();
   ctx.ellipse(X, y + s * 0.01, s * 0.26, s * 0.045, 0, 0, Math.PI * 2);
@@ -1492,7 +1548,7 @@ function drawWalkerSide(ctx, o) {
     ctx.stroke();
   }
   // 팔
-  ctx.strokeStyle = `color-mix(in srgb, ${base} 85%, black)`;
+  ctx.strokeStyle = dimHex(base, 0.85);
   ctx.lineWidth = s * 0.08;
   const asw = Math.sin(ph) * s * 0.12;
   ctx.beginPath();
@@ -1668,150 +1724,6 @@ export function drawRaincoatSeated(ctx, o) {
   ctx.stroke();
   ctx.restore();
 }
-// 서 있는(걷는) 사람: 모자와 무릎까지 오는 우비
-export function drawRaincoatStanding(ctx, o) {
-  const { x, y, s, bright = 1, front = false, type = 'blanket', still = false } = o;
-  const t = still ? 0 : o.t || 0;
-  const ph = t / 150;
-  const bob = Math.abs(Math.sin(ph)) * s * 0.03;
-  const shY = y - s * 1.12 - bob;
-  const sw = s * (type === 'blanket' ? 0.3 : 0.24);
-  const hr = s * 0.17;
-  const hy = shY - s * 0.17;
-  const Y = tone(RAIN_YELLOW, (bright - 1) * 0.6);
-  const D = tone(RAIN_EDGE, (bright - 1) * 0.6);
-  ctx.save();
-  ctx.fillStyle = Y;
-  ctx.beginPath();
-  ctx.moveTo(x - s * 0.27, shY + s * 0.04);
-  ctx.quadraticCurveTo(x, shY - s * 0.06, x + s * 0.27, shY + s * 0.04);
-  ctx.lineTo(x + s * 0.33, y - s * 0.3);
-  ctx.quadraticCurveTo(x, y - s * 0.26, x - s * 0.33, y - s * 0.3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = D;
-  ctx.lineWidth = Math.max(0.8, s * 0.015);
-  ctx.beginPath();
-  ctx.moveTo(x, shY + s * 0.03);
-  ctx.lineTo(x, y - s * 0.3);
-  ctx.stroke();
-  // 소매: 걸을 때 흔드는 팔을 그대로 덮음
-  ctx.strokeStyle = Y;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = s * 0.115;
-  for (const [sg, off] of [[-1, Math.PI], [1, 0]]) {
-    const sw2 = Math.sin(ph + off) * s * 0.07;
-    ctx.beginPath();
-    ctx.moveTo(x + sg * sw * 0.95, shY + s * 0.1);
-    ctx.lineTo(x + sg * sw * 1.05 + sw2 * 0.4, shY + s * 0.45);
-    ctx.stroke();
-  }
-  // 모자 (앞모습이면 얼굴 둘레만 감싸 얼굴이 보이게)
-  ctx.fillStyle = Y;
-  ctx.beginPath();
-  if (front) {
-    // 앞모습: 머리 둘레를 어깨까지 감싸고 얼굴 자리만 동그랗게 비움
-    ctx.arc(x, hy, hr * 1.26, Math.PI, 0);
-    ctx.lineTo(x + hr * 1.32, shY + s * 0.05);
-    ctx.quadraticCurveTo(x, shY + s * 0.12, x - hr * 1.32, shY + s * 0.05);
-    ctx.closePath();
-    ctx.ellipse(x, hy + hr * 0.12, hr * 0.84, hr * 0.82, 0, 0, Math.PI * 2);
-    ctx.fill('evenodd');
-    ctx.strokeStyle = D;
-    ctx.lineWidth = Math.max(0.8, s * 0.012);
-    ctx.beginPath();
-    ctx.ellipse(x, hy + hr * 0.12, hr * 0.86, hr * 0.84, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    return;
-  } else {
-    // 뒷모습: 머리 전체를 감싸고 목까지
-    ctx.arc(x, hy, hr * 1.24, Math.PI, 0);
-    ctx.lineTo(x + hr * 1.3, shY + s * 0.04);
-    ctx.quadraticCurveTo(x, shY + s * 0.1, x - hr * 1.3, shY + s * 0.04);
-    ctx.closePath();
-  }
-  ctx.fill();
-  ctx.restore();
-}
-// 강아지·고양이 우비: 등을 덮는 노란 망토와 귀 구멍 난 모자
-export function drawPetRaincoat(ctx, o) {
-  const { x, y, s, kind = 1, bright = 1, hop = 0, walking = false } = o;
-  const B = breedOf(kind);
-  const k = s * 0.42 * B.size;
-  const W = B.wide || 1;
-  const Y = tone(RAIN_YELLOW, (bright - 1) * 0.6);
-  const D = tone(RAIN_EDGE, (bright - 1) * 0.6);
-  ctx.save();
-  ctx.fillStyle = Y;
-  if (walking) {
-    const by = y - k * 0.4 + k * 0.2 * (1 - (B.legs || 1));
-    if (o.face === 'front') {
-      // 앞모습: 망토는 턱 아래부터 (얼굴을 가리지 않게)
-      const chin = y - k * 0.7 + k * 0.2 * (1 - (B.legs || 1)) + k * 0.22 * 0.98;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x - k, chin, k * 2, k);
-      ctx.clip();
-    }
-    ctx.beginPath();
-    ctx.ellipse(x, by - k * 0.03, k * 0.29 * W, k * 0.17, 0, Math.PI, 0);
-    ctx.lineTo(x + k * 0.29 * W, by + k * 0.04);
-    ctx.quadraticCurveTo(x, by + k * 0.1, x - k * 0.29 * W, by + k * 0.04);
-    ctx.fill();
-    if (o.face === 'front') ctx.restore();
-    // 귀까지 덮는 모자 (앞모습이면 얼굴은 보이게 위쪽만)
-    const hy = y - k * 0.7 + k * 0.2 * (1 - (B.legs || 1));
-    const hr = k * 0.22;
-    ctx.save();
-    ctx.fillStyle = Y;
-    petEars(ctx, B, x, hy, hr * 1.05, 0, Y, Y, null);
-    ctx.fillStyle = Y;
-    ctx.beginPath();
-    ctx.arc(x, hy, hr * 1.12, 0, Math.PI * 2);
-    if (o.face === 'front') {
-      // 앞모습: 얼굴 자리는 비워서 눈·코·입이 모자 앞으로 보이게
-      ctx.ellipse(x, hy + hr * 0.18, hr * 0.84, hr * 0.8, 0, 0, Math.PI * 2);
-      ctx.fill('evenodd');
-      ctx.strokeStyle = D;
-      ctx.lineWidth = Math.max(0.7, k * 0.02);
-      ctx.beginPath();
-      ctx.ellipse(x, hy + hr * 0.18, hr * 0.86, hr * 0.82, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    } else ctx.fill();
-    ctx.restore();
-  } else {
-    const by = y - hop * k * 0.55;
-    ctx.beginPath();
-    ctx.moveTo(x - k * 0.22 * W, by - k * 0.6);
-    ctx.quadraticCurveTo(x, by - k * 0.68, x + k * 0.22 * W, by - k * 0.6);
-    ctx.quadraticCurveTo(x + k * 0.4 * W, by - k * 0.3, x + k * 0.36 * W, by - k * 0.14);
-    ctx.quadraticCurveTo(x, by - k * 0.06, x - k * 0.36 * W, by - k * 0.14);
-    ctx.quadraticCurveTo(x - k * 0.4 * W, by - k * 0.3, x - k * 0.22 * W, by - k * 0.6);
-    ctx.fill();
-    ctx.strokeStyle = D;
-    ctx.lineWidth = Math.max(0.7, k * 0.02);
-    ctx.beginPath();
-    ctx.moveTo(x, by - k * 0.62);
-    ctx.lineTo(x, by - k * 0.12);
-    ctx.stroke();
-    // 모자: 머리 전체와 귀까지 덮음 (뒷모습)
-    const hy = by - k * 0.82;
-    const hr = k * 0.26;
-    ctx.fillStyle = Y;
-    ctx.beginPath();
-    ctx.arc(x, hy, hr * 1.08, 0, Math.PI * 2);
-    ctx.fill();
-    petEars(ctx, B, x, hy, hr * 1.05, 0, Y, Y, null);
-    ctx.strokeStyle = D;
-    ctx.lineWidth = Math.max(0.7, k * 0.02);
-    ctx.beginPath();
-    ctx.arc(x, hy + hr * 0.05, hr * 0.85, Math.PI * 1.2, Math.PI * 1.8);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 // 앉은 강아지·고양이 우비 망토 (몸 바로 다음, 꼬리·머리보다 먼저 그림)
 function petCape(ctx, x, by, k, W, bright) {
   const Y = tone(RAIN_YELLOW, (bright - 1) * 0.6);

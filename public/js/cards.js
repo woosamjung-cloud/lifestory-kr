@@ -279,26 +279,6 @@ function wrap(ctx, text, maxW, font) {
 }
 
 // 저장 또는 공유
-export async function saveOrShare(canvas, filename, shareText) {
-  const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
-  const file = new File([blob], filename, { type: 'image/png' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], text: shareText });
-      return 'shared';
-    } catch (err) {
-      if (err && err.name === 'AbortError') return 'cancelled';
-    }
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  return 'downloaded';
-}
 
 // 이미지 파일로 바로 저장
 export async function downloadCanvas(canvas, filename) {

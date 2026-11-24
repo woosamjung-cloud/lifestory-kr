@@ -1001,7 +1001,6 @@ export class Scene {
         hop: Math.max(hopT > 0 ? Math.sin(hopT * Math.PI) : 0, cel * 0.5),
         rim,
         t: nowMs,
-        steam: p.me || sl.r >= 3,
         dpr: this.dpr,
         bright: critterBright,
         hair: p.hair ?? null,

@@ -5,7 +5,6 @@ import { STARS, LINES, NAMES } from './skydata.js';
 import { gmst, equToHor, moonPosition, activeShower, SPORADIC_PER_HOUR } from './sky.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
-const RAD = Math.PI / 180;
 
 // 별 색 (색지수 B-V → 색)
 function starColor(bv) {
