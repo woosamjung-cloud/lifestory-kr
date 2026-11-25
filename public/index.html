@@ -157,6 +157,24 @@
     <div class="saypick" id="saypick" hidden></div>
     <div class="person-menu" id="person-menu" hidden></div>
     <div class="person-menu" id="sleep-menu" hidden></div>
+    <!-- 1:1 수다톡 -->
+    <div class="talk-invite" id="talk-invite" hidden role="alertdialog" aria-live="polite">
+      <div class="ti-text"></div>
+      <div class="ti-row"><button class="btn ti-no">다음에</button><button class="btn primary ti-yes">수락</button></div>
+    </div>
+    <section class="talk" id="talk" hidden aria-label="수다톡">
+      <header class="tk-head">
+        <span id="talk-who">🗨️ 수다톡</span>
+        <button type="button" id="talk-report" title="신고">🚨</button>
+        <button type="button" id="talk-mini" title="접기">—</button>
+        <button type="button" id="talk-close" title="닫기">✕</button>
+      </header>
+      <div class="tk-list" id="talk-list"></div>
+      <form class="tk-form" id="talk-form" autocomplete="off">
+        <input id="talk-input" maxlength="80" placeholder="하고 싶은 말 (80자)">
+        <button class="btn primary" type="submit">보내기</button>
+      </form>
+    </section>
     <div class="itembar" id="itembar" aria-label="내 아이템">
       <button class="item-btn" data-item="candle" hidden title="촛불 켜고 끄기">🕯️</button>
       <button class="item-btn" data-item="flash" hidden title="후레쉬 흔들기">🔦</button>

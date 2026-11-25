@@ -3,7 +3,7 @@
 // - WebSocket(/ws)으로 좌석, 대기열, "와!" 함성, 풍등·유리병 편지 효과를 실시간으로 나눕니다.
 // 실행: npm install && npm start  (기본 주소 http://localhost:3000)
 
-import { cleanCustom, CUSTOM_GAP_MS } from './saycheck.js';
+import { cleanCustom, CUSTOM_GAP_MS, cleanChat } from './saycheck.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -91,6 +91,34 @@ function labelsOf(room) {
     if (l) map[i] = l;
   });
   return map;
+}
+// ---------- 1:1 수다톡 ----------
+// 건 사람이 동전 1개(상대가 수락할 때 차감), 한 번에 한 사람과만, 20분 조용하면 닫힘.
+// 대화는 서버에 저장하지 않음. 신고할 때만 최근 30줄을 reports.jsonl에 남김 (운영자 확인용)
+const TALK_IDLE_MS = 20 * 60 * 1000;
+const talkBlocks = new Map(); // visitor -> Set(차단한 visitor)
+let talkSeq = 1;
+const blocked = (a, b) => (talkBlocks.get(a.visitor) || new Set()).has(b.visitor) || (talkBlocks.get(b.visitor) || new Set()).has(a.visitor);
+function endTalk(c, reason) {
+  const s = c.talk;
+  if (!s) return;
+  for (const x of [s.a, s.b]) {
+    x.talk = null;
+    send(x.ws, { t: 'talkend', reason: x === c ? 'me' : reason });
+  }
+}
+function reportTalk(c) {
+  const s = c.talk;
+  if (!s) return;
+  const other = s.a === c ? s.b : s.a;
+  const line = { at: new Date().toISOString(), reporter: c.visitor, reporterNick: c.nick || '', target: other.visitor, targetNick: other.nick || '', lines: s.lines.slice(-30) };
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.appendFileSync(path.join(DATA_DIR, 'reports.jsonl'), JSON.stringify(line) + '\n');
+  } catch (err) {
+    console.error('신고 저장 실패:', err && err.message);
+  }
+  bump('talkreport');
 }
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink'];
@@ -248,6 +276,7 @@ function leaveRoom(c) {
 
 function joinRoom(c, roomKey) {
   if (c.room === roomKey) return;
+  endTalk(c, 'left');
   leaveRoom(c);
   const room = rooms[roomKey];
   c.room = roomKey;
@@ -482,6 +511,81 @@ function handle(c, msg) {
       bump('whisper');
       send(target.ws, { t: 'whisper', from: c.seat, i });
       send(c.ws, { t: 'whisper', from: c.seat, to, i, self: true });
+      return;
+    }
+    case 'talkask': {
+      // 수다톡 신청: 가까이 있는 사람에게, 10초에 한 번. 동전은 수락할 때 차감
+      const to = Number(msg.seat);
+      const room = rooms[c.room];
+      if (c.seat == null || !Number.isInteger(to) || to === c.seat || !room || !room.seats[to]) return;
+      if (now - (c.lastTalkAsk || 0) < 10000) return send(c.ws, { t: 'talkno', reason: 'wait' });
+      const target = room.seats[to];
+      if (target.visitor === c.visitor) return;
+      if (shop.wallet(c.visitor).coins < 1) return send(c.ws, { t: 'need', item: 'coins' });
+      if (c.talk) return send(c.ws, { t: 'talkno', reason: 'busy-me' });
+      if (target.talk || blocked(c, target)) return send(c.ws, { t: 'talkno', reason: 'busy' });
+      c.lastTalkAsk = now;
+      const id = talkSeq++;
+      target.talkInvites = target.talkInvites || new Map();
+      target.talkInvites.set(id, { from: c, at: now });
+      send(target.ws, { t: 'talkask', id, from: c.seat, nick: c.nick || '' });
+      send(c.ws, { t: 'talkwait', to });
+      return;
+    }
+    case 'talkans': {
+      const inv = c.talkInvites && c.talkInvites.get(Number(msg.id));
+      if (!inv) return;
+      c.talkInvites.delete(Number(msg.id));
+      const from = inv.from;
+      const alive = clients.has(from) && from.room === c.room && from.seat != null && now - inv.at < 60000;
+      if (msg.ok !== true || !alive) {
+        if (alive) send(from.ws, { t: 'talkno', reason: 'later' });
+        return;
+      }
+      if (c.talk || from.talk) return send(from.ws, { t: 'talkno', reason: 'busy' });
+      if (!shop.spendCoin(from.visitor)) return send(from.ws, { t: 'need', item: 'coins' });
+      send(from.ws, { t: 'wallet', wallet: shop.wallet(from.visitor) });
+      const s = { a: from, b: c, lines: [], last: now };
+      from.talk = s;
+      c.talk = s;
+      const room = rooms[c.room];
+      room.talks = room.talks || new Map();
+      room.talks.set(pairKey(c.visitor, from.visitor), now); // 수다 나눈 사이: 하트 가능
+      bump('talk');
+      send(from.ws, { t: 'talkopen', with: c.seat, nick: c.nick || '' });
+      send(c.ws, { t: 'talkopen', with: from.seat, nick: from.nick || '' });
+      return;
+    }
+    case 'talk': {
+      // 대화: 0.7초에 하나, 80자. 두 사람에게만
+      const s = c.talk;
+      if (!s) return;
+      if (now - (c.lastTalk || 0) < 700) return send(c.ws, { t: 'talkno', reason: 'fast' });
+      const r = cleanChat(msg.text);
+      if (r.error) return send(c.ws, { t: 'talkno', reason: 'text', error: r.error });
+      c.lastTalk = now;
+      s.last = now;
+      s.lines.push([c === s.a ? 'a' : 'b', r.text, now]);
+      if (s.lines.length > 60) s.lines.splice(0, s.lines.length - 60);
+      const other = s.a === c ? s.b : s.a;
+      send(c.ws, { t: 'talkmsg', text: r.text, me: true });
+      send(other.ws, { t: 'talkmsg', text: r.text, me: false });
+      return;
+    }
+    case 'talkend': {
+      endTalk(c, 'left');
+      return;
+    }
+    case 'talkreport': {
+      // 신고: 최근 대화를 남기고, 서로 다시 신청 못 하게 차단한 뒤 닫음
+      const s = c.talk;
+      if (!s) return;
+      const other = s.a === c ? s.b : s.a;
+      reportTalk(c);
+      if (!talkBlocks.has(c.visitor)) talkBlocks.set(c.visitor, new Set());
+      talkBlocks.get(c.visitor).add(other.visitor);
+      endTalk(c, 'left');
+      send(c.ws, { t: 'talkreported' });
       return;
     }
     case 'heart': {
@@ -899,6 +1003,7 @@ wss.on('connection', (ws, req) => {
     }
   });
   ws.on('close', () => {
+    endTalk(c, 'left');
     leaveRoom(c);
     clients.delete(c);
     const n = (perIp.get(ip) || 1) - 1;
@@ -906,6 +1011,15 @@ wss.on('connection', (ws, req) => {
     else perIp.set(ip, n);
   });
 });
+
+// 20분 동안 말이 없는 수다톡은 닫고, 1분 지난 신청은 지움
+setInterval(() => {
+  const now = Date.now();
+  for (const c of clients) {
+    if (c.talk && c.talk.a === c && now - c.talk.last > TALK_IDLE_MS) endTalk(c, 'idle');
+    if (c.talkInvites) for (const [id, v] of c.talkInvites) if (now - v.at > 60000) c.talkInvites.delete(id);
+  }
+}, 30 * 1000).unref();
 
 // 한마디 나눈 짝 기록은 30분 지나면 지움 (오래 켜 둬도 쌓이지 않게)
 setInterval(() => {

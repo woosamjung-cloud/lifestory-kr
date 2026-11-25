@@ -1083,10 +1083,10 @@ export class Scene {
       const w2 = pet ? ctx.measureText(sep + pet).width : 0;
       const tw = w1 + w2 + 16;
       const ly = sl.y - sl.s * 1.85;
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillStyle = 'rgba(255,255,255,0.62)';
       roundRect(ctx, sl.x - tw / 2, ly - 12, tw, 22, 11);
       ctx.fill();
-      ctx.fillStyle = '#3b2a20';
+      ctx.fillStyle = 'rgba(59,42,32,0.85)';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       const x0 = sl.x - (w1 + w2) / 2;

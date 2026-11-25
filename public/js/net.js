@@ -81,6 +81,7 @@ export class Net {
       else if (m.t === 'whisper' && this.h.onWhisper) this.h.onWhisper(m);
       else if (m.t === 'who' && this.h.onWho) this.h.onWho(m);
       else if (m.t === 'nickok' && this.h.onNickOk) this.h.onNickOk(m);
+      else if (m.t.startsWith('talk') && this.h.onTalk) this.h.onTalk(m);
       else if ((m.t === 'labels' || m.t === 'label') && this.h.onLabels) this.h.onLabels(m.map || {}, m.t === 'labels');
     };
     ws.onclose = () => {
@@ -161,6 +162,27 @@ export class Net {
     if (petName !== undefined) m.petName = petName;
     if (tag !== undefined) m.tag = tag;
     this.send(m);
+  }
+
+  // 1:1 수다톡
+  talkAsk(seat) {
+    this.send({ t: 'talkask', seat });
+  }
+
+  talkAns(id, ok) {
+    this.send({ t: 'talkans', id, ok });
+  }
+
+  talk(text) {
+    this.send({ t: 'talk', text });
+  }
+
+  talkEnd() {
+    this.send({ t: 'talkend' });
+  }
+
+  talkReport() {
+    this.send({ t: 'talkreport' });
   }
 
   whisper(seat, i) {

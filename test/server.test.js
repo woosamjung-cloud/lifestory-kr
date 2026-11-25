@@ -328,6 +328,51 @@ test('이름표: 켠 사람만 [별명, 친구 이름]이 같은 방 사람에�
   await wait(200);
 });
 
+test('수다톡: 동전 없으면 못 걸고, 수락하면 건 사람 동전 1개, 둘만 보고, 욕설은 가리고 링크는 막고, 신고하면 차단', async () => {
+  const visitor = 'talktester01';
+  const o = await post('/api/shop/order', { visitor, product: 'coins10' });
+  const paid = await post('/api/shop/confirm', { orderId: o.body.orderId, paymentKey: 'test', amount: 1000 });
+  const coins0 = paid.body.wallet.coins;
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'hello', visitor }));
+  a.send(JSON.stringify({ t: 'join', room: 'west', char: 'scarf', color: 1, visitor, nick: '별빛' }));
+  b.send(JSON.stringify({ t: 'join', room: 'west', char: 'hood', color: 2, visitor: 'talktester02', nick: '달빛' }));
+  await wait(600);
+  const sa = last(a, 'seat').seat;
+  const sb = last(b, 'seat').seat;
+  // 동전 없는 b는 못 검
+  b.send(JSON.stringify({ t: 'talkask', seat: sa }));
+  await wait(300);
+  assert.equal(last(b, 'need').item, 'coins');
+  // a가 걸면 b에게 신청, 거절하면 동전 그대로
+  a.send(JSON.stringify({ t: 'talkask', seat: sb }));
+  await wait(300);
+  const ask = last(b, 'talkask');
+  assert.equal(ask.nick, '별빛');
+  b.send(JSON.stringify({ t: 'talkans', id: ask.id, ok: true }));
+  await wait(300);
+  assert.equal(last(a, 'wallet').wallet.coins, coins0 - 1);
+  assert.equal(last(a, 'talkopen').nick, '달빛');
+  a.send(JSON.stringify({ t: 'talk', text: '시발 해 진짜 예쁘다' }));
+  await wait(800);
+  a.send(JSON.stringify({ t: 'talk', text: 'www.example.com 와봐요' }));
+  await wait(300);
+  assert.equal(last(b, 'talkmsg').text, '♡♡ 해 진짜 예쁘다');
+  assert.equal(last(a, 'talkno').reason, 'text');
+  // 신고하면 닫히고 차단
+  b.send(JSON.stringify({ t: 'talkreport' }));
+  await wait(300);
+  assert.ok(last(a, 'talkend'));
+  assert.ok(last(b, 'talkreported'));
+  await wait(10100);
+  a.send(JSON.stringify({ t: 'talkask', seat: sb }));
+  await wait(300);
+  assert.equal(last(a, 'talkno').reason, 'busy');
+  a.close();
+  b.close();
+  await wait(200);
+});
+
 test('보안: 너무 큰 요청은 413, 배열·이상한 본문은 400', async () => {
   const big = await fetch(`http://localhost:${PORT}/api/shop/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(10000) });
   assert.equal(big.status, 413);

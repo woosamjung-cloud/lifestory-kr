@@ -149,6 +149,9 @@ const net = new Net({
     if (m.error) return toast(m.error);
     toast(m.nick ? `🙂 별명을 "${m.nick}"(으)로 바꿨어요` : '🙂 별명을 지웠어요');
   },
+  onTalk(m) {
+    onTalkMsg(m);
+  },
   onLabels(map, full) {
     if (full) scene.labels.clear();
     for (const [k, v] of Object.entries(map)) {
@@ -1500,7 +1503,15 @@ function openPersonMenu(who, x, y) {
     closePersonMenu();
     sendHeart(who);
   });
-  box.append(title, say, heart);
+  const chat = document.createElement('button');
+  chat.className = 'pm-talk';
+  chat.textContent = '🗨️ 수다톡 걸기 · 🪙1';
+  chat.title = '상대가 수락하면 소원 동전 1개가 쓰여요';
+  chat.addEventListener('click', () => {
+    closePersonMenu();
+    askTalk(who);
+  });
+  box.append(title, say, heart, chat);
   box.hidden = false;
   const w = box.offsetWidth;
   const h = box.offsetHeight;
@@ -1510,6 +1521,91 @@ function openPersonMenu(who, x, y) {
 document.addEventListener('pointerdown', (e) => {
   const box = $('person-menu');
   if (!box.hidden && !box.contains(e.target)) closePersonMenu();
+});
+
+// ---------- 1:1 수다톡 ----------
+// 건 사람이 소원 동전 1개 (상대가 수락할 때만 쓰임). 둘만 보는 대화, 서버에 저장 안 함, 신고하면 최근 대화만 운영자에게
+const talkState = { open: false, nick: '', seat: null };
+function talkAgeOk() {
+  if (store.get('talkAge', false)) return true;
+  if (!confirm('수다톡은 만 14세 이상만 쓸 수 있어요.\n만 14세 이상이에요?')) return false;
+  store.set('talkAge', true);
+  return true;
+}
+function askTalk(who) {
+  if (talkState.open) return toast('🗨️ 지금 나누는 수다톡을 먼저 닫아 주세요');
+  if (!talkAgeOk()) return;
+  if ((myWallet.coins || 0) < 1) return openShop('수다톡은 소원 동전 1개가 필요해요', 'coins');
+  net.talkAsk(who.seat);
+}
+const talkName = (n) => (n ? `${n} 님` : '가까이 있는 여행자');
+function talkLine(text, me) {
+  const li = document.createElement('div');
+  li.className = 'tk-line' + (me ? ' me' : me === null ? ' sys' : '');
+  li.textContent = text;
+  const list = $('talk-list');
+  list.append(li);
+  while (list.children.length > 80) list.firstChild.remove();
+  list.scrollTop = list.scrollHeight;
+}
+function showInvite(m) {
+  const box = $('talk-invite');
+  box.querySelector('.ti-text').textContent = `🗨️ ${talkName(m.nick)}이(가) 수다톡을 걸어왔어요`;
+  box.hidden = false;
+  clearTimeout(showInvite.tm);
+  showInvite.tm = setTimeout(() => (box.hidden = true), 45000);
+  box.querySelector('.ti-yes').onclick = () => {
+    box.hidden = true;
+    if (!talkAgeOk()) return net.talkAns(m.id, false);
+    net.talkAns(m.id, true);
+  };
+  box.querySelector('.ti-no').onclick = () => {
+    box.hidden = true;
+    net.talkAns(m.id, false);
+  };
+}
+const TALK_NO = { wait: '⏳ 잠시 뒤에 다시 걸어 주세요', busy: '🙂 지금은 수다톡이 어려운 분이에요', 'busy-me': '🗨️ 지금 나누는 수다톡을 먼저 닫아 주세요', later: '🙂 지금은 어렵대요. 다음에 또 말 걸어 봐요', fast: '🐢 조금 천천히 보내 주세요' };
+function onTalkMsg(m) {
+  if (m.t === 'talkask') return showInvite(m);
+  if (m.t === 'talkwait') return toast('🗨️ 수다톡을 걸었어요. 상대가 수락하면 시작돼요');
+  if (m.t === 'talkno') return toast(m.reason === 'text' ? `🙅 ${m.error}` : TALK_NO[m.reason] || '지금은 어려워요');
+  if (m.t === 'talkopen') {
+    talkState.open = true;
+    talkState.nick = m.nick;
+    talkState.seat = m.with;
+    talked.set(m.with, Date.now());
+    $('talk-who').textContent = `🗨️ ${talkName(m.nick)}과(와) 수다톡`;
+    $('talk-list').innerHTML = '';
+    talkLine('둘만 보는 대화예요. 서버에 남지 않고, 신고할 때만 최근 대화가 운영자에게 전달돼요.', null);
+    $('talk').hidden = false;
+    return;
+  }
+  if (m.t === 'talkmsg') {
+    talkLine(m.text, m.me);
+    if (!m.me && $('talk').classList.contains('mini')) $('talk').classList.add('new');
+    return;
+  }
+  if (m.t === 'talkend') {
+    if (!talkState.open) return;
+    talkState.open = false;
+    $('talk').hidden = true;
+    $('talk').classList.remove('mini', 'new');
+    toast(m.reason === 'me' ? '🗨️ 수다톡을 닫았어요' : m.reason === 'idle' ? '🗨️ 한동안 조용해서 수다톡이 닫혔어요' : `🗨️ ${talkName(talkState.nick)}이(가) 수다톡을 닫았어요`);
+    return;
+  }
+  if (m.t === 'talkreported') toast('🚨 신고했어요. 이 분은 다시 수다톡을 걸 수 없어요');
+}
+$('talk-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('talk-input').value.trim();
+  if (!v) return;
+  net.talk(v.slice(0, 80));
+  $('talk-input').value = '';
+});
+$('talk-close').addEventListener('click', () => net.talkEnd());
+$('talk-mini').addEventListener('click', () => $('talk').classList.toggle('mini') || $('talk').classList.remove('new'));
+$('talk-report').addEventListener('click', () => {
+  if (confirm('이 수다톡을 신고할까요?\n최근 대화가 운영자에게 전달되고, 서로 다시 수다톡을 걸 수 없어요.')) net.talkReport();
 });
 
 function sendHeart(who) {
