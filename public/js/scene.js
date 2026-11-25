@@ -816,15 +816,18 @@ export class Scene {
     ctx.strokeStyle = glit > 0.02 ? `rgba(255,${Math.round(225 - 25 * glit)},${Math.round(200 - 60 * glit)},${0.06 + 0.12 * light + 0.12 * glit})` : `rgba(255,255,255,${0.06 + 0.12 * light})`;
     ctx.lineWidth = 1;
     const rippleBase = ctx.strokeStyle;
+    // 줄마다 고유 번호(id)를 붙여, 한 칸 넘어갈 때 물결 모양이 바뀌며 '턱' 걸리지 않게
+    const rippleCycle = Math.floor(nowMs / 4000);
     for (let i = 0; i < 14; i++) {
       const t = (i + ((nowMs / 4000) % 1)) / 14;
+      const id = i - rippleCycle;
       const yy = horizonY + t * t * (shoreY - horizonY);
       // 수평선에서 서서히 나타나 해변 앞에서 서서히 옅어짐 (뚝 끊기지 않게)
       ctx.globalAlpha = clamp(t / 0.1) * clamp((1 - t) / 0.18);
       ctx.strokeStyle = rippleBase;
       ctx.beginPath();
       for (let x = 0; x < W + 24; x += 24) {
-        const yv = yy + Math.sin(x / 40 + i * 2 + nowMs / 900) * (0.6 + t * 2);
+        const yv = yy + Math.sin(x / 40 + id * 2 + nowMs / 900) * (0.6 + t * 2);
         if (x === 0) ctx.moveTo(x, yv);
         else ctx.lineTo(x, yv);
       }
