@@ -103,9 +103,15 @@ export class Net {
     if (this.ws && this.connected) this.ws.send(JSON.stringify(msg));
   }
 
-  join(room, char, color, hair = 0, pet = 0, nick = '', petName = '', tag = false) {
-    this.want = { room, char, color, hair, pet, nick, petName, tag };
+  join(room, char, color, hair = 0, pet = 0, nick = '', petName = '', tag = false, trip = 'round') {
+    this.want = { room, char, color, hair, pet, nick, petName, tag, trip };
     this.send({ t: 'join', ...this.want, visitor: this.visitor });
+  }
+
+  // 내리기 (다시 연결돼도 자동으로 타지 않음)
+  leave() {
+    this.want = null;
+    this.send({ t: 'leave' });
   }
 
   stat(k) {

@@ -23,6 +23,7 @@ const PORT = Number(process.env.PORT || 3000);
 const VERSION = process.env.RENDER_GIT_COMMIT || String(Date.now());
 const SEATS = Math.max(1, Number(process.env.SEATS || 100)); // 장소(방)마다 좌석 수 (한 공간 100명이 아늑하고 매끄러움)
 const MAX_CLIENTS = Number(process.env.MAX_CLIENTS || 20000); // 서버 전체 접속 상한
+const POST_LIMIT = Number(process.env.POST_LIMIT || 40); // 한 IP에서 1분에 보낼 수 있는 상점 요청 수
 const MAX_PER_IP = Number(process.env.MAX_PER_IP || 30); // 한 IP에서 동시 접속 상한 (회사·학교 와이파이 고려)
 const PEOPLE_IN_SNAPSHOT = 150; // 화면에 그릴 수 있는 앞쪽 좌석만 보냅니다.
 const CHARS = ['blanket', 'hood', 'scarf', 'beanie', 'coat']; // public/js/characters.js 의 CHAR_LIST 순서와 같아야 함
@@ -127,8 +128,66 @@ function reportTalk(c) {
   }
   bump('talkreport');
 }
+// ---------- 왕복 승차권 · 머문 시간 (귀가 후기 보상 확인용, 메모리에만) ----------
+const stays = new Map(); // visitor -> { ms, round, place, at }
+function addStay(c) {
+  if (!c.seatAt || !c.visitor) return;
+  const s = stays.get(c.visitor) || { ms: 0 };
+  s.ms += Date.now() - c.seatAt;
+  s.round = s.round || !!c.round;
+  s.place = c.room;
+  s.at = Date.now();
+  stays.set(c.visitor, s);
+  c.seatAt = null;
+}
+function stayOf(visitor) {
+  const s = stays.get(visitor) || { ms: 0 };
+  let ms = s.ms;
+  let round = !!s.round;
+  let place = s.place;
+  for (const c of clients) {
+    if (c.visitor !== visitor) continue;
+    if (c.seatAt) ms += Date.now() - c.seatAt;
+    if (c.round) round = true;
+    if (c.room) place = c.room;
+  }
+  return { ms, round, place };
+}
+const REVIEW_HOSTS = ['instagram.com', 'threads.net', 'threads.com', 'x.com', 'twitter.com', 'facebook.com', 'fb.watch', 'blog.naver.com', 'cafe.naver.com', 'post.naver.com', 'tiktok.com', 'youtube.com', 'youtu.be', 'brunch.co.kr', 'story.kakao.com', 'band.us', 'tistory.com', 'velog.io'];
+const reviewIp = new Map(); // ip -> [시각...] 하루 3번까지
+const REVIEW_MIN_MS = Number(process.env.REVIEW_MIN_SEC ?? 600) * 1000; // 최소 머문 시간 (기본 10분)
+function reviewReward(body, ip) {
+  const visitor = typeof body.visitor === 'string' ? body.visitor : '';
+  if (!/^[a-z0-9]{8,40}$/i.test(visitor)) return { error: '다시 시도해 주세요' };
+  let u;
+  try {
+    u = new URL(String(body.url || '').trim());
+  } catch {
+    return { error: '후기 글의 주소(링크)를 붙여 넣어 주세요' };
+  }
+  const host = u.hostname.toLowerCase().replace(/^(www\.|m\.)/, '');
+  if (u.protocol !== 'https:' || !REVIEW_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) return { error: '인스타그램·스레드·X·페이스북·네이버 블로그 같은 SNS 글 주소만 받을 수 있어요' };
+  if (u.pathname.replace(/\/+$/, '').length < 3) return { error: '글 하나의 주소를 붙여 넣어 주세요 (내 프로필 주소 말고)' };
+  const key = `${host}${u.pathname.replace(/\/+$/, '')}`.toLowerCase().slice(0, 200);
+  const st = stayOf(visitor);
+  if (!st.round) return { error: '왕복 승차권으로 다녀온 분께 드리는 선물이에요' };
+  if (st.ms < REVIEW_MIN_MS) return { error: `${Math.ceil((REVIEW_MIN_MS - st.ms) / 60000)}분만 더 머물다 오면 받을 수 있어요` };
+  const rs = shop.reviewState(visitor, key);
+  if (rs.used) return { error: '이미 선물을 받은 후기예요' };
+  if (Date.now() - rs.last < 20 * 3600 * 1000) return { error: '후기 선물은 하루에 한 번이에요. 내일 또 다녀와 주세요' };
+  const now = Date.now();
+  const hits = (reviewIp.get(ip) || []).filter((t) => now - t < 86400000);
+  if (hits.length >= 3) return { error: '오늘은 여기까지예요. 내일 다시 해 주세요' };
+  hits.push(now);
+  reviewIp.set(ip, hits);
+  const wallet = shop.grantReview(visitor, key, { url: u.href.slice(0, 300), place: st.place || '', stayMin: Math.round(st.ms / 60000) });
+  if (!wallet) return { error: '다시 시도해 주세요' };
+  stays.delete(visitor); // 다음 여행은 다시 0분부터
+  bump('review');
+  return { ok: true, coins: shop.REVIEW_COINS, wallet };
+}
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink'];
+const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink', 'home'];
 const dailyVisitors = new Map(); // dateKey -> Set(visitorId)  (메모리에만, 하루 지나면 지움)
 function today() {
   return dateKey(new Date());
@@ -235,6 +294,7 @@ function seatClient(room, c) {
   c.seat = idx;
   c.pos = null; // 걸어간 자리 (없으면 원래 좌석)
   c.queued = false;
+  c.seatAt = Date.now();
   send(c.ws, { t: 'seat', seat: idx });
   send(c.ws, { t: 'labels', map: labelsOf(room) });
   markLabel(c);
@@ -264,6 +324,7 @@ function leaveRoom(c) {
   const room = c.room && rooms[c.room];
   if (!room) return;
   room.members.delete(c);
+  addStay(c);
   if (c.seat != null && room.seats[c.seat] === c) {
     room.seats[c.seat] = null;
     room.labelDiff.set(c.seat, null);
@@ -380,6 +441,7 @@ function handle(c, msg) {
       setNick(c, msg.nick);
       setPetName(c, msg.petName);
       c.tag = msg.tag === true;
+      if (msg.trip === 'round') c.round = true; // 왕복 승차권
       joinRoom(c, msg.room);
       markLabel(c);
       return;
@@ -759,7 +821,7 @@ async function handleShop(req, res, url) {
   const ip = clientIp(req);
   const hits = (postHits.get(ip) || 0) + 1;
   postHits.set(ip, hits);
-  if (hits > 40) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
+  if (hits > POST_LIMIT) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
   if (shop.shopMode() === 'off') return json(res, 403, { error: '상점이 닫혀 있어요' });
   const body = await readJson(req);
   if (body === null) {
@@ -776,6 +838,7 @@ async function handleShop(req, res, url) {
   else if (route === '/confirm') r = await shop.confirmOrder(body);
   else if (route === '/code') r = shop.recoveryCode(body.visitor);
   else if (route === '/restore') r = shop.restore(body.code);
+  else if (route === '/review') r = reviewReward(body, ip);
   else return json(res, 404, { error: '없는 주소예요' });
   return json(res, r.error ? 400 : 200, r);
 }
@@ -1042,6 +1105,8 @@ setInterval(() => {
     if (c.talkInvites) for (const [id, v] of c.talkInvites) if (now - v.at > 60000) c.talkInvites.delete(id);
   }
   for (const [k, t] of rated) if (now - t > 86400000) rated.delete(k);
+  for (const [k, s] of stays) if (now - s.at > 86400000) stays.delete(k);
+  for (const [k, v] of reviewIp) if (!v.some((t) => now - t < 86400000)) reviewIp.delete(k);
 }, 30 * 1000).unref();
 
 // 한마디 나눈 짝 기록은 30분 지나면 지움 (오래 켜 둬도 쌓이지 않게)

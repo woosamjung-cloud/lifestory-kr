@@ -11,7 +11,7 @@ const DATA_DIR = fs.mkdtempSync('/tmp/haedoti-test-');
 
 before(async () => {
   proc = spawn(process.execPath, ['server.js'], {
-    env: { ...process.env, PORT: String(PORT), SEATS: '2', MAX_PER_IP: '4', DATA_DIR },
+    env: { ...process.env, PORT: String(PORT), SEATS: '2', MAX_PER_IP: '4', DATA_DIR, REVIEW_MIN_SEC: '1', POST_LIMIT: '200' },
     stdio: ['ignore', 'ignore', process.env.TEST_SERVER_LOG ? fs.openSync(process.env.TEST_SERVER_LOG, 'a') : 'ignore'],
   });
   for (let i = 0; i < 50; i++) {
@@ -405,6 +405,34 @@ test('수다톡 평판: 둘 다 말한 뒤 끝나면 서로 한 번 평가, 같�
   assert.deepEqual(last(b, 'who').rep, { up: 1, down: 0 });
   a.close();
   b.close();
+  await wait(200);
+});
+
+test('귀가 후기: 왕복 승차권 + 머문 시간 + SNS 글 주소면 동전 10개, 같은 글·하루 두 번·편도는 안 됨', async () => {
+  const one = await client();
+  one.send(JSON.stringify({ t: 'hello', visitor: 'onewaytrip01' }));
+  one.send(JSON.stringify({ t: 'join', room: 'west', char: 'scarf', color: 1, visitor: 'onewaytrip01', trip: 'one' }));
+  const a = await client();
+  a.send(JSON.stringify({ t: 'hello', visitor: 'roundtrip001' }));
+  a.send(JSON.stringify({ t: 'join', room: 'west', char: 'scarf', color: 1, visitor: 'roundtrip001', trip: 'round' }));
+  await wait(1300);
+  const bad = await post('/api/shop/review', { visitor: 'onewaytrip01', url: 'https://www.instagram.com/p/abc123/' });
+  assert.match(bad.body.error, /왕복/);
+  const notSns = await post('/api/shop/review', { visitor: 'roundtrip001', url: 'https://example.com/post/1' });
+  assert.ok(notSns.body.error);
+  const profile = await post('/api/shop/review', { visitor: 'roundtrip001', url: 'https://www.instagram.com/' });
+  assert.ok(profile.body.error);
+  a.send(JSON.stringify({ t: 'leave' }));
+  await wait(200);
+  const ok = await post('/api/shop/review', { visitor: 'roundtrip001', url: 'https://www.instagram.com/p/abc123/' });
+  assert.equal(ok.body.ok, true);
+  assert.equal(ok.body.wallet.coins, 10);
+  const twice = await post('/api/shop/review', { visitor: 'roundtrip001', url: 'https://www.threads.net/@me/post/xyz' });
+  assert.ok(twice.body.error);
+  const same = await post('/api/shop/review', { visitor: 'onewaytrip01', url: 'https://instagram.com/p/abc123' });
+  assert.ok(same.body.error);
+  one.close();
+  a.close();
   await wait(200);
 });
 

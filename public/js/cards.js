@@ -46,8 +46,8 @@ export function seatLabel(seat, fallbackSeed = 0) {
   return `${Math.floor(n / 40) + 1}호차 ${(n % 40) + 1}번`;
 }
 
-export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, seat, seed }) {
-  await loadGlyphs(`방구석해돋이호해넘이열차승차권편도잠옷착용출발도착내방정동진정서진승객날짜일출일몰예정좌석호차번익명의여행자년월일새해첫마지막이불밖은추우니에서봐요담요를두른후드를쓴목도리를한비니를쓴코트를입은→0123456789:${name || ''}`);
+export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, seat, seed, round = false }) {
+  await loadGlyphs(`방구석해돋이호해넘이열차승차권편도왕복잠옷착용출발도착내방정동진정서진승객날짜일출일몰예정좌석호차번익명의여행자년월일새해첫마지막이불밖은추우니에서봐요담요를두른후드를쓴목도리를한비니를쓴코트를입은→0123456789:${name || ''}`);
   const c = newCanvas();
   const ctx = localizeCtx(c.getContext('2d'));
   const place = PLACES[event.place];
@@ -94,8 +94,9 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
   ctx.font = `30px ${FONT}`;
   ctx.fillText(east ? '해돋이 열차 · 승차권' : '해넘이 열차 · 승차권', tx + 60, ty + 115);
   ctx.textAlign = 'right';
-  fitFont(ctx, '편도 · 잠옷 착용', 30, FONT, tw * 0.3);
-  ctx.fillText('편도 · 잠옷 착용', tx + tw - 60, ty + 64);
+  const kindLabel = round ? '왕복 · 잠옷 착용' : '편도 · 잠옷 착용';
+  fitFont(ctx, kindLabel, 30, FONT, tw * 0.3);
+  ctx.fillText(kindLabel, tx + tw - 60, ty + 64);
 
   // 구간
   ctx.fillStyle = '#3b2a20';
@@ -261,6 +262,86 @@ export async function makeProofCard({ sceneCanvas, event, name, witnesses, wish,
   ctx.fillText(`이불 밖은 추우니까${name ? ` · ${name}` : ''}`, W / 2, H - 110);
   ctx.font = `26px ${FONT}`;
   ctx.fillText(location.host || '', W / 2, H - 65);
+  return c;
+}
+
+// 귀가 인증 사진: 다녀온 장면 + 장소·날짜·머문 시간·띄운 소원/편지 + "이불 속으로 돌아왔어요"
+export async function makeHomeCard({ sceneCanvas, event, name, stayMin, wishes = [], cheers = 0, round = true, focusY }) {
+  await loadGlyphs(`이불밖은추우니까정동진정서진방구석으로돌아왔어요귀가인증해돋이해넘이머문시간분띄운소원그리운이에게와번왕복승차권년월일“”·0123456789:🏠${name || ''}${wishes.join('')}`);
+  const c = newCanvas();
+  const ctx = localizeCtx(c.getContext('2d'));
+  const place = PLACES[event.place];
+  const east = place.kind === 'sunrise';
+  // 위쪽 70%: 다녀온 장면 (내 자리가 아래쪽에 오도록)
+  const sw = sceneCanvas.width;
+  const sh = sceneCanvas.height;
+  const ratio = sw / (sceneCanvas.clientWidth || sw);
+  const PH = Math.round(H * 0.68);
+  let cw = sw;
+  let ch = (sw * PH) / W;
+  let cx = 0;
+  let cy = 0;
+  if (ch > sh) {
+    ch = sh;
+    cw = (sh * W) / PH;
+    cx = (sw - cw) / 2;
+  } else {
+    const bottom = Math.min(sh, ((focusY || sh / ratio) + 30) * ratio);
+    cy = Math.max(0, bottom - ch);
+  }
+  ctx.drawImage(sceneCanvas, cx, cy, cw, ch, 0, 0, W, PH);
+  const shade = ctx.createLinearGradient(0, 0, 0, PH * 0.4);
+  shade.addColorStop(0, 'rgba(0,0,0,0.5)');
+  shade.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, W, PH * 0.4);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 12;
+  ctx.font = `40px ${FONT}`;
+  ctx.fillText(`${place.name} ${east ? '해돋이' : '해넘이'} · ${formatDateKo(event.time)}`, W / 2, 100);
+  ctx.font = `72px ${TITLE}`;
+  ctx.fillText('이불 속으로 돌아왔어요', W / 2, 195);
+  ctx.shadowBlur = 0;
+  // 아래쪽: 이불 색 종이에 여행 기록
+  const py = PH;
+  const pg = ctx.createLinearGradient(0, py, 0, H);
+  pg.addColorStop(0, '#fff6ea');
+  pg.addColorStop(1, '#f3e2cc');
+  ctx.fillStyle = pg;
+  ctx.fillRect(0, py, W, H - py);
+  // 이불 누빔 무늬
+  ctx.strokeStyle = 'rgba(200,150,110,0.18)';
+  ctx.lineWidth = 2;
+  for (let x = -H; x < W; x += 60) {
+    ctx.beginPath();
+    ctx.moveTo(x, H);
+    ctx.lineTo(x + (H - py), py);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#c8453e';
+  ctx.font = `34px ${FONT}`;
+  ctx.fillText(`🏠 ${round ? '왕복 승차권 · ' : ''}귀가 인증`, W / 2, py + 52);
+  ctx.fillStyle = '#3b2a20';
+  ctx.font = `700 52px ${FONT}`;
+  const facts = [`머문 시간 ${stayMin}분`];
+  if (cheers) facts.push(`와! ${cheers}번`);
+  ctx.fillText(facts.join(' · '), W / 2, py + 122);
+  if (wishes.length) {
+    ctx.fillStyle = '#8a5a3c';
+    ctx.font = `28px ${FONT}`;
+    ctx.fillText(east ? '🏮 띄운 소원' : '🍾 그리운 이에게 띄운 편지', W / 2, py + 186);
+    ctx.fillStyle = '#3b2a20';
+    const lines = wrap(ctx, wishes.slice(-2).map((w) => `“${w}”`).join('  '), W - 160, `38px ${FONT}`).slice(0, 2);
+    lines.forEach((ln, i) => ctx.fillText(ln, W / 2, py + 236 + i * 48));
+  }
+  ctx.fillStyle = 'rgba(59,42,32,0.75)';
+  ctx.font = `30px ${TITLE}`;
+  ctx.fillText(`이불 밖은 추우니까${name ? ` · ${name}` : ''}`, W / 2, H - 70);
+  ctx.font = `24px ${FONT}`;
+  ctx.fillText(location.host || '', W / 2, H - 32);
   return c;
 }
 

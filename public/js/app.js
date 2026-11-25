@@ -14,7 +14,7 @@ import { Scene, FUEL_SECONDS } from './scene.js';
 import { TrainIntro } from './train.js';
 import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait, renderPetPortrait } from './characters.js';
 import { Net } from './net.js';
-import { makeTicket, makeProofCard, downloadCanvas, shareImage } from './cards.js';
+import { makeTicket, makeProofCard, makeHomeCard, downloadCanvas, shareImage } from './cards.js';
 import { todayLine, loadDays, recordDay, dayStats } from './daily.js';
 import { t, tOr, getLang, setLang, applyI18n, startAutoTranslate, LANGS, L } from './i18n.js';
 import { COUNTRIES, DESTINATIONS } from './countries.js';
@@ -68,7 +68,7 @@ const store = {
 
 const state = {
   screen: 'home',
-  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0), petName: store.get('petName', ''), tag: store.get('tag', false) },
+  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0), petName: store.get('petName', ''), tag: store.get('tag', false), trip: store.get('trip', 'round') },
   placeMode: 'auto', // auto | east | west
   event: null,
   netStatus: 'connecting',
@@ -365,7 +365,7 @@ function applyEvent(ev, { animate = false } = {}) {
   if (placeChanged) {
     state.room = null;
     scene.people = [];
-    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name, state.profile.petName, !!state.profile.tag);
+    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name, state.profile.petName, !!state.profile.tag, state.profile.trip);
     if (animate && state.screen === 'ride') playTrain(ev);
   }
   renderEventTexts();
@@ -590,6 +590,8 @@ function buildPicker() {
   $('petname').value = state.profile.petName;
   $('nick').value = state.profile.name;
   $('tag-on').checked = !!state.profile.tag;
+  $('trip-round').checked = state.profile.trip !== 'one';
+  $('trip-one').checked = state.profile.trip === 'one';
   refreshPicker();
 }
 
@@ -639,14 +641,18 @@ $('board-form').addEventListener('submit', async (e) => {
   store.set('petName', state.profile.petName);
   state.profile.tag = $('tag-on').checked;
   store.set('tag', state.profile.tag);
+  state.profile.trip = $('trip-round').checked ? 'round' : 'one';
+  store.set('trip', state.profile.trip);
+  startTrip();
 
   // 승차권에 실제 좌석 번호를 넣기 위해 먼저 자리를 잡습니다.
   state.joined = true;
-  net.join(state.event.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name, state.profile.petName, !!state.profile.tag);
+  net.join(state.event.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name, state.profile.petName, !!state.profile.tag, state.profile.trip);
   await waitForSeat(1500);
 
   ticketCanvas = await makeTicket({
     ...state.profile,
+    round: state.profile.trip !== 'one',
     event: state.event,
     seat: state.seat,
     seed: hash(net.visitor || state.profile.name || 'x'),
@@ -712,9 +718,10 @@ $('board').addEventListener('click', () => {
 
 // 장소로 가는 막간: 이불 속에서 끊은 승차권으로 열차를 타고 출발 (화면을 누르면 바로 도착)
 const trainIntro = new TrainIntro($('train-cv'));
-function playTrain(ev) {
+function playTrain(ev, home = null) {
   const place = PLACES[ev.place];
-  $('train-text').textContent = `${place.name}행 ${ev.kind === 'sunrise' ? '해돋이호' : '해넘이호'}가 출발합니다`;
+  $('train-text').textContent = home ? '방구석행 귀가 열차가 출발합니다' : `${place.name}행 ${ev.kind === 'sunrise' ? '해돋이호' : '해넘이호'}가 출발합니다`;
+  $('train-pre').textContent = home ? `${place.name}에서 따뜻한 이불 속으로` : '이불 밖은 추우니까, 이불 속에서 끊은 승차권으로';
   const ov = $('train');
   // 그 장소의 지금 해 높이로 낮·밤 (지평선 아래 2도보다 낮으면 밤: 아파트 야경, 위면 낮: 산과 들)
   const night = solarPosition(realNow(), place.lat, place.lon).elevation < -2;
@@ -734,6 +741,7 @@ function playTrain(ev) {
     ov.removeEventListener('pointerdown', finish);
     trainIntro.stop();
     ov.hidden = true;
+    if (home) return home();
     const diff = ev.time - realNow();
     if (diff > 90 * 60000) {
       toast(`${ev.kind === 'sunrise' ? '해돋이' : '해넘이'}까지 ${Math.round(diff / 3600000)}시간쯤 남았어요. ☰ 에서 미리보기를 해 보세요`);
@@ -743,8 +751,88 @@ function playTrain(ev) {
   setTimeout(() => ov.addEventListener('pointerdown', finish), 300);
 }
 
+// ---------- 왕복 승차권: 여행 기록 → 집으로 돌아가기 → 귀가 인증 → 후기 남기면 소원 동전 ----------
+// 편도·왕복 모두 무료. 왕복으로 다녀와 SNS에 귀가 인증 후기를 올리고 링크를 남기면 소원 동전 10개(1,000원어치)
+let trip = store.get('tripLog', null);
+function startTrip() {
+  trip = { round: state.profile.trip !== 'one', start: Date.now(), wishes: [], cheers: 0, says: 0 };
+  store.set('tripLog', trip);
+}
+function logTrip(k, v) {
+  if (!trip) return;
+  if (k === 'wish' && v) trip.wishes = [...trip.wishes, v].slice(-3);
+  else if (k in trip) trip[k] += 1;
+  store.set('tripLog', trip);
+}
+let homeCanvas = null;
+const HOME_FILE = 'haedoji-home.png';
+$('menu-home').addEventListener('click', async () => {
+  $('menu').close();
+  if (state.screen !== 'ride') return;
+  const ev = state.event;
+  const stayMin = trip ? Math.max(1, Math.round((Date.now() - trip.start) / 60000)) : 1;
+  // 떠나기 전 장면으로 귀가 인증 사진을 만듦
+  homeCanvas = await makeHomeCard({
+    sceneCanvas: $('scene'),
+    event: ev,
+    name: state.profile.name,
+    stayMin,
+    wishes: trip ? trip.wishes : [],
+    cheers: trip ? trip.cheers : 0,
+    round: !trip || trip.round,
+    focusY: scene.mySlot ? scene.mySlot.y : null,
+  });
+  net.stat('home');
+  net.leave();
+  state.joined = false;
+  state.seat = null;
+  playTrain(ev, () => {
+    show('home');
+    openHomeCard(stayMin);
+  });
+});
+function openHomeCard(stayMin) {
+  const round = !trip || trip.round;
+  $('home-img').src = homeCanvas.toDataURL('image/png');
+  $('home-stay').textContent = `${stayMin}분 머물다 왔어요`;
+  $('home-reward').hidden = !round;
+  $('home-oneway').hidden = round;
+  $('home-url').value = '';
+  $('home-msg').textContent = '';
+  $('homecard').showModal();
+}
+// 대가를 받은 후기임을 글에 밝힘 (표시·광고 심사지침)
+const homeText = () => {
+  const p = state.event ? PLACES[state.event.place] : null;
+  return `이불 밖은 추우니까 🏠 ${p ? `${p.name} ${p.kind === 'sunrise' ? '해돋이' : '해넘이'}` : '방구석 여행'} 보고 이불 속으로 돌아왔어요. #이불밖은추우니까 #방구석해돋이호 #소원동전후기 (소원 동전을 받고 남기는 후기예요)`;
+};
+document.querySelectorAll('#homecard .sns').forEach((b) => b.addEventListener('click', () => shareTo(b.dataset.sns, homeCanvas, HOME_FILE, homeText())));
+$('home-save').addEventListener('click', async () => {
+  if (!homeCanvas) return;
+  await downloadCanvas(homeCanvas, HOME_FILE);
+  toast('📥 귀가 인증 사진을 저장했어요');
+});
+$('home-claim').addEventListener('click', async () => {
+  const url = $('home-url').value.trim();
+  if (!url) return ($('home-msg').textContent = 'SNS에 올린 글의 주소(링크)를 붙여 넣어 주세요');
+  $('home-claim').disabled = true;
+  const r = await postJson('api/shop/review', { visitor: net.visitor, url });
+  $('home-claim').disabled = false;
+  if (!r.ok) return ($('home-msg').textContent = (r.body && r.body.error) || '잠시 후 다시 시도해 주세요');
+  setWallet(r.body.wallet);
+  $('home-msg').textContent = `🪙 소원 동전 ${r.body.coins}개가 충전됐어요. 다녀와 줘서 고마워요!`;
+  $('home-reward').querySelectorAll('input,button').forEach((x) => (x.disabled = true));
+  trip = null;
+  store.set('tripLog', null);
+});
+$('home-close').addEventListener('click', () => {
+  $('homecard').close();
+  $('home-reward').querySelectorAll('input,button').forEach((x) => (x.disabled = false));
+});
+
 // ---------- 탑승 중 버튼 ----------
 $('act-cheer').addEventListener('click', () => {
+  logTrip('cheers');
   scene.cheerAt(scene.mySlot, true);
   ambience.cheer(2, 1);
   net.cheer();
@@ -795,6 +883,7 @@ $('ritual-form').addEventListener('submit', (e) => {
   }
   state.wish = $('ritual-text').value.trim().slice(0, 40);
   const text = publicWish != null ? ritualList()[publicWish] : null;
+  logTrip('wish', state.wish || text);
   scene.ritualAt(scene.mySlot, true, text);
   if (text) {
     myWallet.coins -= 1;
@@ -1745,6 +1834,7 @@ function sayPreset(i) {
   lastSay = Date.now();
   showSay(shopInfo.sayings[i], true, myWeight());
   net.say(i);
+  logTrip('says');
 }
 function renderCustomRow() {
   const row = $('saypick').querySelector('.say-custom');
@@ -1819,6 +1909,7 @@ $('open-say').addEventListener('click', () => {
       setTimeout(() => el.classList.remove('pending'), 3000);
     }
     net.sayText(text);
+    logTrip('says');
     input.value = '';
     renderCustomRow();
     toast(`💬 보냈어요 · 다음 직접 한마디는 10분 뒤 (${fmtWait(CUSTOM_GAP)})`);

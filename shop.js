@@ -209,6 +209,24 @@ export function sayWeight(visitor) {
   return Math.min(5, w);
 }
 
+// ---------- 귀가 후기 보상 (왕복 승차권으로 다녀와 SNS 후기 링크를 남기면 소원 동전) ----------
+export const REVIEW_COINS = 10; // 1,000원어치
+export function reviewState(visitor, url) {
+  db.reviews = db.reviews || {};
+  const a = account(visitor, false);
+  return { used: !!db.reviews[url], last: a ? a.lastReview || 0 : 0 };
+}
+export function grantReview(visitor, url, info) {
+  const a = account(visitor);
+  if (!a) return null;
+  db.reviews = db.reviews || {};
+  a.coins += REVIEW_COINS;
+  a.lastReview = Date.now();
+  db.reviews[url] = { visitor, at: Date.now(), ...info };
+  dirty = true;
+  return wallet(visitor);
+}
+
 // ---------- 수다톡 평판 (좋아요·별로예요) ----------
 export function rep(visitor) {
   const a = account(visitor, false);

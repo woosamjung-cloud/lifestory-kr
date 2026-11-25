@@ -79,6 +79,11 @@
           <label class="field-label" for="petname"><span data-i18n="form.petName">친구 이름</span> <span class="muted" data-i18n="form.petNameHint2">(선택, 이름표를 켜면 함께 보여요)</span></label>
           <input id="petname" maxlength="8" placeholder="예) 콩이" autocomplete="off" data-i18n-ph="form.petNamePh">
         </div>
+        <span class="field-label" id="trip-label">승차권 <span class="muted">(둘 다 무료)</span></span>
+        <div class="trip-row" role="radiogroup" aria-labelledby="trip-label">
+          <label class="trip-opt"><input type="radio" name="trip" id="trip-round" checked><span><b>왕복</b><small>돌아와서 후기를 남기면 🪙 소원 동전 10개</small></span></label>
+          <label class="trip-opt"><input type="radio" name="trip" id="trip-one"><span><b>편도</b><small>후기 선물 없이 가볍게</small></span></label>
+        </div>
         <label class="check-row"><input type="checkbox" id="tag-on"> <span data-i18n="form.tagOn">머리 위에 내 이름표 보이기</span> <span class="muted" data-i18n="form.tagHint">(별명 · 친구 이름)</span></label>
 
         <button type="submit" class="btn primary big" id="get-ticket" data-i18n="form.ticket">승차권 받기</button>
@@ -207,6 +212,7 @@
     <button class="btn wide" id="menu-shop">🎁 상점 · 내 아이템</button>
     <button class="btn wide" id="menu-nick">🙂 별명 · 이름표</button>
     <button class="btn wide" id="menu-music" hidden>🎵 우리 음악</button>
+    <button class="btn wide" id="menu-home">🏠 집으로 돌아가기</button>
     <button class="btn wide" id="show-help">이용 안내</button>
     <button class="btn wide ghost" id="menu-close">닫기</button>
   </dialog>
@@ -370,6 +376,30 @@
     <button class="btn ghost wide" id="card-close">닫기</button>
   </dialog>
 
+  <!-- 귀가 인증 (왕복 승차권: 후기를 남기면 소원 동전) -->
+  <dialog id="homecard" class="modal">
+    <h3>이불 속으로 돌아왔어요</h3>
+    <p class="muted small" id="home-stay"></p>
+    <img id="home-img" alt="귀가 인증 사진">
+    <button class="btn primary wide" id="home-save">📥 귀가 인증 사진 저장</button>
+    <p class="sns-title">SNS에 후기 올리기</p>
+    <div class="sns-row">
+      <button class="sns" data-sns="instagram" title="인스타그램"><span class="sns-ico insta"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff"/></svg></span><span>인스타</span></button>
+      <button class="sns" data-sns="threads" title="스레드"><span class="sns-ico threads">@</span><span>스레드</span></button>
+      <button class="sns" data-sns="x" title="X"><span class="sns-ico xx">X</span><span>X</span></button>
+      <button class="sns" data-sns="facebook" title="페이스북"><span class="sns-ico fb">f</span><span>페이스북</span></button>
+      <button class="sns" data-sns="link" title="링크 복사"><span class="sns-ico link">🔗</span><span>링크 복사</span></button>
+    </div>
+    <div class="home-reward" id="home-reward">
+      <p class="small"><b>🪙 소원 동전 10개 받기</b><br><span class="muted">사진과 한 줄 후기를 SNS에 올린 뒤, 그 글의 주소를 붙여 넣어 주세요. 하루에 한 번 받을 수 있어요.</span></p>
+      <div class="home-claim-row"><input id="home-url" type="url" inputmode="url" placeholder="https://www.instagram.com/p/…" autocomplete="off"><button class="btn primary" id="home-claim">받기</button></div>
+      <p class="small" id="home-msg" aria-live="polite"></p>
+      <p class="muted tiny">후기에는 소원 동전을 받는다는 문구(#소원동전후기)가 함께 들어가요.</p>
+    </div>
+    <p class="muted small" id="home-oneway" hidden>다음엔 <b>왕복 승차권</b>으로 타 보세요. 돌아와서 후기를 남기면 소원 동전 10개를 드려요.</p>
+    <button class="btn ghost wide" id="home-close">닫기</button>
+  </dialog>
+
   <!-- 우리 음악 -->
   <dialog id="musicdlg" class="modal">
     <h3>우리 음악</h3>
@@ -412,7 +442,7 @@
   <div id="train" class="overlay train-overlay" hidden>
     <canvas id="train-cv" aria-hidden="true"></canvas>
     <div class="train-copy">
-      <p class="train-pre">이불 밖은 추우니까, 이불 속에서 끊은 승차권으로</p>
+      <p class="train-pre" id="train-pre">이불 밖은 추우니까, 이불 속에서 끊은 승차권으로</p>
       <p class="train-text" id="train-text">정동진행 해돋이호가 출발합니다</p>
       <p class="train-skip">화면을 누르면 바로 도착해요</p>
     </div>
