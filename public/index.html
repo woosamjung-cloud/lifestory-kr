@@ -402,9 +402,9 @@
   <div id="queue" class="overlay" hidden>
     <div class="sheet small-sheet">
       <div class="queue-ico">🚉</div>
-      <h3>만석이에요</h3>
+      <h3>이번 열차는 만석이에요</h3>
       <p>대기 순번 <b id="queue-pos">-</b>번</p>
-      <p class="muted small">자리가 나면 자동으로 앉혀 드려요.<br>기다리는 동안에도 하늘은 볼 수 있어요.</p>
+      <p class="muted small">한 칸에 100명까지 함께 타요.<br>한 분이 내리면 승차권이 나와서 바로 앉혀 드려요.<br>기다리는 동안에도 하늘은 볼 수 있어요.</p>
     </div>
   </div>
 
@@ -417,6 +417,20 @@
             <linearGradient id="tb" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stop-color="#ffffff"/><stop offset="0.7" stop-color="#eeeae4"/><stop offset="1" stop-color="#d8d3cb"/>
             </linearGradient>
+            <!-- 밤: 형광등 켜진 객실 / 낮: 하늘이 비친 유리 -->
+            <linearGradient id="winNight" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#fbfdf2"/><stop offset="0.55" stop-color="#eef4e6"/><stop offset="1" stop-color="#cfd9cf"/>
+            </linearGradient>
+            <linearGradient id="winDay" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#bcd6ea"/><stop offset="0.6" stop-color="#8fb3cf"/><stop offset="1" stop-color="#6f8fab"/>
+            </linearGradient>
+            <linearGradient id="glare" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+            </linearGradient>
+            <clipPath id="winClip">
+              <rect x="14" y="42" width="144" height="24" rx="8"/><rect x="178" y="42" width="144" height="24" rx="8"/>
+              <path d="M342 42 L430 42 C462 43 486 50 504 62 L504 66 L342 66 Z"/>
+            </clipPath>
             <linearGradient id="dawn" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0" stop-color="#e46f86"/><stop offset="0.5" stop-color="#f08a5d"/><stop offset="1" stop-color="#f4c26b"/>
             </linearGradient>
@@ -427,7 +441,7 @@
           <!-- 객차 1 -->
           <g class="car">
             <rect x="6" y="28" width="160" height="62" rx="14" fill="url(#tb)"/>
-            <rect x="14" y="42" width="144" height="24" rx="8" fill="#2c3346"/>
+            <rect class="win" x="14" y="42" width="144" height="24" rx="8" fill="#2c3346"/>
             <circle cx="28" cy="57" r="5.2" fill="#2a211d"/><path d="M20 66 Q28 58 36 66 Z" fill="#6c5a52"/><circle cx="54" cy="57" r="5.2" fill="#3a2b23"/><path d="M46 66 Q54 58 62 66 Z" fill="#6c5a52"/><circle cx="80" cy="57" r="5.2" fill="#4a3428"/><path d="M72 66 Q80 58 88 66 Z" fill="#6c5a52"/><circle cx="106" cy="57" r="5.2" fill="#1e1a19"/><path d="M98 66 Q106 58 114 66 Z" fill="#6c5a52"/><circle cx="132" cy="57" r="5.2" fill="#2a211d"/><path d="M124 66 Q132 58 140 66 Z" fill="#6c5a52"/><circle cx="158" cy="57" r="5.2" fill="#3a2b23"/><path d="M150 66 Q158 58 166 66 Z" fill="#6c5a52"/>
             <rect x="6" y="72" width="160" height="7" fill="url(#dawn)"/>
             <rect x="6" y="82" width="160" height="8" rx="3" fill="#4b4f5c"/>
@@ -435,22 +449,35 @@
           <!-- 객차 2: 특별열차 표지 -->
           <g class="car c2">
             <rect x="170" y="28" width="160" height="62" rx="14" fill="url(#tb)"/>
-            <rect x="178" y="42" width="144" height="24" rx="8" fill="#2c3346"/>
+            <rect class="win" x="178" y="42" width="144" height="24" rx="8" fill="#2c3346"/>
             <circle cx="192" cy="57" r="5.2" fill="#2a211d"/><path d="M184 66 Q192 58 200 66 Z" fill="#6c5a52"/><circle cx="218" cy="57" r="5.2" fill="#3a2b23"/><path d="M210 66 Q218 58 226 66 Z" fill="#6c5a52"/><circle cx="244" cy="57" r="5.2" fill="#4a3428"/><path d="M236 66 Q244 58 252 66 Z" fill="#6c5a52"/><circle cx="270" cy="57" r="5.2" fill="#1e1a19"/><path d="M262 66 Q270 58 278 66 Z" fill="#6c5a52"/><circle cx="296" cy="57" r="5.2" fill="#2a211d"/><path d="M288 66 Q296 58 304 66 Z" fill="#6c5a52"/><circle cx="322" cy="57" r="5.2" fill="#3a2b23"/><path d="M314 66 Q322 58 330 66 Z" fill="#6c5a52"/>
             <rect x="170" y="72" width="160" height="7" fill="url(#dawn)"/>
             <rect x="170" y="82" width="160" height="8" rx="3" fill="#4b4f5c"/>
             <rect x="196" y="12" width="108" height="20" rx="10" fill="#fffaf0" stroke="#e8b48a" stroke-width="1.5"/>
-            <text x="250" y="27" text-anchor="middle" font-family="Nanum Brush Script, Gowun Batang, serif" font-size="18" fill="#b9574e">해돋이 특별열차</text>
+            <text x="250" y="27" text-anchor="middle" font-family="Nanum Brush Script, Gowun Batang, serif" font-size="18" fill="#b9574e" id="train-sign">해돋이 특별열차</text>
           </g>
           <!-- 동력차: 오른쪽이 앞 (날렵한 고속열차 앞모양) -->
           <g class="car c3">
             <path d="M334 28 L440 28 C492 30 528 52 552 80 Q556 90 544 90 L334 90 Z" fill="url(#tb)"/>
-            <path d="M342 42 L430 42 C462 43 486 50 504 62 L504 66 L342 66 Z" fill="#2c3346"/>
+            <path class="win" d="M342 42 L430 42 C462 43 486 50 504 62 L504 66 L342 66 Z" fill="#2c3346"/>
             <circle cx="356" cy="57" r="5.2" fill="#2a211d"/><path d="M348 66 Q356 58 364 66 Z" fill="#6c5a52"/><circle cx="382" cy="57" r="5.2" fill="#3a2b23"/><path d="M374 66 Q382 58 390 66 Z" fill="#6c5a52"/><circle cx="408" cy="57" r="5.2" fill="#4a3428"/><path d="M400 66 Q408 58 416 66 Z" fill="#6c5a52"/><circle cx="434" cy="57" r="5.2" fill="#1e1a19"/><path d="M426 66 Q434 58 442 66 Z" fill="#6c5a52"/>
             <path d="M334 72 L530 72 Q540 76 546 82 L334 82 Z" fill="url(#dawn)"/>
             <rect x="334" y="82" width="214" height="8" rx="3" fill="#4b4f5c"/>
             <circle cx="534" cy="70" r="3.5" fill="#fff4c2"/>
             <circle cx="486" cy="54" r="5" fill="#f4c26b" opacity="0.9"/>
+          </g>
+          <!-- 밤: 천장 형광등 줄 -->
+          <g class="lamps" fill="#ffffff">
+            <rect x="22" y="44.5" width="30" height="2.2" rx="1.1"/><rect x="72" y="44.5" width="30" height="2.2" rx="1.1"/><rect x="122" y="44.5" width="30" height="2.2" rx="1.1"/>
+            <rect x="186" y="44.5" width="30" height="2.2" rx="1.1"/><rect x="236" y="44.5" width="30" height="2.2" rx="1.1"/><rect x="286" y="44.5" width="30" height="2.2" rx="1.1"/>
+            <rect x="350" y="44.5" width="30" height="2.2" rx="1.1"/><rect x="400" y="44.5" width="30" height="2.2" rx="1.1"/>
+          </g>
+          <!-- 낮: 유리에 비친 햇빛이 스쳐 지나감 -->
+          <g class="glare" clip-path="url(#winClip)">
+            <g class="glare-move">
+              <path d="M-60 40 L-36 40 L-56 70 L-80 70 Z" fill="url(#glare)"/>
+              <path d="M-26 40 L-18 40 L-38 70 L-46 70 Z" fill="url(#glare)" opacity="0.7"/>
+            </g>
           </g>
           <g fill="#3a3d47">
             <rect x="24" y="90" width="40" height="7" rx="3"/><rect x="108" y="90" width="40" height="7" rx="3"/>

@@ -209,6 +209,19 @@ export function sayWeight(visitor) {
   return Math.min(5, w);
 }
 
+// ---------- 수다톡 평판 (좋아요·별로예요) ----------
+export function rep(visitor) {
+  const a = account(visitor, false);
+  return { up: a ? a.repUp || 0 : 0, down: a ? a.repDown || 0 : 0 };
+}
+export function rate(visitor, good) {
+  const a = account(visitor);
+  if (!a) return;
+  if (good) a.repUp = (a.repUp || 0) + 1;
+  else a.repDown = (a.repDown || 0) + 1;
+  dirty = true;
+}
+
 export function spendCoin(visitor) {
   const a = account(visitor, false);
   if (!a || a.coins < 1) return false;

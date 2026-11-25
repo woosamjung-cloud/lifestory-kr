@@ -816,3 +816,15 @@ html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }
 .tk-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
 .tk-form input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--line); background: #fff; }
 .person-menu .pm-talk { background: #fff3e4; }
+
+/* 출발 열차 창문: 밤에는 형광등 켜진 객실, 낮에는 하늘이 비친 유리 + 햇빛 반사 */
+.train .lamps, .train .glare { display: none; }
+.train-overlay.night .train .win { fill: url(#winNight); }
+.train-overlay.night .train .lamps { display: inline; opacity: 0.95; }
+.train-overlay.night .train .win { filter: drop-shadow(0 0 4px rgba(255, 252, 225, 0.75)); }
+.train-overlay.day { background: linear-gradient(180deg, #7fb3dd 0%, #a9cbe6 45%, #f2d9b8 85%, #f6e3c6 100%); color: #3b2a20; }
+.train-overlay.day .train .win { fill: url(#winDay); }
+.train-overlay.day .train .glare { display: inline; }
+.train-overlay.day .train .glare-move { animation: glare 2.4s ease-in-out 0.2s infinite; }
+@keyframes glare { from { transform: translateX(0); } to { transform: translateX(640px); } }
+@media (prefers-reduced-motion: reduce) { .train-overlay.day .train .glare-move { animation: none; transform: translateX(260px); } }

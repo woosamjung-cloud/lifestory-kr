@@ -72,6 +72,7 @@ const TEXT = {
   '🌇 해가 졌어요. 오늘도 수고했어요': '🌇 The sun has set. You did well today',
   '방금': 'just now',
   '해돋이 특별열차': 'Sunrise special',
+  '해넘이 특별열차': 'Sunset special',
   '크리스마스 아침 해돋이': 'Christmas morning sunrise',
   '크리스마스 이브 해넘이': 'Christmas Eve sunset',
   '해돋이 보는 중': 'Watching the sunrise',
@@ -353,6 +354,9 @@ const TEXT = {
   '번': '',
   '개': '',
   '자리가 나면 자동으로 앉혀 드려요.': 'We’ll seat you as soon as a spot opens.',
+  '한 칸에 100명까지 함께 타요.': 'Up to 100 people ride in each car.',
+  '한 분이 내리면 승차권이 나와서 바로 앉혀 드려요.': 'When someone gets off, a ticket comes out and you’re seated right away.',
+  '기다리는 동안에도 하늘은 볼 수 있어요.': 'You can still watch the sky while you wait.',
   '기다리는 동안에도 하늘은 볼 수 있어요.': 'You can still watch the sky while you wait.',
 
   // ---------- 이용 안내 ----------
@@ -430,6 +434,8 @@ const TEXT = {
   // ---------- 별명 · 소셜 로그인 ----------
   '🙂 별명 바꾸기': '🙂 Change nickname',
   '🙂 별명 · 이름표': '🙂 Nickname · name tag',
+  '이번 열차는 만석이에요': 'This train is full',
+  '🎫 승차권이 나왔어요! 자리에 앉았어요 ☺️': '🎫 Your ticket is ready! You’re seated ☺️',
   '🗨️ 수다톡 걸기 · 🪙1': '🗨️ Start a chat · 🪙1',
   '상대가 수락하면 소원 동전 1개가 쓰여요': 'Uses 1 wish coin if they accept',
   '다음에': 'Maybe later',
@@ -447,6 +453,10 @@ const TEXT = {
   '🙂 지금은 수다톡이 어려운 분이에요': '🙂 They can’t chat right now',
   '🙂 지금은 어렵대요. 다음에 또 말 걸어 봐요': '🙂 Not now, they said. Try again another time',
   '🐢 조금 천천히 보내 주세요': '🐢 A little slower, please',
+  '👍 좋아요': '👍 Good',
+  '👎 별로예요': '👎 Not great',
+  '👍 좋아요를 남겼어요': '👍 You left a like',
+  '👎 의견을 남겼어요. 고마워요': '👎 Feedback saved. Thanks',
   '별명 · 이름표': 'Nickname · name tag',
   '함께 온 친구 이름': 'Your pet’s name',
   '머리 위에 내 이름표 보이기': 'Show my name tag above my head',

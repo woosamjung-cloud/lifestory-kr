@@ -181,6 +181,10 @@ export class Net {
     this.send({ t: 'talkend' });
   }
 
+  rate(good) {
+    this.send({ t: 'rate', good });
+  }
+
   talkReport() {
     this.send({ t: 'talkreport' });
   }

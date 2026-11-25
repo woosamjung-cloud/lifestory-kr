@@ -373,6 +373,41 @@ test('수다톡: 동전 없으면 못 걸고, 수락하면 건 사람 동전 1�
   await wait(200);
 });
 
+test('수다톡 평판: 둘 다 말한 뒤 끝나면 서로 한 번 평가, 같은 짝은 하루 한 번', async () => {
+  const visitor = 'reptester01';
+  const o = await post('/api/shop/order', { visitor, product: 'coins10' });
+  await post('/api/shop/confirm', { orderId: o.body.orderId, paymentKey: 'test', amount: 1000 });
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'hello', visitor }));
+  a.send(JSON.stringify({ t: 'join', room: 'west', char: 'scarf', color: 1, visitor, nick: '해' }));
+  b.send(JSON.stringify({ t: 'join', room: 'west', char: 'hood', color: 2, visitor: 'reptester02', nick: '달' }));
+  await wait(600);
+  const sa = last(a, 'seat').seat;
+  const sb = last(b, 'seat').seat;
+  a.send(JSON.stringify({ t: 'talkask', seat: sb }));
+  await wait(300);
+  assert.deepEqual(last(b, 'talkask').rep, { up: 0, down: 0 });
+  b.send(JSON.stringify({ t: 'talkans', id: last(b, 'talkask').id, ok: true }));
+  await wait(300);
+  a.send(JSON.stringify({ t: 'talk', text: '안녕하세요' }));
+  b.send(JSON.stringify({ t: 'talk', text: '반가워요' }));
+  await wait(300);
+  a.send(JSON.stringify({ t: 'talkend' }));
+  await wait(300);
+  assert.equal(last(a, 'talkend').canRate, true);
+  assert.equal(last(b, 'talkend').canRate, true);
+  b.send(JSON.stringify({ t: 'rate', good: true }));
+  b.send(JSON.stringify({ t: 'rate', good: true })); // 두 번은 안 됨
+  await wait(300);
+  assert.equal(b.inbox.filter((m) => m.t === 'talkrated').length, 1);
+  b.send(JSON.stringify({ t: 'who', seat: sa }));
+  await wait(300);
+  assert.deepEqual(last(b, 'who').rep, { up: 1, down: 0 });
+  a.close();
+  b.close();
+  await wait(200);
+});
+
 test('보안: 너무 큰 요청은 413, 배열·이상한 본문은 400', async () => {
   const big = await fetch(`http://localhost:${PORT}/api/shop/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(10000) });
   assert.equal(big.status, 413);

@@ -118,10 +118,12 @@ const net = new Net({
     $('queue').hidden = true;
     // 켜 둔 아이템 상태를 서버에 알림 (다른 사람 화면에 촛불이 보이도록)
     if (typeof owned === 'function') for (const k of ['candle', 'bigfire']) if (owned(k)) net.use(k, itemShow[k]);
-    if (state.screen === 'ride') toast('자리에 앉았어요. 함께 해를 기다려요 ☺️');
+    if (state.screen === 'ride') toast(state.wasQueued ? '🎫 승차권이 나왔어요! 자리에 앉았어요 ☺️' : '자리에 앉았어요. 함께 해를 기다려요 ☺️');
+    state.wasQueued = false;
   },
   onQueue(pos) {
     state.queuePos = pos;
+    state.wasQueued = true;
     state.seat = null;
     scene.selfSeat = null;
     scene.selfStanding = true;
@@ -143,7 +145,7 @@ const net = new Net({
   },
   onWho(m) {
     const t = document.querySelector(`#person-menu .pm-nick[data-seat="${m.seat}"]`);
-    if (t) t.textContent = m.nick ? `🙂 ${m.nick}` : '🙂 이름 없는 여행자';
+    if (t) t.textContent = (m.nick ? `🙂 ${m.nick}` : '🙂 이름 없는 여행자') + repText(m.rep, true);
   },
   onNickOk(m) {
     if (m.error) return toast(m.error);
@@ -710,7 +712,12 @@ $('board').addEventListener('click', () => {
 function playTrain(ev) {
   const place = PLACES[ev.place];
   $('train-text').textContent = `${place.name}행 ${ev.kind === 'sunrise' ? '해돋이호' : '해넘이호'}가 출발합니다`;
+  $('train-sign').textContent = ev.kind === 'sunrise' ? '해돋이 특별열차' : '해넘이 특별열차';
   const ov = $('train');
+  // 그 장소의 지금 해 높이로 낮·밤 (해가 지평선 아래 2도보다 낮으면 밤: 형광등, 위면 낮: 햇빛 반사)
+  const el = solarPosition(realNow(), place.lat, place.lon).elevation;
+  ov.classList.toggle('night', el < -2);
+  ov.classList.toggle('day', el >= -2);
   ov.hidden = false;
   // 기차 소리 (소리가 켜져 있을 때만, 탑승 직후엔 소리가 켜질 때까지 잠깐 기다림)
   setTimeout(() => ambience.train(), 250);
@@ -1526,17 +1533,34 @@ document.addEventListener('pointerdown', (e) => {
 // ---------- 1:1 수다톡 ----------
 // 건 사람이 소원 동전 1개 (상대가 수락할 때만 쓰임). 둘만 보는 대화, 서버에 저장 안 함, 신고하면 최근 대화만 운영자에게
 const talkState = { open: false, nick: '', seat: null };
-function talkAgeOk() {
-  if (store.get('talkAge', false)) return true;
-  if (!confirm('수다톡은 만 14세 이상만 쓸 수 있어요.\n만 14세 이상이에요?')) return false;
-  store.set('talkAge', true);
-  return true;
-}
 function askTalk(who) {
   if (talkState.open) return toast('🗨️ 지금 나누는 수다톡을 먼저 닫아 주세요');
-  if (!talkAgeOk()) return;
   if ((myWallet.coins || 0) < 1) return openShop('수다톡은 소원 동전 1개가 필요해요', 'coins');
   net.talkAsk(who.seat);
+}
+// 수다톡 평판: 👍 좋아요 · 👎 별로예요 (아직 없으면 '첫 수다톡')
+function repText(r, short) {
+  if (!r) return '';
+  if (!r.up && !r.down) return short ? '' : ' · 🌱 첫 수다톡이에요';
+  return ` · 👍 ${r.up}${r.down ? ` 👎 ${r.down}` : ''}`;
+}
+function askRate(nick) {
+  const box = $('talk-invite');
+  box.querySelector('.ti-text').textContent = `🗨️ ${talkName(nick)}과(와)의 수다톡 어땠어요?`;
+  const yes = box.querySelector('.ti-yes');
+  const no = box.querySelector('.ti-no');
+  yes.textContent = '👍 좋아요';
+  no.textContent = '👎 별로예요';
+  const reset = () => {
+    box.hidden = true;
+    yes.textContent = '수락';
+    no.textContent = '다음에';
+  };
+  yes.onclick = () => (reset(), net.rate(true));
+  no.onclick = () => (reset(), net.rate(false));
+  box.hidden = false;
+  clearTimeout(showInvite.tm);
+  showInvite.tm = setTimeout(reset, 20000);
 }
 const talkName = (n) => (n ? `${n} 님` : '가까이 있는 여행자');
 function talkLine(text, me) {
@@ -1550,13 +1574,14 @@ function talkLine(text, me) {
 }
 function showInvite(m) {
   const box = $('talk-invite');
-  box.querySelector('.ti-text').textContent = `🗨️ ${talkName(m.nick)}이(가) 수다톡을 걸어왔어요`;
+  box.querySelector('.ti-text').textContent = `🗨️ ${talkName(m.nick)}이(가) 수다톡을 걸어왔어요${repText(m.rep)}`;
+  box.querySelector('.ti-yes').textContent = '수락';
+  box.querySelector('.ti-no').textContent = '다음에';
   box.hidden = false;
   clearTimeout(showInvite.tm);
   showInvite.tm = setTimeout(() => (box.hidden = true), 45000);
   box.querySelector('.ti-yes').onclick = () => {
     box.hidden = true;
-    if (!talkAgeOk()) return net.talkAns(m.id, false);
     net.talkAns(m.id, true);
   };
   box.querySelector('.ti-no').onclick = () => {
@@ -1574,7 +1599,7 @@ function onTalkMsg(m) {
     talkState.nick = m.nick;
     talkState.seat = m.with;
     talked.set(m.with, Date.now());
-    $('talk-who').textContent = `🗨️ ${talkName(m.nick)}과(와) 수다톡`;
+    $('talk-who').textContent = `🗨️ ${talkName(m.nick)}${repText(m.rep, true)}`;
     $('talk-list').innerHTML = '';
     talkLine('둘만 보는 대화예요. 서버에 남지 않고, 신고할 때만 최근 대화가 운영자에게 전달돼요.', null);
     $('talk').hidden = false;
@@ -1591,9 +1616,11 @@ function onTalkMsg(m) {
     $('talk').hidden = true;
     $('talk').classList.remove('mini', 'new');
     toast(m.reason === 'me' ? '🗨️ 수다톡을 닫았어요' : m.reason === 'idle' ? '🗨️ 한동안 조용해서 수다톡이 닫혔어요' : `🗨️ ${talkName(talkState.nick)}이(가) 수다톡을 닫았어요`);
+    if (m.canRate) setTimeout(() => askRate(m.nick), 1200);
     return;
   }
-  if (m.t === 'talkreported') toast('🚨 신고했어요. 이 분은 다시 수다톡을 걸 수 없어요');
+  if (m.t === 'talkrated') return toast(m.good ? '👍 좋아요를 남겼어요' : '👎 의견을 남겼어요. 고마워요');
+  if (m.t === 'talkreported') return toast('🚨 신고했어요. 이 분은 다시 수다톡을 걸 수 없어요');
 }
 $('talk-form').addEventListener('submit', (e) => {
   e.preventDefault();

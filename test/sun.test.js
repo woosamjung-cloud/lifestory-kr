@@ -52,3 +52,26 @@ test('크리스마스 특별 운행 표시', () => {
   assert.equal(currentEvent(new Date('2026-12-24T15:00:00+09:00')).special, '크리스마스 이브 해넘이');
   assert.equal(currentEvent(new Date('2026-12-25T06:00:00+09:00')).special, '크리스마스 아침 해돋이');
 });
+
+// 규칙: 같은 지역(30km 안)의 다른 편(열차·비행기)은 배경(scenery)과 바라보는 자리(spot)가 달라야 함
+test('스테이지 규칙: 같은 지역이라도 편마다 배경과 자리가 다름', async () => {
+  const { PLACES } = await import('../public/js/sun.js');
+  const list = Object.values(PLACES);
+  const km = (a, b) => {
+    const r = Math.PI / 180;
+    const d = Math.sin(((b.lat - a.lat) * r) / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(((b.lon - a.lon) * r) / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(d));
+  };
+  for (const p of list) {
+    assert.ok(p.scenery, `${p.key}: 배경(scenery)이 없음`);
+    assert.ok(p.spot, `${p.key}: 바라보는 자리(spot)가 없음`);
+  }
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i];
+      const b = list[j];
+      assert.notEqual(a.spot, b.spot, `${a.key}·${b.key}: 바라보는 자리가 같음`);
+      if (km(a, b) < 30) assert.notEqual(a.scenery, b.scenery, `${a.key}·${b.key}: 같은 지역인데 배경이 같음`);
+    }
+  }
+});

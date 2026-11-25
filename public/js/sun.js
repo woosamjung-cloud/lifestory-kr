@@ -75,6 +75,12 @@ export const PLACES = {
 };
 PLACES.east.scenery = 'beach';
 PLACES.west.scenery = 'deck';
+// 바라보는 자리 (규칙: 같은 지역이라도 편마다 배경·자리가 달라야 함. test/sun.test.js가 검사)
+PLACES.east.spot = '정동진 모래사장 · 동해 수평선';
+PLACES.west.spot = '정서진 데크 · 서해 섬';
+PLACES.haleakala.spot = '할레아칼라 정상 · 구름 바다';
+PLACES.angkor.spot = '앙코르와트 연못 앞 · 사원 실루엣';
+PLACES.santorini.spot = '이아 마을 성채 · 에게해';
 export const PLACE_KEYS = Object.keys(PLACES);
 
 // 현지 시각 "06:12" (해외 명소는 그 나라 시간, 국내는 한국 시간)

@@ -21,7 +21,7 @@ const DATA_FILE = path.join(DATA_DIR, 'counts.json');
 const PORT = Number(process.env.PORT || 3000);
 // 배포 버전 (Render는 커밋 번호를 알려줌). 바뀌면 접속자 화면이 새 버전으로 다시 열림
 const VERSION = process.env.RENDER_GIT_COMMIT || String(Date.now());
-const SEATS = Math.max(1, Number(process.env.SEATS || 1000)); // 장소(방)마다 좌석 수
+const SEATS = Math.max(1, Number(process.env.SEATS || 100)); // 장소(방)마다 좌석 수 (한 공간 100명이 아늑하고 매끄러움)
 const MAX_CLIENTS = Number(process.env.MAX_CLIENTS || 20000); // 서버 전체 접속 상한
 const MAX_PER_IP = Number(process.env.MAX_PER_IP || 30); // 한 IP에서 동시 접속 상한 (회사·학교 와이파이 고려)
 const PEOPLE_IN_SNAPSHOT = 150; // 화면에 그릴 수 있는 앞쪽 좌석만 보냅니다.
@@ -99,12 +99,19 @@ const TALK_IDLE_MS = 20 * 60 * 1000;
 const talkBlocks = new Map(); // visitor -> Set(차단한 visitor)
 let talkSeq = 1;
 const blocked = (a, b) => (talkBlocks.get(a.visitor) || new Set()).has(b.visitor) || (talkBlocks.get(b.visitor) || new Set()).has(a.visitor);
+// 평판: 둘 다 한 줄 이상 말한 수다톡이 끝나면 서로 한 번씩 평가 (같은 짝은 하루에 한 번)
+const rated = new Map(); // "평가한 사람>받은 사람" -> 시각
 function endTalk(c, reason) {
   const s = c.talk;
   if (!s) return;
+  const both = s.lines.some((l) => l[0] === 'a') && s.lines.some((l) => l[0] === 'b');
+  const now = Date.now();
   for (const x of [s.a, s.b]) {
+    const other = x === s.a ? s.b : s.a;
     x.talk = null;
-    send(x.ws, { t: 'talkend', reason: x === c ? 'me' : reason });
+    const canRate = both && reason !== 'report' && now - (rated.get(`${x.visitor}>${other.visitor}`) || 0) > 86400000;
+    x.rateable = canRate ? { visitor: other.visitor, until: now + 10 * 60 * 1000 } : null;
+    send(x.ws, { t: 'talkend', reason: x === c ? 'me' : reason, canRate, nick: other.nick || '' });
   }
 }
 function reportTalk(c) {
@@ -393,7 +400,7 @@ function handle(c, msg) {
       const to = Number(msg.seat);
       const room = rooms[c.room];
       if (c.seat == null || !Number.isInteger(to) || !room || !room.seats[to]) return;
-      send(c.ws, { t: 'who', seat: to, nick: room.seats[to].nick || '' });
+      send(c.ws, { t: 'who', seat: to, nick: room.seats[to].nick || '', rep: shop.rep(room.seats[to].visitor) });
       return;
     }
     case 'hello': {
@@ -528,7 +535,7 @@ function handle(c, msg) {
       const id = talkSeq++;
       target.talkInvites = target.talkInvites || new Map();
       target.talkInvites.set(id, { from: c, at: now });
-      send(target.ws, { t: 'talkask', id, from: c.seat, nick: c.nick || '' });
+      send(target.ws, { t: 'talkask', id, from: c.seat, nick: c.nick || '', rep: shop.rep(c.visitor) });
       send(c.ws, { t: 'talkwait', to });
       return;
     }
@@ -552,8 +559,8 @@ function handle(c, msg) {
       room.talks = room.talks || new Map();
       room.talks.set(pairKey(c.visitor, from.visitor), now); // 수다 나눈 사이: 하트 가능
       bump('talk');
-      send(from.ws, { t: 'talkopen', with: c.seat, nick: c.nick || '' });
-      send(c.ws, { t: 'talkopen', with: from.seat, nick: from.nick || '' });
+      send(from.ws, { t: 'talkopen', with: c.seat, nick: c.nick || '', rep: shop.rep(c.visitor) });
+      send(c.ws, { t: 'talkopen', with: from.seat, nick: from.nick || '', rep: shop.rep(from.visitor) });
       return;
     }
     case 'talk': {
@@ -576,6 +583,19 @@ function handle(c, msg) {
       endTalk(c, 'left');
       return;
     }
+    case 'rate': {
+      // 끝난 수다톡 상대 평가: 좋아요 / 별로예요
+      const r = c.rateable;
+      if (!r || now > r.until || typeof msg.good !== 'boolean') return;
+      c.rateable = null;
+      const key = `${c.visitor}>${r.visitor}`;
+      if (now - (rated.get(key) || 0) < 86400000) return;
+      rated.set(key, now);
+      shop.rate(r.visitor, msg.good);
+      bump(msg.good ? 'rateup' : 'ratedown');
+      send(c.ws, { t: 'talkrated', good: msg.good });
+      return;
+    }
     case 'talkreport': {
       // 신고: 최근 대화를 남기고, 서로 다시 신청 못 하게 차단한 뒤 닫음
       const s = c.talk;
@@ -584,7 +604,9 @@ function handle(c, msg) {
       reportTalk(c);
       if (!talkBlocks.has(c.visitor)) talkBlocks.set(c.visitor, new Set());
       talkBlocks.get(c.visitor).add(other.visitor);
-      endTalk(c, 'left');
+      shop.rate(other.visitor, false); // 신고는 별로예요 하나로 셈
+      rated.set(`${c.visitor}>${other.visitor}`, now);
+      endTalk(c, 'report');
       send(c.ws, { t: 'talkreported' });
       return;
     }
@@ -1019,6 +1041,7 @@ setInterval(() => {
     if (c.talk && c.talk.a === c && now - c.talk.last > TALK_IDLE_MS) endTalk(c, 'idle');
     if (c.talkInvites) for (const [id, v] of c.talkInvites) if (now - v.at > 60000) c.talkInvites.delete(id);
   }
+  for (const [k, t] of rated) if (now - t > 86400000) rated.delete(k);
 }, 30 * 1000).unref();
 
 // 한마디 나눈 짝 기록은 30분 지나면 지움 (오래 켜 둬도 쌓이지 않게)
