@@ -11,6 +11,7 @@ import {
   solarPosition,
 } from './sun.js';
 import { Scene, FUEL_SECONDS } from './scene.js';
+import { TrainIntro } from './train.js';
 import { CHAR_LIST, BLANKETS, HAIRS, PETS, renderPortrait, renderPetPortrait } from './characters.js';
 import { Net } from './net.js';
 import { makeTicket, makeProofCard, downloadCanvas, shareImage } from './cards.js';
@@ -703,32 +704,43 @@ $('board').addEventListener('click', () => {
   }
   if (store.get('sound', true)) ambience.start().then((ok) => {
     syncIosBed();
-    if (ok) setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 3200);
+    if (ok) setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 4800);
   });
   show('ride');
   playTrain(state.event);
 });
 
+// 장소로 가는 막간: 이불 속에서 끊은 승차권으로 열차를 타고 출발 (화면을 누르면 바로 도착)
+const trainIntro = new TrainIntro($('train-cv'));
 function playTrain(ev) {
   const place = PLACES[ev.place];
   $('train-text').textContent = `${place.name}행 ${ev.kind === 'sunrise' ? '해돋이호' : '해넘이호'}가 출발합니다`;
-  $('train-sign').textContent = ev.kind === 'sunrise' ? '해돋이 특별열차' : '해넘이 특별열차';
   const ov = $('train');
-  // 그 장소의 지금 해 높이로 낮·밤 (해가 지평선 아래 2도보다 낮으면 밤: 형광등, 위면 낮: 햇빛 반사)
-  const el = solarPosition(realNow(), place.lat, place.lon).elevation;
-  ov.classList.toggle('night', el < -2);
-  ov.classList.toggle('day', el >= -2);
+  // 그 장소의 지금 해 높이로 낮·밤 (지평선 아래 2도보다 낮으면 밤: 아파트 야경, 위면 낮: 산과 들)
+  const night = solarPosition(realNow(), place.lat, place.lon).elevation < -2;
+  ov.classList.toggle('night', night);
+  ov.classList.toggle('day', !night);
   ov.hidden = false;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ms = reduce ? 1400 : 4200;
+  trainIntro.play({ night, kind: ev.kind, duration: ms, still: reduce });
   // 기차 소리 (소리가 켜져 있을 때만, 탑승 직후엔 소리가 켜질 때까지 잠깐 기다림)
   setTimeout(() => ambience.train(), 250);
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  setTimeout(() => {
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    ov.removeEventListener('pointerdown', finish);
+    trainIntro.stop();
     ov.hidden = true;
     const diff = ev.time - realNow();
     if (diff > 90 * 60000) {
       toast(`${ev.kind === 'sunrise' ? '해돋이' : '해넘이'}까지 ${Math.round(diff / 3600000)}시간쯤 남았어요. ☰ 에서 미리보기를 해 보세요`);
     }
-  }, reduce ? 900 : 2700);
+  };
+  const timer = setTimeout(finish, ms);
+  setTimeout(() => ov.addEventListener('pointerdown', finish), 300);
 }
 
 // ---------- 탑승 중 버튼 ----------

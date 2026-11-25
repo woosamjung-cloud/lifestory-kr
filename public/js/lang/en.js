@@ -73,6 +73,8 @@ const TEXT = {
   '방금': 'just now',
   '해돋이 특별열차': 'Sunrise special',
   '해넘이 특별열차': 'Sunset special',
+  '이불 밖은 추우니까, 이불 속에서 끊은 승차권으로': 'Too cold outside the blanket, so with a ticket bought from under it',
+  '화면을 누르면 바로 도착해요': 'Tap to arrive right away',
   '크리스마스 아침 해돋이': 'Christmas morning sunrise',
   '크리스마스 이브 해넘이': 'Christmas Eve sunset',
   '해돋이 보는 중': 'Watching the sunrise',
