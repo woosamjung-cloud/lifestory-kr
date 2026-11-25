@@ -81,6 +81,7 @@ export class Net {
       else if (m.t === 'whisper' && this.h.onWhisper) this.h.onWhisper(m);
       else if (m.t === 'who' && this.h.onWho) this.h.onWho(m);
       else if (m.t === 'nickok' && this.h.onNickOk) this.h.onNickOk(m);
+      else if ((m.t === 'labels' || m.t === 'label') && this.h.onLabels) this.h.onLabels(m.map || {}, m.t === 'labels');
     };
     ws.onclose = () => {
       clearTimeout(giveUp);
@@ -101,8 +102,8 @@ export class Net {
     if (this.ws && this.connected) this.ws.send(JSON.stringify(msg));
   }
 
-  join(room, char, color, hair = 0, pet = 0, nick = '') {
-    this.want = { room, char, color, hair, pet, nick };
+  join(room, char, color, hair = 0, pet = 0, nick = '', petName = '', tag = false) {
+    this.want = { room, char, color, hair, pet, nick, petName, tag };
     this.send({ t: 'join', ...this.want, visitor: this.visitor });
   }
 
@@ -149,9 +150,17 @@ export class Net {
     this.send({ t: 'who', seat });
   }
 
-  nick(nick) {
-    if (this.want) this.want.nick = nick;
-    this.send({ t: 'nick', nick });
+  // 별명·친구 이름·이름표 보이기 (petName, tag는 생략 가능)
+  nick(nick, petName, tag) {
+    if (this.want) {
+      this.want.nick = nick;
+      if (petName !== undefined) this.want.petName = petName;
+      if (tag !== undefined) this.want.tag = tag;
+    }
+    const m = { t: 'nick', nick };
+    if (petName !== undefined) m.petName = petName;
+    if (tag !== undefined) m.tag = tag;
+    this.send(m);
   }
 
   whisper(seat, i) {

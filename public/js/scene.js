@@ -205,6 +205,8 @@ export class Scene {
     this.tiltG = 0; // 휴대폰 좌우 기울기 (도)
     this.time = new Date();
     this.people = []; // 다른 승객 [{id, seat, char, color}]
+    this.labels = new Map(); // 좌석 -> [별명, 친구 이름] (본인이 이름표를 켠 사람만)
+    this.showTags = true; // 다른 사람 이름표 보기
     this.self = null; // { char, color, name }
     this.selfSeat = null;
     this.effects = [];
@@ -967,6 +969,7 @@ export class Scene {
     this.drawFireGlow(ctx, fire, nowMs, fireNight);
     draw.push({ sl: { y: fire.y, x: fire.x }, fire: true });
     draw.sort((a, b) => a.sl.y - b.sl.y);
+    const tags = [];
     for (const { sl, p, fire: isFire } of draw) {
       if (isFire) {
         this.drawFire(ctx, fire, nowMs, fireNight);
@@ -981,6 +984,7 @@ export class Scene {
       if (sl.phase == null) sl.phase = Math.random() * 10000;
       const raining = wet && (p.me ? !!this.selfItems.raincoat : !!(p.flags & 8));
       const standing = sl.walking || (p.me ? this.selfUp : p.up);
+      if (!p.me && this.showTags && this.labels.has(p.seat)) tags.push({ x: sl.x, y: sl.y - sl.s * (standing ? 1.85 : 1.38), s: sl.s, l: this.labels.get(p.seat) });
       if (standing) {
         // 걷는 중이거나 서 있는 중 (아래로 쓸면 앉음)
         const still = !sl.walking;
@@ -1019,8 +1023,8 @@ export class Scene {
         const pt = this.pettingAt(sl, nowMs, hopT <= 0 && !celebrating);
         drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: hopNow, petted: pt.pet, coat: raining });
         if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs, petSize: (BREEDS[p.pet] || BREEDS[1]).size, coat: raining });
-        // 내 친구 이름 (내 화면에만)
-        if (p.me && p.petName) {
+        // 내 친구 이름 (이름표를 끈 경우 내 화면에만, 켜면 이름표 한 줄에 함께)
+        if (p.me && p.petName && !p.tag) {
           const sz = (BREEDS[p.pet] || BREEDS[1]).size;
           ctx.font = `700 ${Math.max(10, sl.s * 0.15)}px "Gowun Batang", serif`;
           ctx.textAlign = 'center';
@@ -1044,20 +1048,55 @@ export class Scene {
     this.drawFireLight(ctx, fire, nowMs, fireNight);
     this.drawFuelHint(ctx, fire, nowMs);
 
-    // 내 이름표
+    // 다른 사람 이름표 (RPG처럼 머리 위, 은은하게). 가까운 사람부터 놓고, 겹치면 한 칸 위로, 그래도 겹치면 생략
+    const placed = [];
     if (this.self && !this.selfStanding) {
       const sl = this.mySlot;
-      const label = this.self.name ? `나 · ${this.self.name}` : '나';
-      ctx.font = `700 ${Math.max(12, sl.s * 0.22)}px "Gowun Batang", serif`;
-      const tw = ctx.measureText(label).width + 16;
+      placed.push({ x: sl.x - sl.s * 0.9, y: sl.y - sl.s * 1.85 - 12, w: sl.s * 1.8, h: 22 });
+    }
+    const hit = (r) => placed.some((q) => r.x < q.x + q.w && r.x + r.w > q.x && r.y < q.y + q.h && r.y + r.h > q.y);
+    tags.sort((a, b) => b.y - a.y);
+    for (const g of tags) {
+      const m = this.measureTag(ctx, g.s, g.l[0], g.l[1]);
+      let y = g.y;
+      let r = { x: g.x - m.w / 2 - 2, y: y - m.h / 2 - 1, w: m.w + 4, h: m.h + 2 };
+      if (hit(r)) {
+        y -= m.h + 2;
+        r = { ...r, y: y - m.h / 2 - 1 };
+        if (hit(r)) continue;
+      }
+      placed.push(r);
+      this.drawTag(ctx, g.x, y, g.s, g.l[0], g.l[1]);
+    }
+
+    // 내 이름표 (이름표를 켜면 친구 이름도 한 줄에, 조금 작게)
+    if (this.self && !this.selfStanding) {
+      const sl = this.mySlot;
+      const pet = this.self.tag && this.self.pet ? this.self.petName || '' : '';
+      const main = this.self.name ? `나 · ${this.self.name}` : '나';
+      const big = Math.max(12, sl.s * 0.22);
+      const small = big - 2;
+      ctx.font = `700 ${big}px "Gowun Batang", serif`;
+      const w1 = ctx.measureText(main).width;
+      const sep = pet ? ' · ' : '';
+      ctx.font = `700 ${small}px "Gowun Batang", serif`;
+      const w2 = pet ? ctx.measureText(sep + pet).width : 0;
+      const tw = w1 + w2 + 16;
       const ly = sl.y - sl.s * 1.85;
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       roundRect(ctx, sl.x - tw / 2, ly - 12, tw, 22, 11);
       ctx.fill();
       ctx.fillStyle = '#3b2a20';
-      ctx.textAlign = 'center';
+      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, sl.x, ly - 1);
+      const x0 = sl.x - (w1 + w2) / 2;
+      ctx.font = `700 ${big}px "Gowun Batang", serif`;
+      ctx.fillText(main, x0, ly - 1);
+      if (pet) {
+        ctx.font = `700 ${small}px "Gowun Batang", serif`;
+        ctx.fillStyle = '#6b4a36';
+        ctx.fillText(sep + pet, x0 + w1, ly - 1);
+      }
     }
 
     // 효과들
@@ -1159,6 +1198,44 @@ export class Scene {
   }
 
   // 불이 약해지면 모닥불 옆에 '🪵 장작' 표시가 천천히 깜빡임
+  // 이름표 한 줄: 별명 · 친구 이름(2px 작게). 어두운 반투명 바탕에 밝은 글씨 (불멍을 가리지 않게 은은하게)
+  measureTag(ctx, s, nick, pet) {
+    const big = Math.max(9, Math.min(13, s * 0.17));
+    ctx.font = `600 ${big}px "Gowun Batang", serif`;
+    const w1 = nick ? ctx.measureText(nick).width : 0;
+    ctx.font = `600 ${big - 2}px "Gowun Batang", serif`;
+    const w2 = pet ? ctx.measureText((nick ? ' · ' : '') + pet).width : 0;
+    return { w: w1 + w2 + 10, h: big + 6 };
+  }
+
+  drawTag(ctx, x, y, s, nick, pet) {
+    const big = Math.max(9, Math.min(13, s * 0.17));
+    const small = big - 2;
+    const sep = nick && pet ? ' · ' : '';
+    ctx.font = `600 ${big}px "Gowun Batang", serif`;
+    const w1 = nick ? ctx.measureText(nick).width : 0;
+    ctx.font = `600 ${small}px "Gowun Batang", serif`;
+    const w2 = pet ? ctx.measureText(sep + pet).width : 0;
+    const tw = w1 + w2 + 10;
+    const h = big + 6;
+    ctx.fillStyle = 'rgba(20,14,12,0.32)';
+    roundRect(ctx, x - tw / 2, y - h / 2, tw, h, h / 2);
+    ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const x0 = x - (w1 + w2) / 2;
+    if (nick) {
+      ctx.font = `600 ${big}px "Gowun Batang", serif`;
+      ctx.fillStyle = 'rgba(255,250,240,0.88)';
+      ctx.fillText(nick, x0, y + 0.5);
+    }
+    if (pet) {
+      ctx.font = `600 ${small}px "Gowun Batang", serif`;
+      ctx.fillStyle = 'rgba(255,232,200,0.8)';
+      ctx.fillText(sep + pet, x0 + w1, y + 0.5);
+    }
+  }
+
   drawFuelHint(ctx, f, t) {
     if (this.fuel == null || this.selfStanding) return;
     // 남은 시간이 4분쯤일 때만 모닥불 아래 게이지가 나타나 천천히 깜빡임 (남은 4분이 줄어드는 만큼 짧아짐)

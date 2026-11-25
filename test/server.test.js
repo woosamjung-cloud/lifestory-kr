@@ -302,6 +302,32 @@ test('보안: 깨진 주소에도 서버가 살아 있고, 보안 헤더가 붙�
   assert.ok([403, 404].includes(trav2.status));
 });
 
+test('이름표: 켠 사람만 [별명, 친구 이름]이 같은 방 사람에게 가고, 끄면 사라짐', async () => {
+  const [a, b] = await Promise.all([client(), client()]);
+  a.send(JSON.stringify({ t: 'join', room: 'west', char: 'cat', color: 1, pet: 3, nick: '별빛', petName: '콩이', tag: true }));
+  await wait(300);
+  b.send(JSON.stringify({ t: 'join', room: 'west', char: 'cat', color: 2, pet: 0, nick: '달빛', tag: false }));
+  await wait(1300);
+  const sa = last(a, 'seat').seat;
+  const sb = last(b, 'seat').seat;
+  const full = last(b, 'labels').map;
+  assert.deepEqual(full[sa], ['별빛', '콩이']);
+  assert.equal(full[sb], undefined); // 이름표를 끈 사람은 없음
+  // 나쁜 친구 이름은 거절
+  a.send(JSON.stringify({ t: 'nick', nick: '별빛', petName: '010-1234-5678' }));
+  await wait(300);
+  assert.ok(last(a, 'nickok').error);
+  // 이름표 끄기 → 다른 사람에게 null
+  await wait(3100);
+  a.send(JSON.stringify({ t: 'nick', nick: '별빛', tag: false }));
+  await wait(1300);
+  const diffs = b.inbox.filter((m) => m.t === 'label' && sa in m.map);
+  assert.equal(diffs.pop().map[sa], null);
+  a.close();
+  b.close();
+  await wait(200);
+});
+
 test('보안: 너무 큰 요청은 413, 배열·이상한 본문은 400', async () => {
   const big = await fetch(`http://localhost:${PORT}/api/shop/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(10000) });
   assert.equal(big.status, 413);

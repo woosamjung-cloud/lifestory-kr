@@ -76,9 +76,10 @@
         <span class="field-label" id="pet-label" data-i18n="form.pet">함께 온 친구</span>
         <div class="pet-row" id="pet-row" role="radiogroup" aria-labelledby="pet-label"></div>
         <div class="petname-wrap" id="petname-wrap" hidden>
-          <label class="field-label" for="petname"><span data-i18n="form.petName">친구 이름</span> <span class="muted" data-i18n="form.petNameHint">(선택, 내 화면에만 보여요)</span></label>
+          <label class="field-label" for="petname"><span data-i18n="form.petName">친구 이름</span> <span class="muted" data-i18n="form.petNameHint2">(선택, 이름표를 켜면 함께 보여요)</span></label>
           <input id="petname" maxlength="8" placeholder="예) 콩이" autocomplete="off" data-i18n-ph="form.petNamePh">
         </div>
+        <label class="check-row"><input type="checkbox" id="tag-on"> <span data-i18n="form.tagOn">머리 위에 내 이름표 보이기</span> <span class="muted" data-i18n="form.tagHint">(별명 · 친구 이름)</span></label>
 
         <button type="submit" class="btn primary big" id="get-ticket" data-i18n="form.ticket">승차권 받기</button>
       </form>
@@ -186,7 +187,7 @@
     </div>
     <button class="btn wide" id="preview-start">⏩ 해돋이 장면 60초 미리보기</button>
     <button class="btn wide" id="menu-shop">🎁 상점 · 내 아이템</button>
-    <button class="btn wide" id="menu-nick">🙂 별명 바꾸기</button>
+    <button class="btn wide" id="menu-nick">🙂 별명 · 이름표</button>
     <button class="btn wide" id="menu-music" hidden>🎵 우리 음악</button>
     <button class="btn wide" id="show-help">이용 안내</button>
     <button class="btn wide ghost" id="menu-close">닫기</button>
@@ -292,9 +293,15 @@
   <!-- 별명 바꾸기 -->
   <dialog id="nickdlg" class="modal">
     <form method="dialog" id="nick-form">
-      <h3>별명 바꾸기</h3>
+      <h3>별명 · 이름표</h3>
       <p class="muted small">가까이 다가온 사람이 나를 누르면 이 별명이 보여요. 승차권에도 적혀요.</p>
       <input id="nick-input" maxlength="10" placeholder="예) 잠꾸러기" autocomplete="off">
+      <div id="nick-pet-wrap" hidden>
+        <p class="muted small" style="margin:10px 0 4px">함께 온 친구 이름</p>
+        <input id="nick-pet" maxlength="8" placeholder="예) 콩이" autocomplete="off">
+      </div>
+      <label class="check-row"><input type="checkbox" id="nick-tag"> 머리 위에 내 이름표 보이기 <span class="muted">(별명 · 친구 이름)</span></label>
+      <label class="check-row"><input type="checkbox" id="nick-see"> 다른 사람 이름표 보기</label>
       <div class="btn-row">
         <button class="btn ghost" value="cancel">취소</button>
         <button class="btn primary" value="save">바꾸기</button>

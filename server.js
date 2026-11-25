@@ -62,6 +62,36 @@ function setNick(c, raw) {
   c.nick = r.text;
   return true;
 }
+// 강아지·고양이 이름 (8자, 별명과 같은 거름망)
+function setPetName(c, raw) {
+  if (raw == null || raw === '') {
+    c.petName = '';
+    return true;
+  }
+  const r = cleanCustom(String(raw).slice(0, 16));
+  if (r.error || [...r.text].length > 8) return false;
+  c.petName = r.text;
+  return true;
+}
+// 머리 위 이름표: 본인이 켠 경우에만 [별명, 친구 이름]
+function labelOf(c) {
+  if (!c.tag) return null;
+  const nick = c.nick || '';
+  const pet = c.pet ? c.petName || '' : '';
+  return nick || pet ? [nick, pet] : null;
+}
+function markLabel(c) {
+  const room = c.room && rooms[c.room];
+  if (room && c.seat != null) room.labelDiff.set(c.seat, labelOf(c));
+}
+function labelsOf(room) {
+  const map = {};
+  room.seats.forEach((s, i) => {
+    const l = s && labelOf(s);
+    if (l) map[i] = l;
+  });
+  return map;
+}
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink'];
 const dailyVisitors = new Map(); // dateKey -> Set(visitorId)  (메모리에만, 하루 지나면 지움)
@@ -127,6 +157,7 @@ const rooms = Object.fromEntries(
       queue: [], // 대기 중인 client
       members: new Set(),
       fx: [], // 모아서 보낼 효과
+      labelDiff: new Map(), // 바뀐 이름표 (좌석 -> [별명, 친구 이름] 또는 null), 1초마다 모아서 보냄
       dirty: true,
     },
   ]),
@@ -170,6 +201,8 @@ function seatClient(room, c) {
   c.pos = null; // 걸어간 자리 (없으면 원래 좌석)
   c.queued = false;
   send(c.ws, { t: 'seat', seat: idx });
+  send(c.ws, { t: 'labels', map: labelsOf(room) });
+  markLabel(c);
   markWitness(room, c);
   return true;
 }
@@ -196,7 +229,10 @@ function leaveRoom(c) {
   const room = c.room && rooms[c.room];
   if (!room) return;
   room.members.delete(c);
-  if (c.seat != null && room.seats[c.seat] === c) room.seats[c.seat] = null;
+  if (c.seat != null && room.seats[c.seat] === c) {
+    room.seats[c.seat] = null;
+    room.labelDiff.set(c.seat, null);
+  }
   const qi = room.queue.indexOf(c);
   if (qi !== -1) room.queue.splice(qi, 1);
   c.seat = null;
@@ -274,6 +310,11 @@ let tick = 0;
 setInterval(() => {
   tick++;
   for (const room of Object.values(rooms)) {
+    if (room.labelDiff.size) {
+      const msg = JSON.stringify({ t: 'label', map: Object.fromEntries(room.labelDiff) });
+      room.labelDiff.clear();
+      for (const c of room.members) if (c.seat != null && c.ws.readyState === c.ws.OPEN) c.ws.send(msg);
+    }
     const busy = room.members.size > 200;
     if (busy ? tick % 2 !== 0 : !room.dirty && tick % 5 !== 0) continue;
     room.dirty = false;
@@ -301,7 +342,10 @@ function handle(c, msg) {
       c.pet = Number.isInteger(msg.pet) ? Math.abs(msg.pet) % 10 : 0; // 0 없음, 1~9 품종 (characters.js BREEDS)
       if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
       setNick(c, msg.nick);
+      setPetName(c, msg.petName);
+      c.tag = msg.tag === true;
       joinRoom(c, msg.room);
+      markLabel(c);
       return;
     }
     case 'nick': {
@@ -309,7 +353,10 @@ function handle(c, msg) {
       if (now - (c.lastNick || 0) < 3000) return;
       c.lastNick = now;
       const ok = setNick(c, msg.nick);
-      send(c.ws, { t: 'nickok', nick: c.nick || '', error: ok ? null : '그 별명은 쓸 수 없어요' });
+      const okPet = msg.petName === undefined ? true : setPetName(c, msg.petName);
+      if (typeof msg.tag === 'boolean') c.tag = msg.tag;
+      markLabel(c);
+      send(c.ws, { t: 'nickok', nick: c.nick || '', petName: c.petName || '', error: ok ? (okPet ? null : '그 친구 이름은 쓸 수 없어요') : '그 별명은 쓸 수 없어요' });
       return;
     }
     case 'who': {

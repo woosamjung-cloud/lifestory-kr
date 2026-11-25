@@ -429,6 +429,13 @@ const TEXT = {
 
   // ---------- 별명 · 소셜 로그인 ----------
   '🙂 별명 바꾸기': '🙂 Change nickname',
+  '🙂 별명 · 이름표': '🙂 Nickname · name tag',
+  '별명 · 이름표': 'Nickname · name tag',
+  '함께 온 친구 이름': 'Your pet’s name',
+  '머리 위에 내 이름표 보이기': 'Show my name tag above my head',
+  '(별명 · 친구 이름)': '(nickname · pet name)',
+  '다른 사람 이름표 보기': 'Show other people’s name tags',
+  '그 친구 이름은 쓸 수 없어요': 'That pet name can’t be used',
   '별명 바꾸기': 'Change nickname',
   '가까이 다가온 사람이 나를 누르면 이 별명이 보여요. 승차권에도 적혀요.': 'People nearby see this when they tap you. It’s on your ticket too.',
   '바꾸기': 'Save',
@@ -577,6 +584,9 @@ export default {
     'form.pet': 'Your buddy',
     'form.petName': 'Buddy’s name',
     'form.petNameHint': '(optional, only you can see it)',
+    'form.petNameHint2': '(optional, shown on your name tag if it’s on)',
+    'form.tagOn': 'Show my name tag above my head',
+    'form.tagHint': '(nickname · pet name)',
     'form.petNamePh': 'e.g. Bean',
     'form.ticket': 'Get my ticket',
     'form.fine': 'No sign-up, no install · What you write stays on your device',

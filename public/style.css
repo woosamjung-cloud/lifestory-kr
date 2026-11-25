@@ -789,3 +789,8 @@ html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }
 .social .naver { background: #03c75a; color: #fff; }
 .or-line { text-align: center; font-size: 12.5px; color: var(--muted); margin: 8px 0; }
 .person-menu .pm-nick { font-size: 16px; font-weight: 700; color: var(--ink); padding: 4px 6px 6px; }
+
+/* 이름표 설정 체크 줄 */
+.check-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; font-size: 0.95em; cursor: pointer; flex-wrap: wrap; }
+.check-row input { width: 18px; height: 18px; margin: 0; accent-color: #c8453e; flex: none; }
+.check-row .muted { font-size: 0.85em; }

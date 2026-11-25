@@ -67,7 +67,7 @@ const store = {
 
 const state = {
   screen: 'home',
-  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0), petName: store.get('petName', '') },
+  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0), petName: store.get('petName', ''), tag: store.get('tag', false) },
   placeMode: 'auto', // auto | east | west
   event: null,
   netStatus: 'connecting',
@@ -85,6 +85,7 @@ if (!CHAR_LIST.some((c) => c.key === state.profile.char)) state.profile.char = C
 state.profile.color = Math.abs(Number(state.profile.color) || 0) % 8;
 
 const scene = new Scene($('scene'));
+scene.showTags = store.get('showTags', true);
 const ambience = new Ambience();
 const music = new Music();
 
@@ -94,6 +95,7 @@ const net = new Net({
     state.netStatus = s;
     if (s !== 'online') {
       scene.people = [];
+      scene.labels.clear();
       state.room = null;
     }
     updateOnlineLabels();
@@ -146,6 +148,14 @@ const net = new Net({
   onNickOk(m) {
     if (m.error) return toast(m.error);
     toast(m.nick ? `🙂 별명을 "${m.nick}"(으)로 바꿨어요` : '🙂 별명을 지웠어요');
+  },
+  onLabels(map, full) {
+    if (full) scene.labels.clear();
+    for (const [k, v] of Object.entries(map)) {
+      const seat = Number(k);
+      if (Array.isArray(v) && seat !== state.seat) scene.labels.set(seat, [String(v[0] || '').slice(0, 10), String(v[1] || '').slice(0, 8)]);
+      else scene.labels.delete(seat);
+    }
   },
   onWhisper(m) {
     const text = shopInfo && shopInfo.whispers[m.i];
@@ -349,7 +359,7 @@ function applyEvent(ev, { animate = false } = {}) {
   if (placeChanged) {
     state.room = null;
     scene.people = [];
-    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name);
+    if (state.screen === 'ride' || state.joined) net.join(ev.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name, state.profile.petName, !!state.profile.tag);
     if (animate && state.screen === 'ride') playTrain(ev);
   }
   renderEventTexts();
@@ -573,6 +583,7 @@ function buildPicker() {
   });
   $('petname').value = state.profile.petName;
   $('nick').value = state.profile.name;
+  $('tag-on').checked = !!state.profile.tag;
   refreshPicker();
 }
 
@@ -620,10 +631,12 @@ $('board-form').addEventListener('submit', async (e) => {
   store.set('pet', state.profile.pet);
   state.profile.petName = $('petname').value.trim().slice(0, 8);
   store.set('petName', state.profile.petName);
+  state.profile.tag = $('tag-on').checked;
+  store.set('tag', state.profile.tag);
 
   // 승차권에 실제 좌석 번호를 넣기 위해 먼저 자리를 잡습니다.
   state.joined = true;
-  net.join(state.event.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name);
+  net.join(state.event.place, state.profile.char, state.profile.color, state.profile.hair, state.profile.pet, state.profile.name, state.profile.petName, !!state.profile.tag);
   await waitForSeat(1500);
 
   ticketCanvas = await makeTicket({
@@ -1880,16 +1893,30 @@ $('menu-music').addEventListener('click', () => openMusicList(null));
 $('menu-nick').addEventListener('click', () => {
   $('menu').close();
   $('nick-input').value = state.profile.name || '';
+  $('nick-pet').value = state.profile.petName || '';
+  $('nick-pet-wrap').hidden = !state.profile.pet;
+  $('nick-tag').checked = !!state.profile.tag;
+  $('nick-see').checked = scene.showTags;
   $('nickdlg').showModal();
 });
 $('nick-form').addEventListener('submit', (e) => {
   if (!(e.submitter && e.submitter.value === 'save')) return;
   const v = $('nick-input').value.trim().slice(0, 10);
+  const pn = $('nick-pet').value.trim().slice(0, 8);
+  const tag = $('nick-tag').checked;
   state.profile.name = v;
+  state.profile.petName = pn;
+  state.profile.tag = tag;
   store.set('name', v);
+  store.set('petName', pn);
+  store.set('tag', tag);
+  scene.showTags = $('nick-see').checked;
+  store.set('showTags', scene.showTags);
   $('nick').value = v;
-  if (scene.self) scene.self.name = v;
-  net.nick(v);
+  $('petname').value = pn;
+  $('tag-on').checked = tag;
+  if (scene.self) Object.assign(scene.self, { name: v, petName: pn, tag });
+  net.nick(v, pn, tag);
   if (state.netStatus !== 'online') toast(v ? `🙂 별명을 "${v}"(으)로 바꿨어요` : '🙂 별명을 지웠어요');
 });
 $('music-close').addEventListener('click', () => $('musicdlg').close());
