@@ -1265,9 +1265,11 @@ export class Scene {
         const cx = r() * W;
         const n = 6 + Math.floor(r() * 14);
         const spread = 20 + r() * 70;
-        for (let i = 0; i < n; i++) wave.foam.push({ x: cx + (r() - 0.5) * spread, d: r() * 7, s: 0.6 + r() * 1.6, life: 0.55 + r() * 0.45 });
+        for (let i = 0; i < n; i++) wave.foam.push({ x: cx + (r() - 0.5) * spread, d: r() * 7, s: 0.6 + r() * 1.6, life: 0.55 + r() * 0.45, g: r() < 0.5 ? 0 : 1, ox: (r() - 0.5) * 2.4, oy: (r() - 0.5) * 1.6 });
       }
-      for (let i = 0; i < 30; i++) wave.foam.push({ x: r() * W, d: r() * 5, s: 0.5 + r() * 1, life: 0.4 + r() * 0.4 });
+      for (let i = 0; i < 30; i++) wave.foam.push({ x: r() * W, d: r() * 5, s: 0.5 + r() * 1, life: 0.4 + r() * 0.4, g: r() < 0.5 ? 0 : 1, ox: (r() - 0.5) * 2.4, oy: (r() - 0.5) * 1.6 });
+      // 물막·젖은 모래 위 햇빛 반짝임 자리 (파도마다 다르게)
+      wave.glints = Array.from({ length: 26 + Math.floor(r() * 20) }, () => ({ x: r() * W, d: 0.25 + r() * 0.75, ph: r() * 6.28, sp: 240 + r() * 260, s: 0.8 + r() * 1.4 }));
       sw.waves.push(wave);
       // 다음 파도: 이번 파도가 빠지는 중간쯤 (가끔은 일찍 와서 겹침)
       sw.next = nowMs + dur * (0.55 + Math.random() * 0.45);
@@ -1289,6 +1291,24 @@ export class Scene {
     };
     const wet = (a) => `rgba(96,70,45,${(a * (0.6 + 0.4 * bright)).toFixed(3)})`;
     const dim = 0.45 + 0.55 * bright;
+    // 물보라 두 컷이 번갈아 비침 (번들번들): 컷 A가 밝아지면 컷 B가 옅어짐
+    const cut = [0.5 + 0.5 * Math.sin(nowMs / 210), 0.5 - 0.5 * Math.sin(nowMs / 210)];
+    // 반짝임: 해가 있으면 따뜻한 흰빛, 밤엔 아주 옅게
+    const glintK = 0.25 + 0.75 * bright;
+    const glint = (x, y, s, a) => {
+      if (a < 0.03) return;
+      ctx.fillStyle = `rgba(255,248,225,${a.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(x - s * 2.2, y);
+      ctx.lineTo(x, y - s * 0.5);
+      ctx.lineTo(x + s * 2.2, y);
+      ctx.lineTo(x, y + s * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y, s * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+    };
     // 오래된 파도부터 (젖은 자국 → 물)
     sw.waves = sw.waves.filter((w) => (nowMs - w.t0) / w.dur < 2.2);
     for (const w of sw.waves) {
@@ -1313,12 +1333,20 @@ export class Scene {
         const q = (p - 0.38) / 0.9;
         for (const f of w.foam) {
           if (q > f.life) continue;
-          const a = (1 - q / f.life) * 0.55 * dim;
-          const y = edge(f.x) + reachOf(f.x, w) - 1 - f.d * 0.6;
+          const a = (1 - q / f.life) * 0.55 * dim * (0.55 + 0.45 * cut[f.g]);
+          const y = edge(f.x) + reachOf(f.x, w) - 1 - f.d * 0.6 + (f.g ? f.oy : 0);
           ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
           ctx.beginPath();
-          ctx.arc(f.x, y, f.s * (1 - q * 0.4), 0, Math.PI * 2);
+          ctx.arc(f.x + (f.g ? f.ox : 0), y, f.s * (1 - q * 0.4), 0, Math.PI * 2);
           ctx.fill();
+        }
+        // 막 빠진 젖은 모래 위 반짝임
+        if (p < 0.95) {
+          const fade = Math.sin(clamp((p - 0.38) / 0.57) * Math.PI) * 0.7 * glintK;
+          for (const gl of w.glints) {
+            const tw = Math.max(0, Math.sin(nowMs / gl.sp + gl.ph)) ** 6;
+            glint(gl.x, edge(gl.x) + reachOf(gl.x, w) * (0.55 + gl.d * 0.45), gl.s * 0.8, tw * fade);
+          }
         }
       }
       if (runup <= 0.01) continue;
@@ -1327,8 +1355,19 @@ export class Scene {
       sheet.addColorStop(0, `rgba(170,205,215,${(0.42 * (0.5 + 0.5 * bright)).toFixed(3)})`);
       sheet.addColorStop(1, `rgba(225,240,240,${(0.3 * (0.5 + 0.5 * bright)).toFixed(3)})`);
       band(w, runup, sheet);
+      // 물막 위 햇빛 반짝임 (자리 고정, 제각각 반짝)
+      for (const gl of w.glints) {
+        const tw = Math.max(0, Math.sin(nowMs / gl.sp + gl.ph)) ** 5;
+        glint(gl.x, edge(gl.x) + reachOf(gl.x, w) * runup * gl.d, gl.s, tw * 0.75 * glintK * Math.min(1, runup * 1.5));
+      }
       // 앞머리 흰 거품 줄: 굵기가 곳곳 다르게 (끊겼다 이어졌다)
       const foamA = (p < 0.38 ? 0.85 : 0.85 * runup) * dim;
+      // 컷 B: 살짝 아래에 얇은 거품 줄이 번갈아 비침
+      ctx.strokeStyle = `rgba(255,255,255,${(foamA * 0.55 * cut[1]).toFixed(3)})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x + 3, edge(x) + reachOf(x, w) * runup + 1.6);
+      ctx.stroke();
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       let prev = null;
@@ -1337,7 +1376,7 @@ export class Scene {
         if (prev) {
           const thick = 0.5 + 0.5 * Math.sin(x / 31 + w.p2) * Math.sin(x / 13 + w.p3);
           const lw = (p < 0.38 ? 1.2 + 2.2 * thick : 0.8 + 1 * thick) * Math.min(1.3, 0.6 + w.amp * 0.6);
-          ctx.strokeStyle = `rgba(255,255,255,${(foamA * (0.45 + 0.55 * thick)).toFixed(3)})`;
+          ctx.strokeStyle = `rgba(255,255,255,${(foamA * (0.45 + 0.55 * thick) * (0.7 + 0.3 * cut[0])).toFixed(3)})`;
           ctx.lineWidth = Math.max(0.6, lw);
           ctx.beginPath();
           ctx.moveTo(prev[0], prev[1]);
@@ -1348,10 +1387,10 @@ export class Scene {
       }
       // 거품 알갱이: 앞머리를 따라 뭉쳤다 흩어졌다
       for (const f of w.foam) {
-        const y = edge(f.x) + reachOf(f.x, w) * runup - 1.5 - f.d;
-        ctx.fillStyle = `rgba(255,255,255,${(foamA * 0.75).toFixed(3)})`;
+        const y = edge(f.x) + reachOf(f.x, w) * runup - 1.5 - f.d + (f.g ? f.oy : 0);
+        ctx.fillStyle = `rgba(255,255,255,${(foamA * 0.75 * (0.45 + 0.55 * cut[f.g])).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(f.x, y, f.s, 0, Math.PI * 2);
+        ctx.arc(f.x + (f.g ? f.ox : 0), y, f.s, 0, Math.PI * 2);
         ctx.fill();
       }
     }
