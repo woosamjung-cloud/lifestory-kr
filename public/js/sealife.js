@@ -45,7 +45,7 @@ export class SeaLife {
     }
     // 거리: 0 수평선 ~ 1 해변. 큰 배는 멀리, 수상스키는 가까이
     // 알아볼 수 있는 크기로만: 너무 먼 수평선 끝에는 띄우지 않음 (밤 고깃배는 불빛이라 멀어도 알아봄)
-    const depth = { cruise: rand(0.07, 0.14), fishing: env.night ? rand(0.06, 0.3) : rand(0.2, 0.4), yacht: rand(0.25, 0.45), ski: rand(0.4, 0.6) }[kind];
+    const depth = { cruise: rand(0.07, 0.14), fishing: env.night ? rand(0.06, 0.3) : rand(0.2, 0.4), yacht: rand(0.5, 0.64), ski: rand(0.4, 0.6) }[kind];
     const dir = Math.random() < 0.5 ? 1 : -1;
     // 화면을 건너는 데 걸리는 시간: 멀수록 느려 보임 (불멍처럼 천천히)
     const cross = { cruise: rand(150, 220), fishing: rand(90, 150), yacht: rand(110, 170), ski: rand(28, 40) }[kind] * 1000;
@@ -190,7 +190,7 @@ export class SeaLife {
     this.drawWake(ctx, s, k, env, now);
     ctx.translate(0, bob);
     // 작은 배일수록 앞뒤로 더 까딱 (파도를 타는 느낌)
-    const pitch = Math.sin(now / 1300 + s.seed * 2) * (s.kind === 'cruise' ? 0.006 : s.kind === 'ski' ? 0.03 : 0.045);
+    const pitch = Math.sin(now / 1300 + s.seed * 2) * (s.kind === 'cruise' ? 0.006 : s.kind === 'yacht' ? 0 : s.kind === 'ski' ? 0.03 : 0.045);
     ctx.rotate(pitch);
     const hull = night ? '#14161f' : '#2d3344';
     const white = night ? '#262a36' : '#f4f2ee';
@@ -292,36 +292,147 @@ export class SeaLife {
         ctx.fillRect(-5 * k, 0, 10 * k, 3 * k);
       }
     } else if (s.kind === 'yacht') {
-      // 요트: 하얀 선체에 삼각 돛 두 장
-      ctx.fillStyle = white;
+      // 고급 세일링 요트: 날렵한 흰 선체(남색 띠·티크 갑판), 낮은 선실 창, 높은 돛대와 붐,
+      // 살대가 든 큰 주돛 + 둥글게 부푼 앞돛, 가는 줄(지삭), 돛대 꼭대기 깃발. 수평 유지(기울지 않음)
+      const luff = Math.sin(now / 900 + s.seed) * 0.25 * k; // 돛이 바람에 살짝 숨 쉬듯 부풂
+      const mastX = -0.6 * k;
+      const mastTop = -19 * k;
+      const deckY = -1.7 * k;
+      // 물에 비친 그림자
+      ctx.fillStyle = night ? 'rgba(0,0,0,0.18)' : 'rgba(20,40,70,0.18)';
       ctx.beginPath();
-      ctx.moveTo(-4.5 * k, -0.6 * k);
-      ctx.lineTo(4 * k, -0.6 * k);
-      ctx.lineTo(5.5 * k, -1.9 * k);
-      ctx.lineTo(-5 * k, -1.9 * k);
-      ctx.closePath();
+      ctx.ellipse(0, 0.5 * k, 8 * k, 0.6 * k, 0, 0, TAU);
       ctx.fill();
-      ctx.strokeStyle = '#6b6b70';
-      ctx.lineWidth = Math.max(0.5, k * 0.15);
-      ctx.beginPath();
-      ctx.moveTo(0, -1.9 * k);
-      ctx.lineTo(0, -11 * k);
+      // 선체: 앞(오른쪽)이 뾰족하고 길게 뻗은 모양, 뒤는 살짝 들린 트랜섬
+      const hullPath = () => {
+        ctx.beginPath();
+        ctx.moveTo(-7.4 * k, deckY);
+        ctx.lineTo(7.6 * k, deckY);
+        ctx.quadraticCurveTo(9.4 * k, deckY - 0.1 * k, 9.9 * k, deckY - 0.6 * k); // 뱃머리
+        ctx.quadraticCurveTo(7.8 * k, 0.2 * k, 5 * k, 0.3 * k);
+        ctx.lineTo(-6.2 * k, 0.3 * k);
+        ctx.quadraticCurveTo(-7.3 * k, 0.1 * k, -7.6 * k, deckY + 0.1 * k); // 트랜섬
+        ctx.closePath();
+      };
+      const hg = ctx.createLinearGradient(0, deckY, 0, 0.3 * k);
+      hg.addColorStop(0, night ? '#2b2f3a' : '#ffffff');
+      hg.addColorStop(1, night ? '#1d2029' : '#dfe4ea');
+      ctx.fillStyle = hg;
+      hullPath();
+      ctx.fill();
+      ctx.save();
+      hullPath();
+      ctx.clip();
+      ctx.fillStyle = night ? '#141824' : '#1f3a63'; // 남색 띠
+      ctx.fillRect(-9 * k, -0.6 * k, 20 * k, 0.5 * k);
+      ctx.fillStyle = night ? '#3a2a20' : '#c8453e'; // 물 닿는 곳 빨간 칠
+      ctx.fillRect(-9 * k, 0, 20 * k, 0.5 * k);
+      ctx.restore();
+      ctx.strokeStyle = night ? 'rgba(255,255,255,0.08)' : 'rgba(40,50,70,0.35)';
+      ctx.lineWidth = Math.max(0.5, k * 0.08);
+      hullPath();
       ctx.stroke();
-      const luff = Math.sin(now / 700 + s.seed) * 0.35 * k; // 돛이 바람에 살짝 부풂
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      // 티크 갑판 줄과 난간
+      ctx.fillStyle = night ? '#3a2f26' : '#b7865a';
+      ctx.fillRect(-7.2 * k, deckY - 0.22 * k, 14.6 * k, 0.24 * k);
+      ctx.strokeStyle = night ? 'rgba(200,200,210,0.25)' : 'rgba(150,155,165,0.9)';
+      ctx.lineWidth = Math.max(0.4, k * 0.06);
       ctx.beginPath();
-      ctx.moveTo(0.3 * k + luff * 0.2, -10.6 * k);
-      ctx.quadraticCurveTo(3.2 * k + luff, -6 * k, 4.2 * k, -2.4 * k);
-      ctx.lineTo(0.3 * k, -2.4 * k);
+      ctx.moveTo(-7 * k, deckY - 0.9 * k);
+      ctx.lineTo(7.4 * k, deckY - 0.9 * k);
+      for (let x = -6.6; x <= 7; x += 1.6) {
+        ctx.moveTo(x * k, deckY - 0.9 * k);
+        ctx.lineTo(x * k, deckY - 0.2 * k);
+      }
+      ctx.stroke();
+      // 낮은 선실 + 길쭉한 창
+      ctx.fillStyle = night ? '#262a35' : '#f6f7f8';
+      ctx.beginPath();
+      ctx.moveTo(-4.4 * k, deckY - 0.2 * k);
+      ctx.lineTo(-3.8 * k, deckY - 1.5 * k);
+      ctx.lineTo(2.6 * k, deckY - 1.5 * k);
+      ctx.lineTo(3.8 * k, deckY - 0.2 * k);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = 'rgba(240,138,93,0.9)';
+      ctx.fillStyle = night ? 'rgba(255,220,150,0.85)' : '#24334d';
       ctx.beginPath();
-      ctx.moveTo(-0.3 * k, -9 * k);
-      ctx.lineTo(-0.3 * k, -2.4 * k);
-      ctx.lineTo(-3.6 * k, -2.4 * k);
+      ctx.moveTo(-3.4 * k, deckY - 0.75 * k);
+      ctx.lineTo(-3.1 * k, deckY - 1.15 * k);
+      ctx.lineTo(2.2 * k, deckY - 1.15 * k);
+      ctx.lineTo(2.9 * k, deckY - 0.75 * k);
       ctx.closePath();
       ctx.fill();
+      // 돛대와 붐
+      ctx.strokeStyle = night ? '#6b6f7a' : '#8c9099';
+      ctx.lineWidth = Math.max(0.6, k * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(mastX, deckY - 1.5 * k);
+      ctx.lineTo(mastX, mastTop);
+      ctx.stroke();
+      ctx.lineWidth = Math.max(0.5, k * 0.13);
+      ctx.beginPath();
+      ctx.moveTo(mastX, deckY - 2.6 * k);
+      ctx.lineTo(-7 * k, deckY - 2.3 * k);
+      ctx.stroke();
+      // 주돛: 살짝 부푼 곡선 + 살대 + 위에서 아래로 그늘
+      {
+        const sg = ctx.createLinearGradient(mastX, 0, -7 * k, 0);
+        sg.addColorStop(0, night ? 'rgba(200,205,215,0.55)' : '#ffffff');
+        sg.addColorStop(1, night ? 'rgba(160,165,180,0.45)' : '#e6e9ee');
+        ctx.fillStyle = sg;
+        ctx.beginPath();
+        ctx.moveTo(mastX - 0.1 * k, mastTop + 0.6 * k);
+        ctx.quadraticCurveTo(-5.2 * k - luff, -10 * k, -6.8 * k, deckY - 2.6 * k);
+        ctx.lineTo(mastX - 0.1 * k, deckY - 2.8 * k);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = night ? 'rgba(255,255,255,0.15)' : 'rgba(150,160,175,0.6)';
+        ctx.lineWidth = Math.max(0.4, k * 0.06);
+        for (let b = 1; b <= 4; b++) {
+          const yb = mastTop + (deckY - 2.8 * k - mastTop) * (b / 5);
+          const span = (b / 5) * 5.6 * k;
+          ctx.beginPath();
+          ctx.moveTo(mastX - 0.2 * k, yb);
+          ctx.lineTo(mastX - span, yb + 0.25 * k);
+          ctx.stroke();
+        }
+        // 앞돛(지브): 둥글게 부푼 삼각, 살짝 주황빛 줄
+        ctx.fillStyle = night ? 'rgba(190,195,205,0.5)' : '#fbfbfc';
+        ctx.beginPath();
+        ctx.moveTo(mastX + 0.25 * k, mastTop + 2.4 * k);
+        ctx.quadraticCurveTo(5.4 * k + luff, -8 * k, 8.6 * k, deckY - 0.5 * k);
+        ctx.lineTo(mastX + 0.3 * k, deckY - 1.6 * k);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = night ? 'rgba(255,170,120,0.3)' : '#f08a5d';
+        ctx.lineWidth = Math.max(0.5, k * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(mastX + 0.3 * k, deckY - 1.6 * k);
+        ctx.lineTo(8.6 * k, deckY - 0.5 * k);
+        ctx.stroke();
+      }
+      // 줄(앞지삭·뒷지삭)
+      ctx.strokeStyle = night ? 'rgba(200,200,210,0.2)' : 'rgba(110,115,125,0.7)';
+      ctx.lineWidth = Math.max(0.35, k * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(mastX, mastTop);
+      ctx.lineTo(9.6 * k, deckY - 0.5 * k);
+      ctx.moveTo(mastX, mastTop);
+      ctx.lineTo(-7.3 * k, deckY - 0.1 * k);
+      ctx.stroke();
+      // 돛대 꼭대기 깃발 (바람에 펄럭)
+      const fl = Math.sin(now / 260 + s.seed) * 0.25 * k;
+      ctx.fillStyle = night ? 'rgba(200,80,80,0.5)' : '#c8453e';
+      ctx.beginPath();
+      ctx.moveTo(mastX, mastTop);
+      ctx.quadraticCurveTo(mastX - 1 * k, mastTop + 0.2 * k + fl, mastX - 2 * k, mastTop + 0.35 * k);
+      ctx.lineTo(mastX, mastTop + 0.8 * k);
+      ctx.closePath();
+      ctx.fill();
+      if (night) {
+        lamp(mastX, mastTop - 0.2 * k, Math.max(0.6, k * 0.25), 'rgba(255,255,255,0.95)'); // 돛대 등
+        lamp(9.2 * k, deckY - 0.4 * k, Math.max(0.5, k * 0.2), 'rgba(120,255,160,0.9)');
+      }
     } else if (s.kind === 'ski') {
       // 수상스키: 빠른 모터보트 + 하얀 물보라 꼬리 + 줄에 매달린 사람
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
@@ -412,9 +523,9 @@ export class SeaLife {
 
   // 항적: 배 뒤로 길게 남는 하얀 물결 줄 (뒤로 갈수록 옅고 넓게)
   drawWake(ctx, s, k, env, now) {
-    const len = { cruise: 26, fishing: 14, yacht: 9, ski: 0 }[s.kind] * k;
+    const len = { cruise: 26, fishing: 14, yacht: 13, ski: 0 }[s.kind] * k;
     if (!len) return;
-    const stern = { cruise: -15, fishing: -5.5, yacht: -4.5 }[s.kind] * k;
+    const stern = { cruise: -15, fishing: -5.5, yacht: -7.4 }[s.kind] * k;
     const a0 = (env.night ? 0.18 : 0.5) * (s.kind === 'yacht' ? 0.7 : 1);
     for (let j = 0; j < 2; j++) {
       ctx.strokeStyle = `rgba(255,255,255,${(a0 * (j ? 0.5 : 1)).toFixed(3)})`;
