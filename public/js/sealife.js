@@ -44,7 +44,8 @@ export class SeaLife {
       }
     }
     // 거리: 0 수평선 ~ 1 해변. 큰 배는 멀리, 수상스키는 가까이
-    const depth = { cruise: rand(0.03, 0.12), fishing: rand(0.08, 0.35), yacht: rand(0.12, 0.4), ski: rand(0.35, 0.6) }[kind];
+    // 알아볼 수 있는 크기로만: 너무 먼 수평선 끝에는 띄우지 않음 (밤 고깃배는 불빛이라 멀어도 알아봄)
+    const depth = { cruise: rand(0.07, 0.14), fishing: env.night ? rand(0.06, 0.3) : rand(0.2, 0.4), yacht: rand(0.25, 0.45), ski: rand(0.4, 0.6) }[kind];
     const dir = Math.random() < 0.5 ? 1 : -1;
     // 화면을 건너는 데 걸리는 시간: 멀수록 느려 보임 (불멍처럼 천천히)
     const cross = { cruise: rand(150, 220), fishing: rand(90, 150), yacht: rand(110, 170), ski: rand(28, 40) }[kind] * 1000;
@@ -104,7 +105,7 @@ export class SeaLife {
       if (u < 0) return true;
       const x = s.dir > 0 ? -0.15 * W + u * 1.3 * W : 1.15 * W - u * 1.3 * W;
       const y = yOf(s.depth);
-      const sc = unit * (0.5 + s.depth * 3);
+      const sc = unit * Math.max(s.kind === 'cruise' ? 0.9 : 1.4, 0.5 + s.depth * 3.4);
       // 화면 끝에서 서서히 나타나고 사라짐
       const fade = clamp(u / 0.06) * clamp((1 - u) / 0.06);
       ctx.save();
