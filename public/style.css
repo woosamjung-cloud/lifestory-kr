@@ -813,7 +813,9 @@ html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }
 .trip-opt input { margin-top: 3px; accent-color: #c8453e; flex: none; }
 .trip-opt span { display: grid; gap: 2px; }
 .trip-opt small { font-size: 12px; color: var(--muted); line-height: 1.35; }
-.trip-opt:has(input:checked) { border-color: #c8453e; background: #fff3e8; }
+.trip-opt:has(input:checked) { border-color: #c8453e; background: rgba(200, 69, 62, 0.16); }
+.trip-opt:has(input:checked) b { color: #c8453e; }
+@media (prefers-color-scheme: dark) { .trip-opt:has(input:checked) b { color: #ffb4a6; } }
 /* 귀가 인증 */
 #home-img { width: 100%; border-radius: 12px; display: block; margin: 6px 0 10px; }
 .home-reward { margin-top: 12px; padding: 12px; border-radius: 14px; background: #fff3e4; border: 1.5px dashed #e8b48a; }
