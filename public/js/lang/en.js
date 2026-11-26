@@ -6,9 +6,9 @@
 const TEXT = {
   // ---------- 공통 / 첫 화면 ----------
   '이불 밖은 추우니까': 'Too Cold to Leave the Blanket',
-  '곧 방구석 해돋이호 출발합니다': 'The Blanket Express departs soon',
-  '방구석 해돋이호': 'Blanket Express',
-  '방구석 해돋이호 승차권': 'Blanket Express ticket',
+  '곧 방구석 해돋이호 출발합니다': 'The Blanket-In Express departs soon',
+  '방구석 해돋이호': 'Blanket-In Express',
+  '방구석 해돋이호 승차권': 'Blanket-In Express ticket',
   '이 페이지는 자바스크립트가 필요해요.': 'This page needs JavaScript.',
   '잠옷 입고 탑승하세요. 혼자 보면 추우니까,': 'Board in your pajamas. Watching alone is a little chilly,',
   '정동진 해돋이와 정서진 노을을 같이 봐요.': 'so let’s watch the sunrise and sunset together.',
@@ -329,7 +329,7 @@ const TEXT = {
   '📥 사진을 저장했어요 · 🔗 링크도 복사했어요': '📥 Photo saved · 🔗 link copied',
   '📥 사진을 저장했어요. 카카오톡에 보내 주세요': '📥 Photo saved. Send it on KakaoTalk',
   '📥 사진을 저장했어요 · 🔗 링크도 복사했어요. 카카오톡에 보내 주세요': '📥 Photo saved · 🔗 link copied. Send it on KakaoTalk',
-  '이불 밖은 추우니까 🎫 방구석 해돋이호 승차권 나왔어요. 잠옷 입고 같이 해 보러 가요!': 'Too cold to leave the blanket 🎫 Got my Blanket Express ticket. Come watch the sun in your pajamas!',
+  '이불 밖은 추우니까 🎫 방구석 해돋이호 승차권 나왔어요. 잠옷 입고 같이 해 보러 가요!': 'Too cold to leave the blanket 🎫 Got my Blanket-In Express ticket. Come watch the sun in your pajamas!',
   // 승차권·인증 사진 그림 속 글자
   '해돋이 열차 · 승차권': 'Sunrise train · Ticket',
   '해넘이 열차 · 승차권': 'Sunset train · Ticket',
@@ -619,7 +619,7 @@ export default {
   label: 'EN',
   keys: {
     'lang.name': 'English',
-    'home.eyebrow': 'The Blanket Express departs soon',
+    'home.eyebrow': 'The Blanket-In Express departs soon',
     'home.title': 'Too Cold to Leave the Blanket',
     'home.lead': 'Board in your pajamas. Watching alone is a little chilly,<br>so let’s watch the sunrise and sunset together.',
     'picket.tag': 'Waiting room sign',
