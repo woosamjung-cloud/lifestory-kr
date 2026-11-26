@@ -112,9 +112,31 @@ export async function makeTicket({ name, char, color, hair = 0, pet = 0, event, 
   ctx.textAlign = 'right';
   fitFont(ctx, place.name, 92, TITLE, half);
   ctx.fillText(place.name, tx + tw - 60, ty + 320);
-  ctx.textAlign = 'center';
-  ctx.font = `60px ${FONT}`;
-  ctx.fillText('→', tx + tw / 2, ty + 318);
+  // 가는 길 화살표: 편도는 → 하나, 왕복은 위 →(가는 길) · 아래 ←(돌아오는 길)
+  {
+    const cx = tx + tw / 2;
+    const cy = ty + 318;
+    const L = 64;
+    const arrow = (y, dir) => {
+      ctx.beginPath();
+      ctx.moveTo(cx - (L / 2) * dir, y);
+      ctx.lineTo(cx + (L / 2) * dir, y);
+      ctx.moveTo(cx + (L / 2 - 16) * dir, y - 12);
+      ctx.lineTo(cx + (L / 2) * dir, y);
+      ctx.lineTo(cx + (L / 2 - 16) * dir, y + 12);
+      ctx.stroke();
+    };
+    ctx.save();
+    ctx.strokeStyle = ctx.fillStyle;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (round) {
+      arrow(cy - 16, 1);
+      arrow(cy + 16, -1);
+    } else arrow(cy, 1);
+    ctx.restore();
+  }
 
   // 정보 칸
   const rows = [
