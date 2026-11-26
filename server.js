@@ -236,6 +236,22 @@ function readFeedback(limit = 100) {
     return [];
   }
 }
+// 같은 기기(기기 번호)는 한 자리만: 새로 연결되면 예전 연결(앱 전환·잠금 뒤 남은 끊긴 연결, 다른 탭)을 정리
+// → 내 캐릭터가 '잔상'처럼 두 번 앉아 있지 않게
+function claimVisitor(c) {
+  if (!c.visitor || c.visitor.startsWith('anon')) return;
+  for (const o of clients) {
+    if (o === c || o.visitor !== c.visitor || o.replaced) continue;
+    o.replaced = true;
+    endTalk(o, 'left');
+    leaveRoom(o);
+    try {
+      o.ws.close(4001, 'replaced');
+    } catch {
+      /* 이미 끊김 */
+    }
+  }
+}
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink', 'home'];
 const dailyVisitors = new Map(); // dateKey -> Set(visitorId)  (메모리에만, 하루 지나면 지움)
@@ -487,7 +503,10 @@ function handle(c, msg) {
       c.color = Number.isInteger(msg.color) ? Math.abs(msg.color) % 8 : 0;
       c.hair = Number.isInteger(msg.hair) ? Math.abs(msg.hair) % 6 : 0;
       c.pet = Number.isInteger(msg.pet) ? Math.abs(msg.pet) % 10 : 0; // 0 없음, 1~9 품종 (characters.js BREEDS)
-      if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
+      if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor) && msg.visitor !== c.visitor) {
+        c.visitor = msg.visitor;
+        claimVisitor(c);
+      }
       setNick(c, msg.nick);
       setPetName(c, msg.petName);
       c.tag = msg.tag === true;
@@ -519,6 +538,7 @@ function handle(c, msg) {
       if (c.helloed) return;
       c.helloed = true;
       if (typeof msg.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(msg.visitor)) c.visitor = msg.visitor;
+      claimVisitor(c);
       countVisitor(c.visitor);
       return;
     }

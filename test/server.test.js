@@ -451,6 +451,27 @@ test('별점·건의: 저장되고 통계엔 개수·평균만, 운영자 키 �
   assert.equal(hidden.status, 404);
 });
 
+test('잔상 방지: 같은 기기가 다시 연결되면 예전 연결은 자리에서 내려가고 닫힘', async () => {
+  const visitor = 'ghosttest001';
+  const old = await client();
+  old.send(JSON.stringify({ t: 'hello', visitor }));
+  old.send(JSON.stringify({ t: 'join', room: 'west', char: 'cat', color: 1, visitor }));
+  await wait(400);
+  assert.ok(last(old, 'seat'));
+  let code = null;
+  old.on('close', (c) => (code = c));
+  const fresh = await client();
+  fresh.send(JSON.stringify({ t: 'hello', visitor }));
+  fresh.send(JSON.stringify({ t: 'join', room: 'west', char: 'cat', color: 1, visitor }));
+  await wait(1300);
+  assert.equal(code, 4001);
+  assert.ok(last(fresh, 'seat'));
+  const st = await (await fetch(`http://localhost:${PORT}/api/status`)).json();
+  assert.equal(st.rooms.west.seated, 1);
+  fresh.close();
+  await wait(200);
+});
+
 test('보안: 너무 큰 요청은 413, 배열·이상한 본문은 400', async () => {
   const big = await fetch(`http://localhost:${PORT}/api/shop/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(10000) });
   assert.equal(big.status, 413);

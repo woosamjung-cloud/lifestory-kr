@@ -84,8 +84,16 @@ export class Net {
       else if (m.t.startsWith('talk') && this.h.onTalk) this.h.onTalk(m);
       else if ((m.t === 'labels' || m.t === 'label') && this.h.onLabels) this.h.onLabels(m.map || {}, m.t === 'labels');
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       clearTimeout(giveUp);
+      // 같은 기기의 다른 창·새 연결이 자리를 이어받음: 이 창은 다시 붙지 않음 (서로 밀어내지 않게)
+      if (ev && ev.code === 4001) {
+        this.connected = false;
+        this.ws = null;
+        this.replaced = true;
+        this.h.onStatus('replaced');
+        return;
+      }
       const wasConnected = this.connected;
       this.connected = false;
       this.ws = null;

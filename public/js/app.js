@@ -94,6 +94,7 @@ const music = new Music();
 const net = new Net({
   onStatus(s) {
     state.netStatus = s;
+    if (s === 'replaced') toast('🪟 다른 창에서 이어서 타고 있어요. 이 창으로 돌아오면 다시 이어져요');
     if (s !== 'online') {
       scene.people = [];
       scene.labels.clear();
@@ -2046,6 +2047,12 @@ let sleepTimer = null;
 let sleepAt = 0;
 const keepOn = () => owned('bgsound') && keepSound;
 document.addEventListener('visibilitychange', () => {
+  // 다른 창에 자리를 넘겼던 창으로 돌아오면 이 창이 다시 자리를 이어받음
+  if (!document.hidden && net.replaced) {
+    net.replaced = false;
+    net.retry = 0;
+    net.connect();
+  }
   if (document.hidden && keepOn()) return;
   ambience.setHidden(document.hidden);
   music.setHidden(document.hidden);
