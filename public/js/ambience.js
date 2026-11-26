@@ -200,6 +200,38 @@ export class Ambience {
     }
   }
 
+  // 크루즈 뱃고동: 멀리서 낮게 '뿌우—웅' 두 번 (멀수록 작게)
+  horn(depth = 0.1) {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const vol = 0.05 + 0.04 * Math.min(1, depth * 4);
+    const blast = (t, dur) => {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 520;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.18);
+      g.gain.setValueAtTime(vol, t + dur - 0.35);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      lp.connect(g).connect(this.master);
+      for (const [f, a] of [[98, 1], [123.5, 0.7], [196, 0.25]]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f * 0.97, t);
+        o.frequency.linearRampToValueAtTime(f, t + 0.25); // 처음엔 살짝 낮게 시작
+        const og = ctx.createGain();
+        og.gain.value = a * 0.5;
+        o.connect(og).connect(lp);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+      }
+    };
+    const t0 = ctx.currentTime + 0.05;
+    blast(t0, 1.4);
+    blast(t0 + 1.9, 0.9);
+  }
+
   woodIn() {
     if (!this.on) return;
     const ctx = this.ctx;

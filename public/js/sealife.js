@@ -103,9 +103,13 @@ export class SeaLife {
       const u = (now - s.start) / s.cross;
       if (u > 1) return false;
       if (u < 0) return true;
+      if (s.kind === 'cruise' && !s.horned && u > 0.3) {
+        s.horned = true;
+        if (Math.random() < 0.75 && this.onHorn) this.onHorn(s.depth);
+      }
       const x = s.dir > 0 ? -0.15 * W + u * 1.3 * W : 1.15 * W - u * 1.3 * W;
       const y = yOf(s.depth);
-      const sc = unit * Math.max(s.kind === 'cruise' ? 0.9 : 1.4, 0.5 + s.depth * 3.4);
+      const sc = unit * Math.max(s.kind === 'cruise' ? 1.15 : 1.8, 0.7 + s.depth * 4);
       // 화면 끝에서 서서히 나타나고 사라짐
       const fade = clamp(u / 0.06) * clamp((1 - u) / 0.06);
       ctx.save();
@@ -182,7 +186,12 @@ export class SeaLife {
   drawShip(ctx, s, k, env, now) {
     const night = env.night;
     const bob = Math.sin(now / 900 + s.seed) * k * 0.15;
+    // 뒤쪽 물살(항적): 배가 지나간 자리에 하얀 물결이 길게 남았다 흩어짐 (흔들림과 상관없이 수면에)
+    this.drawWake(ctx, s, k, env, now);
     ctx.translate(0, bob);
+    // 작은 배일수록 앞뒤로 더 까딱 (파도를 타는 느낌)
+    const pitch = Math.sin(now / 1300 + s.seed * 2) * (s.kind === 'cruise' ? 0.006 : s.kind === 'ski' ? 0.03 : 0.045);
+    ctx.rotate(pitch);
     const hull = night ? '#14161f' : '#2d3344';
     const white = night ? '#262a36' : '#f4f2ee';
     const lamp = (x, y, r, col = 'rgba(255,226,150,0.95)') => {
@@ -207,6 +216,8 @@ export class SeaLife {
       ctx.fillRect(-7 * k, -8.2 * k, 12 * k, 1.5 * k);
       ctx.fillStyle = night ? '#1b1e28' : '#c8453e';
       ctx.fillRect(1 * k, -10 * k, 2.2 * k, 1.9 * k); // 굴뚝
+      this.drawPuffs(ctx, s, 2.1 * k, -10.2 * k, k, now, night ? 0.12 : 0.35, 'cruise');
+      this.drawChurn(ctx, s, -14.5 * k, -1.5 * k, k, now, night ? 0.2 : 0.6);
       if (night) {
         for (let i = 0; i < 18; i++) lamp(-12 * k + i * 1.4 * k, -4.2 * k, Math.max(0.5, k * 0.28));
         for (let i = 0; i < 13; i++) lamp(-10 * k + i * 1.45 * k, -5.9 * k, Math.max(0.5, k * 0.26), 'rgba(255,240,200,0.85)');
@@ -241,6 +252,12 @@ export class SeaLife {
       ctx.fillStyle = night ? 'rgba(255,230,160,0.9)' : '#7fa9cc';
       ctx.fillRect(-2.1 * k, -4.4 * k, 1.1 * k, 0.9 * k);
       ctx.fillRect(-0.5 * k, -4.4 * k, 1.1 * k, 0.9 * k);
+      // 조타실 뒤 굴뚝 + '통통' 연기 (두 번 퐁퐁, 잠깐 쉼)
+      ctx.fillStyle = night ? '#1b1d26' : '#3a3d47';
+      ctx.fillRect(-3.6 * k, -6.4 * k, 0.9 * k, 1.6 * k);
+      this.drawPuffs(ctx, s, -3.15 * k, -6.5 * k, k, now, night ? 0.18 : 0.5, 'fish');
+      // 뒤(프로펠러) 물보라: 하얀 물방울이 퐁퐁 튀어오름
+      this.drawChurn(ctx, s, -5.6 * k, -0.4 * k, k, now, night ? 0.25 : 0.85);
       // 짧은 깃대와 작은 깃발
       ctx.strokeStyle = night ? '#2a2d38' : '#55575f';
       ctx.lineWidth = Math.max(0.6, k * 0.18);
@@ -290,10 +307,11 @@ export class SeaLife {
       ctx.moveTo(0, -1.9 * k);
       ctx.lineTo(0, -11 * k);
       ctx.stroke();
+      const luff = Math.sin(now / 700 + s.seed) * 0.35 * k; // 돛이 바람에 살짝 부풂
       ctx.fillStyle = 'rgba(255,255,255,0.95)';
       ctx.beginPath();
-      ctx.moveTo(0.3 * k, -10.6 * k);
-      ctx.lineTo(4.2 * k, -2.4 * k);
+      ctx.moveTo(0.3 * k + luff * 0.2, -10.6 * k);
+      ctx.quadraticCurveTo(3.2 * k + luff, -6 * k, 4.2 * k, -2.4 * k);
       ctx.lineTo(0.3 * k, -2.4 * k);
       ctx.closePath();
       ctx.fill();
@@ -348,6 +366,75 @@ export class SeaLife {
       ctx.fillStyle = '#f08a5d';
       ctx.beginPath();
       ctx.arc(sx + lean * 0.3, -3.1 * k, 0.55 * k, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  // 연기: 굴뚝에서 몽글몽글 올라가 뒤로 흘러가며 옅어짐. 고깃배는 '통통' 박자(두 번 퐁퐁, 잠깐 쉼)
+  drawPuffs(ctx, s, x, y, k, now, alpha, kind) {
+    const gap = kind === 'fish' ? 1300 : 900;
+    const life = kind === 'fish' ? 2600 : 4200;
+    const phase = s.seed * 97;
+    for (let i = 0; i < 6; i++) {
+      // 고깃배: 한 박자에 두 번 (0ms, 260ms)
+      const base = Math.floor((now + phase) / gap) - Math.floor(i / 2);
+      const born = base * gap - phase + (kind === 'fish' && i % 2 ? 260 : 0);
+      const a = (now - born) / life;
+      if (a < 0 || a > 1) continue;
+      const px = x - a * k * (kind === 'fish' ? 5 : 7); // 배가 앞으로 가니 연기는 뒤로
+      const py = y - a * k * (kind === 'fish' ? 4.5 : 5);
+      const r = k * (kind === 'fish' ? 0.5 + a * 1.4 : 0.7 + a * 2.2);
+      ctx.fillStyle = `rgba(${kind === 'fish' ? '90,90,96' : '210,210,215'},${(alpha * (1 - a) * (a < 0.1 ? a / 0.1 : 1)).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  // 프로펠러 물보라: 뒤꽁무니에서 하얀 물방울이 퐁퐁 튀어 오름
+  drawChurn(ctx, s, x, y, k, now, alpha) {
+    for (let i = 0; i < 7; i++) {
+      const per = 520 + i * 37;
+      const a = ((now + s.seed * 50 + i * 131) % per) / per;
+      const px = x - a * k * 2.2 - (i % 3) * 0.4 * k;
+      const py = y - Math.sin(a * Math.PI) * k * (0.8 + (i % 3) * 0.35);
+      ctx.fillStyle = `rgba(255,255,255,${(alpha * (1 - a)).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(0.5, k * (0.32 - a * 0.15)), 0, TAU);
+      ctx.fill();
+    }
+    // 하얗게 부서지는 물
+    ctx.fillStyle = `rgba(255,255,255,${(alpha * 0.55).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(x - k * 0.8, y + 0.3 * k, k * 1.6, k * 0.35, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  // 항적: 배 뒤로 길게 남는 하얀 물결 줄 (뒤로 갈수록 옅고 넓게)
+  drawWake(ctx, s, k, env, now) {
+    const len = { cruise: 26, fishing: 14, yacht: 9, ski: 0 }[s.kind] * k;
+    if (!len) return;
+    const stern = { cruise: -15, fishing: -5.5, yacht: -4.5 }[s.kind] * k;
+    const a0 = (env.night ? 0.18 : 0.5) * (s.kind === 'yacht' ? 0.7 : 1);
+    for (let j = 0; j < 2; j++) {
+      ctx.strokeStyle = `rgba(255,255,255,${(a0 * (j ? 0.5 : 1)).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.6, k * (j ? 0.25 : 0.4));
+      ctx.beginPath();
+      for (let i = 0; i <= 12; i++) {
+        const u = i / 12;
+        const x = stern - u * len;
+        const y = 0.3 * k + u * k * (j ? 1.4 : 0.6) + Math.sin(u * 9 - now / 400 + s.seed) * k * 0.15 * u;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    // 뒤로 갈수록 흩어지는 거품 점
+    for (let i = 0; i < 8; i++) {
+      const u = ((i * 0.13 + now / 9000 + s.seed) % 1);
+      ctx.fillStyle = `rgba(255,255,255,${(a0 * 0.8 * (1 - u)).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(stern - u * len, 0.4 * k + u * k * (i % 2 ? 1.2 : 0.5), Math.max(0.5, k * 0.25 * (1 - u * 0.5)), 0, TAU);
       ctx.fill();
     }
   }

@@ -1837,6 +1837,7 @@ scene.onWood = (self) => {
 }
 scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick());
 scene.onRock = () => ambience.on && ambience.knock && ambience.knock();
+scene.sea.onHorn = (depth) => ambience.on && ambience.horn(depth); // 크루즈 뱃고동
 // 물수제비 10번 넘으면 옆의 강아지·고양이가 좋아함
 scene.onPetJoy = (n) => {
   if (!state.profile.pet) return;
