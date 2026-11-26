@@ -709,10 +709,19 @@ $('board').addEventListener('click', () => {
     store.set('playHint', true);
     setTimeout(() => toast('👆 모래를 누르면 걸어가요 · ↔ 옆으로 끌면 해변 구경 · ↓ 아래로 쓸면 앉아요 · 🔥 불을 누르면 장작'), 7000);
   }
-  if (store.get('sound', true)) ambience.start().then((ok) => {
+  // 장소에 도착하면 소리와 음악은 기본으로 켜짐 (원치 않으면 오른쪽 위에서 끄면 됨)
+  store.set('sound', true);
+  ambience.start().then((ok) => {
     syncIosBed();
-    if (ok) setTimeout(() => toast('🌊 파도·바람·모닥불 소리가 켜졌어요. 오른쪽 위에서 끌 수 있어요'), 4800);
+    soundButton();
+    if (ok) setTimeout(() => toast('🌊 소리와 음악이 켜져 있어요. 오른쪽 위에서 끌 수 있어요'), 4800);
   });
+  if (!music.on) {
+    music.setMood(musicMood());
+    music.start(3800).then(() => musicButton()); // 열차가 도착할 즈음 서서히 커짐
+    store.set('music', true);
+    musicButton();
+  }
   show('ride');
   playTrain(state.event);
 });
@@ -721,8 +730,8 @@ $('board').addEventListener('click', () => {
 const trainIntro = new TrainIntro($('train-cv'));
 function playTrain(ev, home = null) {
   const place = PLACES[ev.place];
-  $('train-text').textContent = home ? '방구석행 귀가 열차가 출발합니다' : `${place.name}행 ${ev.kind === 'sunrise' ? '해돋이호' : '해넘이호'}가 출발합니다`;
-  $('train-pre').textContent = home ? `${place.name}에서 따뜻한 이불 속으로` : '이불 밖은 추우니까, 이불 속에서 끊은 승차권으로';
+  $('train-text').textContent = home ? '방구석행 귀가 열차가\n출발합니다' : `${place.name}행 ${ev.kind === 'sunrise' ? '해돋이호' : '해넘이호'}가\n출발합니다`;
+  $('train-pre').textContent = home ? `${place.name}에서 따뜻한 이불 속으로` : '이불 밖은 추우니까,\n이불 속에서 끊은 승차권으로';
   const ov = $('train');
   // 그 장소의 지금 해 높이로 낮·밤 (지평선 아래 2도보다 낮으면 밤: 아파트 야경, 위면 낮: 산과 들)
   const night = solarPosition(realNow(), place.lat, place.lon).elevation < -2;

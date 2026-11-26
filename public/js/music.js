@@ -58,9 +58,11 @@ export class Music {
     if (this.on && this.audio && this.tracks && (this.tracks[mood] || []).length) this.playFile(true);
   }
 
-  async start() {
+  // fadeDelay: 재생은 누른 순간 시작하고(브라우저 규칙), 소리는 그만큼 뒤에 서서히 키움 (열차 도착 뒤)
+  async start(fadeDelay = 0) {
     if (this.on) return true;
     this.on = true;
+    this.fadeDelay = fadeDelay;
     if (this.tracks && (this.tracks[this.mood] || []).length) return this.playFile(false);
     return this.startSynth();
   }
@@ -98,7 +100,9 @@ export class Music {
     return a
       .play()
       .then(() => {
-        this.fadeAudio(a, 0.35, 3000);
+        const wait = this.fadeDelay || 0;
+        this.fadeDelay = 0;
+        setTimeout(() => this.audio === a && this.fadeAudio(a, 0.35, 3000), wait);
         if (track.title && this.onTrack) this.onTrack(track);
         return true;
       })
