@@ -691,6 +691,7 @@ function enableTilt() {
 }
 
 $('board').addEventListener('click', () => {
+  ambience.unlock(); // 소리를 꺼 둬도 열차 효과음은 나게
   enableTilt();
   scene.self = { ...state.profile };
   // 나의 하루 기록 (미리보기·해외 장소는 세지 않음)
@@ -767,6 +768,7 @@ function logTrip(k, v) {
 let homeCanvas = null;
 const HOME_FILE = 'haedoji-home.png';
 $('menu-home').addEventListener('click', async () => {
+  ambience.unlock();
   $('menu').close();
   if (state.screen !== 'ride') return;
   if (trip && !trip.round) return;
