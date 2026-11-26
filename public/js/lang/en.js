@@ -320,7 +320,7 @@ const TEXT = {
   '링크 복사': 'Copy link',
   '📥 승차권을 저장했어요': '📥 Ticket saved',
   '📥 인증 사진을 저장했어요': '📥 Photo saved',
-  '🔗 링크를 복사했어요': '🔗 Link copied',
+  '🔗 링크가 복사되었습니다': '🔗 Link copied',
   '링크 복사가 안 돼요. 주소창의 주소를 복사해 주세요': 'Couldn’t copy. Please copy the address bar',
   '📥 사진도 저장했어요. 글쓰기 화면에서 사진을 첨부해 주세요': '📥 Photo saved too. Attach it in the post window',
   '📥 사진을 저장했어요. 인스타그램에서 새 게시물로 올려 주세요': '📥 Photo saved. Post it on Instagram',

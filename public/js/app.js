@@ -969,7 +969,7 @@ async function shareTo(k, canvas, file, text) {
       return false;
     }
   };
-  if (k === 'link') return toast((await copy()) ? '🔗 링크를 복사했어요' : '링크 복사가 안 돼요. 주소창의 주소를 복사해 주세요');
+  if (k === 'link') return toast((await copy()) ? '🔗 링크가 복사되었습니다' : '링크 복사가 안 돼요. 주소창의 주소를 복사해 주세요');
   // 카카오톡·인스타그램: 휴대폰은 공유 창(사진 포함)에서 앱 선택
   const r = await shareImage(canvas, file, `${text} ${url}`);
   if (r === true || r === 'cancelled') return;
@@ -2238,6 +2238,10 @@ $('toast').addEventListener('click', () => {
 });
 function toast(msg) {
   const el = $('toast');
+  // 창(dialog)이 열려 있으면 그 창 안에 띄워야 가려지지 않음
+  const dlg = [...document.querySelectorAll('dialog[open]')].pop();
+  const host = dlg || document.body;
+  if (el.parentNode !== host) host.append(el);
   $('toast-msg').textContent = msg;
   el.hidden = false;
   clearTimeout(toastTimer);
