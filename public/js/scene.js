@@ -859,23 +859,14 @@ export class Scene {
       sand.addColorStop(1, dk('#c9a375'));
       ctx.fillStyle = sand;
       ctx.beginPath();
+      // 땅(모래 경계)은 움직이지 않음 (규칙: 지형 고정)
       ctx.moveTo(0, shoreY + 6);
-      for (let x = 0; x < W + 20; x += 20) ctx.lineTo(x, shoreY + Math.sin(x / 70 + nowMs / 1500) * 3);
+      for (let x = 0; x < W + 20; x += 20) ctx.lineTo(x, shoreY + Math.sin(x / 70) * 3);
       ctx.lineTo(W + 20, H);
       ctx.lineTo(0, H);
       ctx.closePath();
       ctx.fill();
-      // 밀려오는 파도 거품
-      const foam = (Math.sin(nowMs / 2200) + 1) / 2;
-      ctx.strokeStyle = `rgba(255,255,255,${(0.75 * bright).toFixed(2)})`;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      for (let x = 0; x < W + 16; x += 16) {
-        const yv = shoreY + 4 + foam * 10 + Math.sin(x / 35 + nowMs / 700) * 2.5;
-        if (x === 0) ctx.moveTo(x, yv);
-        else ctx.lineTo(x, yv);
-      }
-      ctx.stroke();
+      this.drawSwash(ctx, W, H, shoreY, nowMs, bright);
       // 왼쪽 바위
       // 소나무 (바위 뒤)
       this.drawPines(ctx, W, H, shoreY, dk, bright);
@@ -1197,12 +1188,14 @@ export class Scene {
     return 0.35 + 0.65 * Math.min(1, f) + 0.2 * Math.max(0, f - 1);
   }
 
-  // 장작 한 개 넣기
+  // 장작 한 개 넣기: 게이지가 잠깐 나타나 넣은 만큼 차오름
   addFuel(amount = 0.35) {
-    this.fuel = Math.min(1.4, (this.fuel == null ? 0.8 : this.fuel) + amount);
+    const from = this.fuel == null ? 0.8 : this.fuel;
+    this.fuel = Math.min(1.4, from + amount);
+    const prev = this.fuelShow && performance.now() - this.fuelShow.at < 1200 ? this.fuelShow.from : from; // 연달아 넣으면 처음부터 이어서
+    this.fuelShow = { from: prev, to: this.fuel, at: performance.now(), add: Math.round(((this.fuel - from) * FUEL_SECONDS) / 60) };
   }
 
-  // 불이 약해지면 모닥불 옆에 '🪵 장작' 표시가 천천히 깜빡임
   // 이름표 한 줄: 별명 · 친구 이름(2px 작게). 어두운 반투명 바탕에 밝은 글씨 (불멍을 가리지 않게 은은하게)
   measureTag(ctx, s, nick, pet) {
     const big = Math.max(9, Math.min(13, s * 0.17));
@@ -1241,8 +1234,123 @@ export class Scene {
     }
   }
 
+  // 백사장에 밀려왔다 빠지는 물 (실제 해변처럼)
+  // 9초 한 번: 물이 흰 거품 앞머리를 달고 올라옴 → 빠져나감 → 젖어 어두워진 모래가 서서히 마름.
+  // 물 끝 모양은 파도마다 조금씩 다르지만, 한 번 밀려오는 동안에는 흔들리지 않음
+  drawSwash(ctx, W, H, shoreY, nowMs, bright) {
+    const P = 9000;
+    const cyc = Math.floor(nowMs / P);
+    const p = (nowMs % P) / P;
+    const R = Math.max(14, (H - shoreY) * 0.16);
+    const edge = (x) => shoreY + Math.sin(x / 70) * 3; // 모래 경계 (고정)
+    const reachOf = (x, c) => R * (0.68 + 0.18 * Math.sin(x / 57 + c * 1.7) + 0.14 * Math.sin(x / 23 + c * 2.9));
+    const STEP = 12;
+    const band = (c, k, fill) => {
+      ctx.beginPath();
+      for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x, edge(x) - 1);
+      for (let x = W + STEP; x >= -STEP; x -= STEP) ctx.lineTo(x, edge(x) + reachOf(x, c) * k);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    };
+    const wet = (a) => `rgba(96,70,45,${(a * (0.6 + 0.4 * bright)).toFixed(3)})`;
+    // 지난 파도가 남긴 젖은 자국 (거의 말라 감)
+    const prevA = 0.1 * (1 - clamp(p / 0.4));
+    if (prevA > 0.005) band(cyc - 1, 1, wet(prevA));
+    // 올라오는 정도: 0~0.4 밀려옴, 0.4~0.75 빠져나감
+    const runup = p < 0.4 ? 1 - (1 - p / 0.4) ** 2 : p < 0.75 ? 1 - ((p - 0.4) / 0.35) ** 1.6 : 0;
+    const wetK = p < 0.4 ? runup : 1; // 젖은 자리: 가장 높이 올라온 곳까지
+    // 젖은 모래: 물이 빠진 뒤 가장 진하고 천천히 마름
+    const wetA = p < 0.4 ? 0.26 : 0.26 - 0.16 * clamp((p - 0.45) / 0.55);
+    band(cyc, wetK, wet(wetA));
+    // 물이 막 빠진 자리의 반짝임
+    if (p > 0.4 && p < 0.9) {
+      const g = 0.22 * Math.sin(clamp((p - 0.4) / 0.5) * Math.PI) * bright;
+      ctx.strokeStyle = `rgba(255,255,255,${g.toFixed(3)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x, edge(x) + reachOf(x, cyc) * (runup + (1 - runup) * 0.55));
+      ctx.stroke();
+    }
+    if (runup <= 0.01) return;
+    // 얇은 물막 (모래가 비쳐 보이는 옅은 물빛)
+    const sheet = ctx.createLinearGradient(0, shoreY, 0, shoreY + R);
+    sheet.addColorStop(0, `rgba(170,205,215,${(0.42 * (0.5 + 0.5 * bright)).toFixed(3)})`);
+    sheet.addColorStop(1, `rgba(225,240,240,${(0.3 * (0.5 + 0.5 * bright)).toFixed(3)})`);
+    band(cyc, runup, sheet);
+    // 앞머리 흰 거품: 밀려올 때 진하고 빠질 때 옅어짐
+    const foamA = (p < 0.4 ? 0.85 : 0.85 * runup) * (0.45 + 0.55 * bright);
+    ctx.strokeStyle = `rgba(255,255,255,${foamA.toFixed(3)})`;
+    ctx.lineWidth = p < 0.4 ? 2.6 : 1.6;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x, edge(x) + reachOf(x, cyc) * runup);
+    ctx.stroke();
+    // 거품 알갱이 (자리 고정, 앞머리를 따라감)
+    ctx.fillStyle = `rgba(255,255,255,${(foamA * 0.7).toFixed(3)})`;
+    for (let x = 6; x < W; x += 17) {
+      const r = ((x * 7919) % 97) / 97;
+      const y = edge(x) + reachOf(x, cyc) * runup - 2 - r * 4;
+      ctx.beginPath();
+      ctx.arc(x + r * 6, y, 0.8 + r * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 장작을 넣었을 때: 모닥불 아래 게이지가 이전 양에서 새 양까지 차오르고(0.9초) 잠시 뒤 사라짐
+  drawFuelFill(ctx, f, t) {
+    const fs = this.fuelShow;
+    if (!fs) return false;
+    const age = t - fs.at;
+    const DUR = 3400;
+    if (age > DUR || age < 0) {
+      if (age > DUR) this.fuelShow = null;
+      return false;
+    }
+    const lv = (v) => clamp((v - 0.12) / (1.4 - 0.12)); // 불씨만 남음 0 ~ 가득 1
+    const u = clamp(age / 900);
+    const e = 1 - (1 - u) ** 3;
+    const lvl = lv(fs.from) + (lv(fs.to) - lv(fs.from)) * e;
+    const gw = Math.max(48, f.s * 1.0);
+    const gh = Math.max(5, f.s * 0.075);
+    const gx = f.x - gw / 2;
+    const gy = f.y + f.s * 0.22;
+    ctx.save();
+    ctx.globalAlpha = clamp(age / 200) * clamp((DUR - age) / 600);
+    ctx.fillStyle = 'rgba(20,12,8,0.6)';
+    roundRect(ctx, gx - 1.5, gy - 1.5, gw + 3, gh + 3, (gh + 3) / 2);
+    ctx.fill();
+    const g = ctx.createLinearGradient(gx, 0, gx + gw, 0);
+    g.addColorStop(0, '#e2553b');
+    g.addColorStop(0.5, '#f0a33a');
+    g.addColorStop(1, '#ffd36b');
+    ctx.fillStyle = g;
+    roundRect(ctx, gx, gy, Math.max(gh, gw * lvl), gh, gh / 2);
+    ctx.fill();
+    // 차오르는 끝이 반짝
+    if (u < 1) {
+      ctx.fillStyle = `rgba(255,250,220,${0.8 * (1 - u)})`;
+      ctx.beginPath();
+      ctx.arc(gx + gw * lvl, gy + gh / 2, gh * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (fs.add > 0) {
+      ctx.font = `700 ${Math.max(10, f.s * 0.17)}px "Gowun Batang", serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(255,236,200,0.95)';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(`🔥 +${fs.add}분`, f.x, gy + gh + 4 - 4 * e);
+    }
+    ctx.restore();
+    return true;
+  }
+
+  // 불이 약해지면 모닥불 아래 게이지와 '🪵 장작' 표시가 천천히 깜빡임
   drawFuelHint(ctx, f, t) {
     if (this.fuel == null || this.selfStanding) return;
+    if (this.drawFuelFill(ctx, f, t)) return;
     // 남은 시간이 4분쯤일 때만 모닥불 아래 게이지가 나타나 천천히 깜빡임 (남은 4분이 줄어드는 만큼 짧아짐)
     const left = (this.fuel - 0.12) * FUEL_SECONDS; // 불씨만 남기까지 남은 초
     const WARN = 240;
