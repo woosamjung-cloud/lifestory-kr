@@ -354,6 +354,16 @@ const TEXT = {
   '나': 'Me',
   '퐁당': 'Plop',
   '탁! 바위에 맞았어요': 'Clack! Hit the rock',
+  '퉁! 크루즈선': 'Thunk! The cruise ship',
+  '통! 고깃배': 'Tonk! The fishing boat',
+  '퉁! 요트': 'Thunk! The yacht',
+  '퉁! 보트': 'Thunk! The boat',
+  '딱! 암초': 'Clack! The reef',
+  '🚢 퉁! 크루즈선에 맞고 튀어나왔어요': '🚢 Thunk! It bounced off the cruise ship',
+  '🚤 통! 고깃배에 맞고 튀어나왔어요': '🚤 Tonk! It bounced off the fishing boat',
+  '⛵ 퉁! 요트에 맞고 튀어나왔어요': '⛵ Thunk! It bounced off the yacht',
+  '🎿 앗, 수상스키 보트에 맞았어요': '🎿 Oops, it hit the ski boat',
+  '🪨 딱! 암초에 맞고 튀어나왔어요': '🪨 Clack! It bounced off the reef',
   '🪵 장작': '🪵 Wood',
 
   // ---------- 안내 토스트 ----------

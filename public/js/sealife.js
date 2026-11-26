@@ -97,8 +97,9 @@ export class SeaLife {
     const { W, horizonY, shoreY } = env;
     const yOf = (d) => horizonY + d * d * (shoreY - horizonY) * 1.0 + 1;
     const unit = (shoreY - horizonY) / 120; // 화면 크기에 맞춘 단위
-    // 먼 것부터
-    this.ships.sort((a, b) => a.depth - b.depth);
+    // 배와 암초를 먼 것부터 함께 그림 (가까운 것이 앞을 가림)
+    const targets = []; // 물수제비가 맞을 수 있는 것들 (화면 좌표)
+    const items = [];
     this.ships = this.ships.filter((s) => {
       const u = (now - s.start) / s.cross;
       if (u > 1) return false;
@@ -107,19 +108,33 @@ export class SeaLife {
         s.horned = true;
         if (Math.random() < 0.75 && this.onHorn) this.onHorn(s.depth);
       }
-      const x = s.dir > 0 ? -0.15 * W + u * 1.3 * W : 1.15 * W - u * 1.3 * W;
+      const x = (s.dir > 0 ? -0.15 * W + u * 1.3 * W : 1.15 * W - u * 1.3 * W) - (env.shift || 0) * (0.4 + s.depth);
       const y = yOf(s.depth);
       const sc = unit * Math.max(s.kind === 'cruise' ? 1.15 : 1.8, 0.7 + s.depth * 4);
-      // 화면 끝에서 서서히 나타나고 사라짐
-      const fade = clamp(u / 0.06) * clamp((1 - u) / 0.06);
-      ctx.save();
-      ctx.globalAlpha = fade * (env.rain ? 0.7 : 1);
-      ctx.translate(x - (env.shift || 0) * (0.4 + s.depth), y);
-      if (s.dir < 0) ctx.scale(-1, 1);
-      this.drawShip(ctx, s, sc, env, now);
-      ctx.restore();
+      const fade = clamp(u / 0.06) * clamp((1 - u) / 0.06); // 화면 끝에서 서서히 나타나고 사라짐
+      const half = { cruise: [15, 16], fishing: [5.6, 7.2], yacht: [7.6, 9.9], ski: [3, 4] }[s.kind];
+      const [x0, x1] = s.dir > 0 ? [x - half[0] * sc, x + half[1] * sc] : [x - half[1] * sc, x + half[0] * sc];
+      if (fade > 0.5) targets.push({ x0, x1, y, h: sc * 4, kind: s.kind, ship: s });
+      items.push({ depth: s.depth, draw: () => {
+        ctx.save();
+        ctx.globalAlpha = fade * (env.rain ? 0.7 : 1);
+        ctx.translate(x, y);
+        if (s.dir < 0) ctx.scale(-1, 1);
+        if (s.bonk && now - s.bonk < 600) ctx.rotate(Math.sin((now - s.bonk) / 40) * 0.03 * (1 - (now - s.bonk) / 600)); // 맞으면 살짝 흔들
+        this.drawShip(ctx, s, sc, env, now);
+        ctx.restore();
+      } });
       return true;
     });
+    for (const r of this.reefsFor(env.place)) {
+      const x = r.fx * W - (env.shift || 0) * (0.4 + r.depth);
+      const y = yOf(r.depth);
+      const sc = unit * (0.7 + r.depth * 4) * r.size;
+      targets.push({ x0: x - r.w * sc, x1: x + r.w * sc, y, h: sc * r.h, kind: 'reef' });
+      items.push({ depth: r.depth, draw: () => this.drawReef(ctx, r, x, y, sc, env, now) });
+    }
+    items.sort((a, b) => a.depth - b.depth).forEach((it) => it.draw());
+    this.targets = targets;
     // 튀어 오르는 바다 친구
     this.jumps = this.jumps.filter((j) => {
       const u = (now - j.start) / j.dur;
@@ -479,6 +494,85 @@ export class SeaLife {
       ctx.arc(sx + lean * 0.3, -3.1 * k, 0.55 * k, 0, TAU);
       ctx.fill();
     }
+  }
+
+  // 정동진 바다 암초 (자리 고정, 지형이라 움직이지 않음). 해 기둥 한가운데는 비워 둠
+  reefsFor(place) {
+    if (place !== 'east') return [];
+    if (!this.reefs) {
+      this.reefs = [
+        { fx: 0.12, depth: 0.45, size: 1.7, w: 3.2, h: 3.4, seed: 1 },
+        { fx: 0.22, depth: 0.5, size: 0.9, w: 2.4, h: 2, seed: 2 },
+        { fx: 0.82, depth: 0.32, size: 1.4, w: 2.8, h: 3, seed: 3 },
+        { fx: 0.9, depth: 0.64, size: 1.8, w: 3.6, h: 3.6, seed: 4 },
+        { fx: 0.68, depth: 0.2, size: 1.0, w: 2.4, h: 2.2, seed: 5 },
+      ];
+    }
+    return this.reefs;
+  }
+
+  // 암초: 울퉁불퉁한 바위 + 윗면 빛 + 바닷말 자국 + 가끔 파도가 부딪혀 하얗게 부서짐
+  drawReef(ctx, r, x, y, k, env, now) {
+    const night = env.night;
+    const w = r.w * k;
+    const h = r.h * k;
+    ctx.save();
+    ctx.translate(x, y);
+    // 물에 잠긴 아랫부분 그림자
+    ctx.fillStyle = night ? 'rgba(0,0,0,0.25)' : 'rgba(10,30,50,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0.3 * k, w * 1.15, 0.7 * k, 0, 0, TAU);
+    ctx.fill();
+    // 바위 몸통 (자리마다 다른 모양, 고정)
+    const pts = [];
+    const n = 9;
+    for (let i = 0; i <= n; i++) {
+      const u = i / n;
+      const bump = 0.75 + 0.25 * Math.sin(u * 7 + r.seed * 3) + 0.12 * Math.sin(u * 17 + r.seed);
+      pts.push([-w + u * 2 * w, -(Math.sin(u * Math.PI) ** 0.8) * h * bump]);
+    }
+    const g = ctx.createLinearGradient(0, -h, 0, 0);
+    g.addColorStop(0, night ? '#2a2b33' : '#7d7a80');
+    g.addColorStop(0.6, night ? '#1d1e25' : '#57545d');
+    g.addColorStop(1, night ? '#15161c' : '#3d3b44');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-w, 0.2 * k);
+    for (const [px, py] of pts) ctx.lineTo(px, py);
+    ctx.lineTo(w, 0.2 * k);
+    ctx.closePath();
+    ctx.fill();
+    // 윗면 빛 (해 쪽)
+    ctx.strokeStyle = night ? 'rgba(200,210,230,0.12)' : 'rgba(255,240,220,0.45)';
+    ctx.lineWidth = Math.max(0.6, k * 0.25);
+    ctx.beginPath();
+    pts.slice(1, -2).forEach(([px, py], i) => (i ? ctx.lineTo(px, py + 0.3 * k) : ctx.moveTo(px, py + 0.3 * k)));
+    ctx.stroke();
+    // 물 닿는 곳 바닷말·젖은 자국
+    ctx.fillStyle = night ? 'rgba(20,30,25,0.6)' : 'rgba(55,70,50,0.55)';
+    ctx.fillRect(-w * 0.95, -0.7 * k, w * 1.9, 0.8 * k);
+    // 파도가 부딪혀 하얗게 부서짐 (바위마다 박자 다르게, 은은하게)
+    const per = 5200 + r.seed * 700;
+    const a = ((now + r.seed * 1300) % per) / per;
+    if (a < 0.35) {
+      const q = a / 0.35;
+      const al = Math.sin(q * Math.PI) * (night ? 0.35 : 0.8);
+      ctx.fillStyle = `rgba(255,255,255,${al.toFixed(3)})`;
+      for (let i = 0; i < 7; i++) {
+        const side = i % 2 ? 1 : -1;
+        const px = side * w * (0.7 + 0.3 * ((i * 37) % 10) / 10) + side * q * k * 1.5;
+        const py = -q * h * (0.4 + 0.15 * (i % 3)) + q * q * h * 0.5;
+        ctx.beginPath();
+        ctx.arc(px, py, Math.max(0.6, k * (0.35 - q * 0.15)), 0, TAU);
+        ctx.fill();
+      }
+      ctx.strokeStyle = `rgba(255,255,255,${(al * 0.7).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.6, k * 0.2);
+      ctx.beginPath();
+      ctx.ellipse(0, 0.2 * k, w * (1.05 + q * 0.4), k * (0.4 + q * 0.5), 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // 연기: 굴뚝에서 몽글몽글 올라가 뒤로 흘러가며 옅어짐. 고깃배는 '통통' 박자(두 번 퐁퐁, 잠깐 쉼)

@@ -2231,6 +2231,34 @@ export class Scene {
     // 가는 길에 바위(정동진 해안 절벽)가 있으면 부딪혀서 튕겨 나옴
     const x0 = from.x;
     const y0 = from.y - from.s * 0.9;
+    // 바다의 배·암초에 맞으면 '퉁' 하고 튕겨 나와 물에 떨어짐 (화면 좌표로 비교)
+    const tg = (this.sea && this.sea.targets) || [];
+    if (tg.length) {
+      let prev = { x: x0, y: from.y };
+      for (let i = 0; i < pts.length; i++) {
+        const b = pts[i];
+        let best = null;
+        for (const t of tg) {
+          if (!(b.y <= t.y && prev.y >= t.y)) continue; // 이 구간에서 그 배·암초의 수면 줄을 지남
+          const u = (prev.y - t.y) / Math.max(1e-6, prev.y - b.y);
+          const xs = prev.x + (b.x - prev.x) * u - this.camX;
+          if (xs > t.x0 && xs < t.x1 && (!best || t.y > best.t.y)) best = { t, xs };
+        }
+        if (best) {
+          const { t, xs } = best;
+          const hx = xs + this.camX;
+          const back = Math.sign(x0 - hx) || 1;
+          const landY = t.y + (this.shoreY - t.y) * 0.22;
+          pts.length = i;
+          pts.push({ x: hx, y: t.y - t.h * 0.45, d: 0, type: 'rock', ship: t.ship || null, what: t.kind });
+          pts.push({ x: hx + back * Math.max(14, (this.shoreY - t.y) * 0.35), y: landY, d: Math.max(0, (this.shoreY - landY) / (this.shoreY - this.horizonY)) });
+          if (!this.throws) this.throws = [];
+          this.throws.push({ kind: 'stone', x0, y0, pts, n: i, t0: performance.now(), self: isSelf, rock: true, bonk: t.kind });
+          return;
+        }
+        prev = b;
+      }
+    }
     const hit = this.rockHit(x0, y0, pts, from.y);
     let rock = false;
     if (hit) {
@@ -2441,6 +2469,8 @@ export class Scene {
           if (!th['s' + i] && ra >= 0) {
             th['s' + i] = true;
             if (pt.type === 'rock' && this.onRock) this.onRock();
+            if (pt.ship) pt.ship.bonk = performance.now(); // 맞은 배가 살짝 흔들
+            if (pt.what && th.self && this.onBonk) this.onBonk(pt.what);
           }
           continue;
         }
@@ -2482,7 +2512,8 @@ export class Scene {
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 8;
         ctx.fillStyle = `rgba(255,255,255,${a})`;
-        const word = th.rock ? '탁! 바위에 맞았어요' : th.n > 0 ? `통통 ${th.n}번!` : '퐁당';
+        const BONKW = { cruise: '퉁! 크루즈선', fishing: '통! 고깃배', yacht: '퉁! 요트', ski: '퉁! 보트', reef: '딱! 암초' };
+        const word = th.bonk ? BONKW[th.bonk] || '퉁!' : th.rock ? '탁! 바위에 맞았어요' : th.n > 0 ? `통통 ${th.n}번!` : '퐁당';
         // 글자는 지금 보이는 화면 안에
         const half = ctx.measureText(word).width / 2 + 8;
         const wx = clamp(th.rock ? th.pts[0].x + 40 : last.x, this.camX + half, this.camX + this.W - half);

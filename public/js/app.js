@@ -1838,6 +1838,9 @@ scene.onWood = (self) => {
 scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick());
 scene.onRock = () => ambience.on && ambience.knock && ambience.knock();
 scene.sea.onHorn = (depth) => ambience.on && ambience.horn(depth); // 크루즈 뱃고동
+// 물수제비가 배·암초에 맞으면
+const BONK = { cruise: '🚢 퉁! 크루즈선에 맞고 튀어나왔어요', fishing: '🚤 통! 고깃배에 맞고 튀어나왔어요', yacht: '⛵ 퉁! 요트에 맞고 튀어나왔어요', ski: '🎿 앗, 수상스키 보트에 맞았어요', reef: '🪨 딱! 암초에 맞고 튀어나왔어요' };
+scene.onBonk = (what) => BONK[what] && toast(BONK[what]);
 // 물수제비 10번 넘으면 옆의 강아지·고양이가 좋아함
 scene.onPetJoy = (n) => {
   if (!state.profile.pet) return;
