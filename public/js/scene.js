@@ -1769,11 +1769,16 @@ export class Scene {
     // 돌풍: 몇 초에 한 번 (바람이 셀수록 자주)
     if (t > this.wind.nextGust) {
       this.wind.nextGust = t + (7000 + Math.random() * 9000) / strength;
+      const baseY = this.horizonY * (0.35 + Math.random() * 0.9);
+      const n = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) {
+        this.wind.lines.push({ y: baseY + i * (10 + Math.random() * 14), t0: t + i * 120, len: W * (0.25 + Math.random() * 0.2), amp: 6 + Math.random() * 10, curl: Math.random() < 0.5, speed: W * (0.45 + 0.25 * strength) });
+      }
       // 돌풍에 실려 날아가는 먼지·낙엽
       const snowy = wx && [3, 7].includes(wx.pty);
-      const m = snowy ? 0 : Math.round(1 + 2 * strength);
+      const m = Math.round(4 + 6 * strength);
       for (let i = 0; i < m; i++) {
-        const leaf = true; // 알아보기 힘든 먼지 점은 그리지 않음
+        const leaf = !snowy && Math.random() < 0.35;
         this.wind.bits.push({
           x: dir > 0 ? -20 - Math.random() * W * 0.3 : W + 20 + Math.random() * W * 0.3,
           y: this.shoreY + Math.random() * (H - this.shoreY) * 0.8,
@@ -1793,6 +1798,40 @@ export class Scene {
       this.wind.bits.push({ x: Math.random() * W, y: this.shoreY - 20 - Math.random() * 60, vx: dir * W * 0.08 * strength, vy: 20, rot: 0, vr: 3, leaf: true, col: '#b5652e', sz: 3.5, ph: Math.random() * 6, falling: true });
     }
     ctx.save();
+    // 바람 자국: 가는 곡선이 휙 지나가며 그어졌다 사라짐
+    ctx.lineCap = 'round';
+    this.wind.lines = this.wind.lines.filter((l) => {
+      const age = (t - l.t0) / 1000;
+      if (age < 0) return true;
+      const travel = age * l.speed;
+      const total = W + l.len * 2;
+      if (travel > total) return false;
+      const head = dir > 0 ? -l.len + travel : W + l.len - travel;
+      const tail = head - dir * l.len;
+      const a = Math.min(1, age * 3) * Math.min(1, (total - travel) / (W * 0.3)) * (0.22 + 0.25 * light);
+      const g = ctx.createLinearGradient(tail, 0, head, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.7, `rgba(255,255,255,${a})`);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      const steps = 18;
+      for (let i = 0; i <= steps; i++) {
+        const u = i / steps;
+        const x = tail + (head - tail) * u;
+        let y = l.y + Math.sin(u * Math.PI * 2 + age * 3) * l.amp * 0.4;
+        // 끝에서 돌돌 말리는 바람 자국
+        if (l.curl && u > 0.8) {
+          const k = (u - 0.8) / 0.2;
+          y -= Math.sin(k * Math.PI) * l.amp;
+        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      return true;
+    });
     // 먼지·낙엽
     this.wind.bits = this.wind.bits.filter((b) => {
       if (b.falling) {

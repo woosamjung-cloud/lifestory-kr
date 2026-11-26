@@ -356,8 +356,18 @@ export class Ambience {
   // 기차: 역 안내 차임(딩-동-댕) → 철컥철컥 지나가는 바퀴 소리 + 멀리서 부드러운 기적
   // (실제 철도 안내음을 흉내 내지 않은, 직접 만든 소리)
   train(seconds = 3.2) {
-    if (!this.on) return;
+    // 소리가 아직 켜지는 중이면 켜진 직후에 틀어 줌 (탑승 순간에 바로 부르기 때문)
+    if (!this.on) {
+      this.whenOn = () => this.train(seconds);
+      this.whenOnAt = Date.now();
+      return;
+    }
     const ctx = this.ctx;
+    // 막 켜진 참이라 전체 볼륨이 아직 0에 가까우면 바로 올림 (그래야 열차 소리가 묻히지 않음)
+    if (this.master.gain.value < 0.4) {
+      this.master.gain.cancelScheduledValues(ctx.currentTime);
+      this.master.gain.setTargetAtTime(0.5, ctx.currentTime, 0.12);
+    }
     const t0 = ctx.currentTime + 0.05;
     // 차임: 맑은 종소리 세 음
     [[659.25, 0], [523.25, 0.42], [783.99, 0.84]].forEach(([f, dt]) => {
@@ -475,10 +485,16 @@ export class Ambience {
     this.scheduleWave();
     this.scheduleWind();
     this.scheduleCrackle();
+    if (this.whenOn) {
+      const f = this.whenOn;
+      this.whenOn = null;
+      if (Date.now() - this.whenOnAt < 3000) setTimeout(f, 30); // 오래전 부탁이면 틀지 않음
+    }
     return true;
   }
 
   stop() {
+    this.whenOn = null;
     if (!this.ctx || !this.on) return;
     this.on = false;
     this.timers.forEach(clearTimeout);

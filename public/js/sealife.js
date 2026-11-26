@@ -216,31 +216,60 @@ export class SeaLife {
         for (let i = 0; i < 16; i++) ctx.fillRect(-12 * k + i * 1.5 * k, -4.5 * k, 0.7 * k, 0.6 * k);
       }
     } else if (s.kind === 'fishing') {
-      // 고깃배: 작은 선체 + 조타실 + 돛대. 밤엔 줄줄이 켠 집어등이 바다를 환하게
-      ctx.fillStyle = night ? hull : '#3c5a7a';
+      // 고깃배: 뱃머리가 높은 통통배 + 창 달린 조타실 + 짧은 깃대(깃발) + 줄줄이 달린 집어등 (세모 줄 없음)
+      // 선체: 앞(오른쪽)이 위로 들린 모양, 흰 띠
+      ctx.fillStyle = night ? hull : '#2f6aa3';
       ctx.beginPath();
-      ctx.moveTo(-5 * k, -0.8 * k);
-      ctx.lineTo(4 * k, -0.8 * k);
-      ctx.lineTo(6 * k, -2.6 * k);
-      ctx.lineTo(-5.5 * k, -2.4 * k);
+      ctx.moveTo(-6 * k, -2.2 * k);
+      ctx.lineTo(5.2 * k, -2.2 * k);
+      ctx.quadraticCurveTo(6.6 * k, -2.6 * k, 7.2 * k, -3.6 * k); // 들린 뱃머리
+      ctx.lineTo(5.6 * k, -0.4 * k);
+      ctx.lineTo(-5.2 * k, -0.4 * k);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = night ? '#20232d' : '#f1ede6';
-      ctx.fillRect(-1 * k, -4.6 * k, 3 * k, 2.1 * k);
-      ctx.strokeStyle = night ? '#2a2d38' : '#4a4a52';
-      ctx.lineWidth = Math.max(0.6, k * 0.2);
+      if (!night) {
+        ctx.fillStyle = '#f4f1ea';
+        ctx.fillRect(-5.6 * k, -1.85 * k, 11.2 * k, 0.45 * k);
+        ctx.fillStyle = '#c8453e';
+        ctx.fillRect(-5.2 * k, -0.9 * k, 10.6 * k, 0.4 * k); // 아래 빨간 칠
+      }
+      // 조타실 (네모 + 지붕 + 창 두 개)
+      ctx.fillStyle = night ? '#20232d' : '#f4f1ea';
+      ctx.fillRect(-2.6 * k, -5 * k, 3.6 * k, 2.8 * k);
+      ctx.fillStyle = night ? '#2a2d38' : '#2f6aa3';
+      ctx.fillRect(-2.9 * k, -5.4 * k, 4.2 * k, 0.5 * k);
+      ctx.fillStyle = night ? 'rgba(255,230,160,0.9)' : '#7fa9cc';
+      ctx.fillRect(-2.1 * k, -4.4 * k, 1.1 * k, 0.9 * k);
+      ctx.fillRect(-0.5 * k, -4.4 * k, 1.1 * k, 0.9 * k);
+      // 짧은 깃대와 작은 깃발
+      ctx.strokeStyle = night ? '#2a2d38' : '#55575f';
+      ctx.lineWidth = Math.max(0.6, k * 0.18);
       ctx.beginPath();
-      ctx.moveTo(-3 * k, -2.4 * k);
-      ctx.lineTo(-3 * k, -7 * k);
-      ctx.lineTo(4.5 * k, -2.6 * k);
+      ctx.moveTo(-0.6 * k, -5.4 * k);
+      ctx.lineTo(-0.6 * k, -7.6 * k);
       ctx.stroke();
+      ctx.fillStyle = night ? '#3a2b2b' : '#e46f86';
+      ctx.beginPath();
+      ctx.moveTo(-0.6 * k, -7.6 * k);
+      ctx.lineTo(0.9 * k, -7.2 * k);
+      ctx.lineTo(-0.6 * k, -6.8 * k);
+      ctx.closePath();
+      ctx.fill();
+      // 뱃전 위 집어등 줄 (낮엔 꺼진 전구)
+      ctx.strokeStyle = night ? '#2a2d38' : '#6b6b70';
+      ctx.lineWidth = Math.max(0.4, k * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(-5.4 * k, -3.2 * k);
+      ctx.lineTo(4.8 * k, -3.2 * k);
+      ctx.stroke();
+      if (!night) for (let i = 0; i < 6; i++) lamp(-5 * k + i * 1.9 * k, -3.2 * k, Math.max(0.5, k * 0.25), '#e8e2d6');
       if (night) {
         const g = ctx.createRadialGradient(0, -4 * k, 0, 0, -4 * k, 14 * k);
         g.addColorStop(0, 'rgba(255,250,215,0.45)');
         g.addColorStop(1, 'rgba(255,250,215,0)');
         ctx.fillStyle = g;
         ctx.fillRect(-14 * k, -18 * k, 28 * k, 22 * k);
-        for (let i = 0; i < s.lights; i++) lamp(-4.5 * k + (i * 8.5 * k) / s.lights, -5.5 * k + Math.sin(i) * 0.3 * k, Math.max(0.7, k * 0.42), 'rgba(255,253,230,1)');
+        for (let i = 0; i < s.lights; i++) lamp(-5 * k + (i * 9.8 * k) / s.lights, -3.2 * k, Math.max(0.7, k * 0.42), 'rgba(255,253,230,1)');
         // 물에 비친 불빛
         ctx.fillStyle = 'rgba(255,245,200,0.18)';
         ctx.fillRect(-5 * k, 0, 10 * k, 3 * k);
