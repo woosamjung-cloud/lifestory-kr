@@ -68,7 +68,7 @@ const store = {
 
 const state = {
   screen: 'home',
-  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0), petName: store.get('petName', ''), tag: store.get('tag', false), trip: store.get('trip', 'round') },
+  profile: { name: store.get('name', ''), char: store.get('char', 'blanket'), color: store.get('color', 0), hair: store.get('hair', 0), pet: store.get('pet', 0), petName: store.get('petName', ''), tag: store.get('tag', true), trip: store.get('trip', 'round') },
   placeMode: 'auto', // auto | east | west
   event: null,
   netStatus: 'connecting',

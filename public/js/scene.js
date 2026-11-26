@@ -6,6 +6,7 @@ import { drawCritterFast, drawPet, drawWalker, drawPettingArm, BREEDS, drawRainc
 import { localizeCtx } from './i18n.js';
 import { cameraFor } from './camera.js';
 import { NightSky } from './nightsky.js';
+import { SeaLife } from './sealife.js';
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -206,6 +207,7 @@ export class Scene {
     this.time = new Date();
     this.people = []; // 다른 승객 [{id, seat, char, color}]
     this.labels = new Map(); // 좌석 -> [별명, 친구 이름] (본인이 이름표를 켠 사람만)
+    this.sea = new SeaLife(); // 가끔 지나가는 배, 튀어 오르는 돌고래·참치·물고기
     this.showTags = true; // 다른 사람 이름표 보기
     this.self = null; // { char, color, name }
     this.selfSeat = null;
@@ -836,6 +838,9 @@ export class Scene {
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+
+    // 바다 위 작은 이벤트 (거리·날씨·낮밤에 맞춰 가끔)
+    this.sea.draw(ctx, { W, horizonY, shoreY, now: nowMs, light, wx: this.weather, place: this.place, shift: this.farShift || 0 });
 
     // ---------- 여기부터 넓은 해변(월드): 카메라만큼 옆으로 옮겨서 그림 ----------
     ctx.save();
