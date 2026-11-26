@@ -1837,6 +1837,13 @@ scene.onWood = (self) => {
 }
 scene.onSkip = (last) => ambience.on && (last ? ambience.plop() : ambience.tick());
 scene.onRock = () => ambience.on && ambience.knock && ambience.knock();
+// 물수제비 10번 넘으면 옆의 강아지·고양이가 좋아함
+scene.onPetJoy = (n) => {
+  if (!state.profile.pet) return;
+  const name = state.profile.petName || (PETS[state.profile.pet] ? PETS[state.profile.pet][0] : '친구');
+  toast(`🐾 ${n}번! ${name}이(가) 신났어요`);
+  if (ambience.on) ambience.cheer(1, 0.6);
+};
 scene.onBird = () => ambience.on && ambience.honk && ambience.honk();
 
 // ---------- 응원 한마디 (정해진 문구, 10초에 한 번) ----------

@@ -1017,7 +1017,9 @@ export class Scene {
       // 함께 온 강아지·고양이 (오른쪽 옆) + 가끔 머리 쓰다듬기
       if (p.pet) {
         const pt = this.pettingAt(sl, nowMs, hopT <= 0 && !celebrating);
-        drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: hopNow, petted: pt.pet, coat: raining });
+        const joy = p.me ? this.petJoy(nowMs) : null; // 물수제비 10번 넘으면 신나서 깡충
+        drawPet(ctx, { x: sl.x + sl.s * 0.62, y: sl.y, s: sl.s, kind: p.pet, t: nowMs + sl.phase * 1.7, bright: critterBright, hop: Math.max(hopNow, joy ? joy.hop : 0), petted: Math.max(pt.pet, joy ? joy.wag : 0), coat: raining });
+        if (joy) this.drawJoyHearts(ctx, sl.x + sl.s * 0.62, sl.y - sl.s * 0.42 * (BREEDS[p.pet] || BREEDS[1]).size * 1.6, sl.s, joy.a);
         if (pt.reach > 0) drawPettingArm(ctx, { x: sl.x, y: sl.y, s: sl.s, color: p.color, bright: critterBright, reach: pt.reach, stroke: pt.stroke, t: nowMs, petSize: (BREEDS[p.pet] || BREEDS[1]).size, coat: raining });
         // 내 친구 이름 (이름표를 끈 경우 내 화면에만, 켜면 이름표 한 줄에 함께)
         if (p.me && p.petName && !p.tag) {
@@ -2288,6 +2290,39 @@ export class Scene {
 
   // 가끔(20~50초마다, 사람마다 제각각) 옆의 강아지·고양이 머리를 쓰다듬음
   // reach: 팔 뻗기, stroke: 쓰다듬기, pet: 강아지·고양이 반응(힐끔·꼬리)
+  // 신난 반려동물: 2.6초 동안 깡충깡충 세 번(점점 낮게) + 꼬리 흔들기
+  petJoy(now) {
+    if (this.petJoyT0 == null) return null;
+    const a = (now - this.petJoyT0) / 1000;
+    if (a > 3.2) {
+      this.petJoyT0 = null;
+      return null;
+    }
+    const hop = a < 2.4 ? Math.abs(Math.sin((a / 2.4) * Math.PI * 3)) * (1 - (a / 2.4) * 0.45) : 0;
+    return { a, hop, wag: a < 3 ? 1 : clamp((3.2 - a) / 0.2) };
+  }
+
+  // 신났을 때 머리 위로 퐁퐁 올라오는 작은 하트
+  drawJoyHearts(ctx, x, y, s, a) {
+    for (let i = 0; i < 4; i++) {
+      const t = a - i * 0.45;
+      if (t < 0 || t > 1.6) continue;
+      const k = t / 1.6;
+      const hx = x + Math.sin(i * 2.1 + t * 3) * s * 0.18 + (i - 1.5) * s * 0.08;
+      const hy = y - k * s * 0.7;
+      const r = s * (0.05 + 0.02 * Math.sin(t * 6)) * (1 - k * 0.3);
+      ctx.save();
+      ctx.globalAlpha = Math.sin(k * Math.PI) * 0.9;
+      ctx.fillStyle = '#ff7a8a';
+      ctx.beginPath();
+      ctx.moveTo(hx, hy + r * 0.9);
+      ctx.bezierCurveTo(hx - r * 1.6, hy - r * 0.2, hx - r * 0.6, hy - r * 1.3, hx, hy - r * 0.4);
+      ctx.bezierCurveTo(hx + r * 0.6, hy - r * 1.3, hx + r * 1.6, hy - r * 0.2, hx, hy + r * 0.9);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   pettingAt(sl, now, ok) {
     if (sl.petNext == null) sl.petNext = now + 8000 + Math.random() * 30000;
     // 와! 하며 뛰면 쓰다듬기는 멈춤
@@ -2417,6 +2452,11 @@ export class Scene {
         if (!th['s' + i] && ra >= 0) {
           th['s' + i] = true;
           if (this.onSkip) this.onSkip(last, i);
+          // 내 물수제비가 10번 넘게 튀면 옆의 강아지·고양이가 좋아함
+          if (last && th.self && th.n >= 10 && !th.rock) {
+            this.petJoyT0 = performance.now();
+            if (this.onPetJoy) this.onPetJoy(th.n);
+          }
         }
       }
       if (seg >= 0) {
