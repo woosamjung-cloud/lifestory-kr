@@ -1598,6 +1598,7 @@ canvasEl.addEventListener('pointerup', (e) => {
       scene.selfUp = false;
       scene.sitHintUntil = 0;
       net.sit();
+      ambience.sit(state.event && PLACES[state.event.place].scenery === 'deck' ? 'deck' : 'sand'); // 털썩 (바닥에 맞는 소리)
     }
     return;
   }

@@ -138,6 +138,68 @@ export class Ambience {
   }
 
   // 장작 넣기: 툭 떨어지는 소리 → 화르륵 불길 → 2~3초간 타닥타닥
+  // 털썩 앉는 소리: 담요가 '폭' 내려앉고, 바닥에 따라 모래 '사락' / 나무 데크 '톡'
+  sit(surface = 'sand') {
+    if (!this.on) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // 폭 (담요·엉덩이가 내려앉는 부드럽고 낮은 소리)
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.14);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.22, t + 0.012);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(og).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.22);
+    // 천이 스치는 소리
+    const s = ctx.createBufferSource();
+    s.buffer = this.noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 900;
+    bp.Q.value = 0.8;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    s.connect(bp).connect(g).connect(this.master);
+    s.start(t, Math.random() * 4, 0.3);
+    if (surface === 'deck') {
+      // 나무 데크: 짧고 마른 '톡'
+      const k = ctx.createOscillator();
+      k.type = 'triangle';
+      k.frequency.setValueAtTime(420, t + 0.02);
+      k.frequency.exponentialRampToValueAtTime(260, t + 0.08);
+      const kg = ctx.createGain();
+      kg.gain.setValueAtTime(0.0001, t + 0.02);
+      kg.gain.exponentialRampToValueAtTime(0.09, t + 0.025);
+      kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      k.connect(kg).connect(this.master);
+      k.start(t + 0.02);
+      k.stop(t + 0.14);
+    } else {
+      // 모래: 잘게 부서지는 '사락'
+      for (let i = 0; i < 5; i++) {
+        const tt = t + 0.03 + i * 0.025 + Math.random() * 0.015;
+        const n = ctx.createBufferSource();
+        n.buffer = this.noise;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 2500;
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.0001, tt);
+        ng.gain.exponentialRampToValueAtTime(0.05 * (1 - i * 0.15), tt + 0.004);
+        ng.gain.exponentialRampToValueAtTime(0.0001, tt + 0.04);
+        n.connect(hp).connect(ng).connect(this.master);
+        n.start(tt, Math.random() * 4, 0.05);
+      }
+    }
+  }
+
   woodIn() {
     if (!this.on) return;
     const ctx = this.ctx;
