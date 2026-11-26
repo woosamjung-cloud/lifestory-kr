@@ -2189,9 +2189,14 @@ document.querySelectorAll('dialog.modal').forEach((dlg) =>
 
 // ---------- 알림 ----------
 let toastTimer = null;
+// 안내 말풍선: ✕나 말풍선을 누르면 바로 닫힘
+$('toast').addEventListener('click', () => {
+  clearTimeout(toastTimer);
+  $('toast').hidden = true;
+});
 function toast(msg) {
   const el = $('toast');
-  el.textContent = msg;
+  $('toast-msg').textContent = msg;
   el.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 3600);

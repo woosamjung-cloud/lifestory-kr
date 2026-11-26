@@ -388,8 +388,13 @@ textarea { resize: none; line-height: 1.5; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   max-width: calc(100vw - 32px);
   text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
 }
 .toast[hidden] { display: none; }
+.toast-x { flex: none; border: 0; background: rgba(59, 42, 32, 0.08); color: #3b2a20; width: 26px; height: 26px; border-radius: 50%; font-size: 13px; line-height: 1; cursor: pointer; margin-right: -8px; }
 
 .noscript { position: fixed; inset: auto 0 40% 0; text-align: center; color: #fff; z-index: 9; }
 
