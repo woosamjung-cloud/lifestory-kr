@@ -769,6 +769,7 @@ const HOME_FILE = 'haedoji-home.png';
 $('menu-home').addEventListener('click', async () => {
   $('menu').close();
   if (state.screen !== 'ride') return;
+  if (trip && !trip.round) return;
   const ev = state.event;
   const stayMin = trip ? Math.max(1, Math.round((Date.now() - trip.start) / 60000)) : 1;
   // 떠나기 전 장면으로 귀가 인증 사진을 만듦
@@ -974,17 +975,24 @@ const TICKET_TEXT = '이불 밖은 추우니까 🎫 방구석 해돋이호 승�
 document.querySelectorAll('#card .sns').forEach((b) => b.addEventListener('click', () => shareTo(b.dataset.sns, cardCanvas, CARD_FILE, shareText())));
 document.querySelectorAll('#ticket .sns').forEach((b) => b.addEventListener('click', () => shareTo(b.dataset.sns, ticketCanvas, TICKET_FILE, TICKET_TEXT)));
 
-$('act-menu').addEventListener('click', () => $('menu').showModal());
+$('act-menu').addEventListener('click', () => {
+  // 출발지로 돌아가기는 왕복 승차권일 때만
+  $('menu-home').hidden = !!trip && !trip.round;
+  $('menu').showModal();
+});
+// 다른 장소(서버)로 가려면 대합실에서 새 승차권을 끊음 (바로 옮겨 가지 않음)
+$('menu-station').addEventListener('click', () => {
+  $('menu').close();
+  if (state.screen !== 'ride') return;
+  net.leave();
+  state.joined = false;
+  state.seat = null;
+  stopPreview();
+  show('home');
+  requestAnimationFrame(() => $('dest-list').scrollIntoView({ block: 'center', behavior: 'smooth' })); // 행선지 매표소가 보이게
+  toast('🚉 대합실이에요. 가고 싶은 행선지 승차권을 끊어 주세요');
+});
 $('menu-close').addEventListener('click', () => $('menu').close());
-document.querySelectorAll('.seg-btn').forEach((b) =>
-  b.addEventListener('click', () => {
-    state.placeMode = b.dataset.place;
-    stopPreview();
-    applyEvent(pickEvent(realNow()), { animate: true });
-    renderEventTexts();
-    $('menu').close();
-  }),
-);
 
 $('preview-start').addEventListener('click', () => {
   $('menu').close();
