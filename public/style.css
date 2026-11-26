@@ -841,3 +841,10 @@ html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }
 @media (prefers-color-scheme: dark) {
   .home-reward { background: rgba(244, 181, 63, 0.08); border-color: rgba(232, 180, 138, 0.55); }
 }
+
+/* 매표소 실시간 표시 */
+.booth-right { display: inline-flex; align-items: center; gap: 8px; }
+.live-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 7px; border-radius: 999px; background: #d8443a; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.5; font-family: system-ui, sans-serif; }
+.live-badge i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: livepulse 2.4s ease-in-out infinite; }
+@keyframes livepulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .live-badge i { animation: none; } }

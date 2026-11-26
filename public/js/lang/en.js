@@ -17,6 +17,7 @@ const TEXT = {
   '대기실 피켓': 'Waiting room sign',
   '매표소': 'Ticket booth',
   '어디로 떠날까요?': 'Where shall we go?',
+  '지금 이 시각의 해와 날씨, 함께 타는 사람들을 실시간으로 보여 줘요': 'Shows the real sun, weather and fellow riders right now',
   '행선지': 'Destination',
   '승객 이름': 'Passenger name',
   '(선택, 승차권에만 써요)': '(optional, only on your ticket)',
