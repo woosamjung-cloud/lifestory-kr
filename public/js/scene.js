@@ -1234,66 +1234,126 @@ export class Scene {
     }
   }
 
-  // 백사장에 밀려왔다 빠지는 물 (실제 해변처럼)
-  // 9초 한 번: 물이 흰 거품 앞머리를 달고 올라옴 → 빠져나감 → 젖어 어두워진 모래가 서서히 마름.
-  // 물 끝 모양은 파도마다 조금씩 다르지만, 한 번 밀려오는 동안에는 흔들리지 않음
+  // 백사장에 밀려왔다 빠지는 물 (실제 해변처럼, 파도마다 다르게)
+  // - 파도마다 길이(7~12초)·크기가 다르고, 몇 번에 한 번은 큰 파도(세트)가 옴
+  // - 물 끝은 파도마다 다른 굴곡이고, 한쪽으로 더 밀려오기도 함 (한 번 밀려오는 동안 모양은 고정)
+  // - 앞머리 거품은 뭉쳤다 흩어졌다 제각각, 물이 빠지면 거품 자국이 남아 하나씩 꺼짐
+  // - 젖은 모래는 파도마다 남고 서서히 마름. 앞 파도가 다 빠지기 전에 다음 파도가 오기도 함
   drawSwash(ctx, W, H, shoreY, nowMs, bright) {
-    const P = 9000;
-    const cyc = Math.floor(nowMs / P);
-    const p = (nowMs % P) / P;
     const R = Math.max(14, (H - shoreY) * 0.16);
     const edge = (x) => shoreY + Math.sin(x / 70) * 3; // 모래 경계 (고정)
-    const reachOf = (x, c) => R * (0.68 + 0.18 * Math.sin(x / 57 + c * 1.7) + 0.14 * Math.sin(x / 23 + c * 2.9));
+    const sw = this.swash || (this.swash = { waves: [], next: nowMs, count: 0 });
+    // 새 파도
+    if (nowMs >= sw.next) {
+      sw.count++;
+      const big = sw.count % (4 + Math.floor(Math.random() * 3)) === 0;
+      const dur = 7000 + Math.random() * 5000;
+      const r = Math.random;
+      const wave = {
+        t0: nowMs,
+        dur,
+        amp: big ? 1.05 + r() * 0.2 : 0.45 + r() * 0.5,
+        p1: r() * 6.28, p2: r() * 6.28, p3: r() * 6.28,
+        f1: 45 + r() * 40, f2: 18 + r() * 14,
+        tilt: (r() - 0.5) * 0.7, // 한쪽으로 더 밀려옴
+        lobeX: r() * W, lobeW: W * (0.15 + r() * 0.35), lobeA: r() < 0.5 ? r() * 0.5 : 0,
+        foam: [],
+      };
+      // 거품 알갱이: 뭉침(덩어리)과 빈 곳이 섞이게
+      const clusters = 4 + Math.floor(r() * 6);
+      for (let c = 0; c < clusters; c++) {
+        const cx = r() * W;
+        const n = 6 + Math.floor(r() * 14);
+        const spread = 20 + r() * 70;
+        for (let i = 0; i < n; i++) wave.foam.push({ x: cx + (r() - 0.5) * spread, d: r() * 7, s: 0.6 + r() * 1.6, life: 0.55 + r() * 0.45 });
+      }
+      for (let i = 0; i < 30; i++) wave.foam.push({ x: r() * W, d: r() * 5, s: 0.5 + r() * 1, life: 0.4 + r() * 0.4 });
+      sw.waves.push(wave);
+      // 다음 파도: 이번 파도가 빠지는 중간쯤 (가끔은 일찍 와서 겹침)
+      sw.next = nowMs + dur * (0.55 + Math.random() * 0.45);
+      if (sw.waves.length > 4) sw.waves.shift();
+    }
     const STEP = 12;
-    const band = (c, k, fill) => {
+    const reachOf = (x, w) => {
+      const lobe = w.lobeA ? w.lobeA * Math.exp(-(((x - w.lobeX) / w.lobeW) ** 2)) : 0;
+      const k = 0.7 + 0.16 * Math.sin(x / w.f1 + w.p1) + 0.1 * Math.sin(x / w.f2 + w.p2) + 0.05 * Math.sin(x / 9 + w.p3) + w.tilt * (x / W - 0.5) + lobe;
+      return R * w.amp * Math.max(0.15, k);
+    };
+    const band = (w, k, fill) => {
       ctx.beginPath();
       for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x, edge(x) - 1);
-      for (let x = W + STEP; x >= -STEP; x -= STEP) ctx.lineTo(x, edge(x) + reachOf(x, c) * k);
+      for (let x = W + STEP; x >= -STEP; x -= STEP) ctx.lineTo(x, edge(x) + reachOf(x, w) * k);
       ctx.closePath();
       ctx.fillStyle = fill;
       ctx.fill();
     };
     const wet = (a) => `rgba(96,70,45,${(a * (0.6 + 0.4 * bright)).toFixed(3)})`;
-    // 지난 파도가 남긴 젖은 자국 (거의 말라 감)
-    const prevA = 0.1 * (1 - clamp(p / 0.4));
-    if (prevA > 0.005) band(cyc - 1, 1, wet(prevA));
-    // 올라오는 정도: 0~0.4 밀려옴, 0.4~0.75 빠져나감
-    const runup = p < 0.4 ? 1 - (1 - p / 0.4) ** 2 : p < 0.75 ? 1 - ((p - 0.4) / 0.35) ** 1.6 : 0;
-    const wetK = p < 0.4 ? runup : 1; // 젖은 자리: 가장 높이 올라온 곳까지
-    // 젖은 모래: 물이 빠진 뒤 가장 진하고 천천히 마름
-    const wetA = p < 0.4 ? 0.26 : 0.26 - 0.16 * clamp((p - 0.45) / 0.55);
-    band(cyc, wetK, wet(wetA));
-    // 물이 막 빠진 자리의 반짝임
-    if (p > 0.4 && p < 0.9) {
-      const g = 0.22 * Math.sin(clamp((p - 0.4) / 0.5) * Math.PI) * bright;
-      ctx.strokeStyle = `rgba(255,255,255,${g.toFixed(3)})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x, edge(x) + reachOf(x, cyc) * (runup + (1 - runup) * 0.55));
-      ctx.stroke();
-    }
-    if (runup <= 0.01) return;
-    // 얇은 물막 (모래가 비쳐 보이는 옅은 물빛)
-    const sheet = ctx.createLinearGradient(0, shoreY, 0, shoreY + R);
-    sheet.addColorStop(0, `rgba(170,205,215,${(0.42 * (0.5 + 0.5 * bright)).toFixed(3)})`);
-    sheet.addColorStop(1, `rgba(225,240,240,${(0.3 * (0.5 + 0.5 * bright)).toFixed(3)})`);
-    band(cyc, runup, sheet);
-    // 앞머리 흰 거품: 밀려올 때 진하고 빠질 때 옅어짐
-    const foamA = (p < 0.4 ? 0.85 : 0.85 * runup) * (0.45 + 0.55 * bright);
-    ctx.strokeStyle = `rgba(255,255,255,${foamA.toFixed(3)})`;
-    ctx.lineWidth = p < 0.4 ? 2.6 : 1.6;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x, edge(x) + reachOf(x, cyc) * runup);
-    ctx.stroke();
-    // 거품 알갱이 (자리 고정, 앞머리를 따라감)
-    ctx.fillStyle = `rgba(255,255,255,${(foamA * 0.7).toFixed(3)})`;
-    for (let x = 6; x < W; x += 17) {
-      const r = ((x * 7919) % 97) / 97;
-      const y = edge(x) + reachOf(x, cyc) * runup - 2 - r * 4;
-      ctx.beginPath();
-      ctx.arc(x + r * 6, y, 0.8 + r * 1.2, 0, Math.PI * 2);
-      ctx.fill();
+    const dim = 0.45 + 0.55 * bright;
+    // 오래된 파도부터 (젖은 자국 → 물)
+    sw.waves = sw.waves.filter((w) => (nowMs - w.t0) / w.dur < 2.2);
+    for (const w of sw.waves) {
+      const p = (nowMs - w.t0) / w.dur;
+      // 밀려옴(0~0.38) → 빠짐(0.38~0.78)
+      const runup = p < 0.38 ? 1 - (1 - p / 0.38) ** 2 : p < 0.78 ? 1 - ((p - 0.38) / 0.4) ** 1.5 : 0;
+      // 젖은 모래: 가장 높이 올라온 곳까지 남고, 파도 두 번쯤 지나면 마름
+      const wetK = p < 0.38 ? runup : 1;
+      const wetA = p < 0.38 ? 0.24 : 0.24 * (1 - clamp((p - 0.45) / 1.6));
+      if (wetA > 0.005) band(w, wetK, wet(wetA));
+      // 막 빠진 자리의 반짝임
+      if (p > 0.38 && p < 0.95) {
+        const g = 0.2 * Math.sin(clamp((p - 0.38) / 0.57) * Math.PI) * bright;
+        ctx.strokeStyle = `rgba(255,255,255,${g.toFixed(3)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = -STEP; x <= W + STEP; x += STEP) ctx.lineTo(x, edge(x) + reachOf(x, w) * (runup + (1 - runup) * 0.6));
+        ctx.stroke();
+      }
+      // 빠진 뒤 남은 거품 자국: 가장 높이 올라온 줄에 남아 하나씩 꺼짐
+      if (p > 0.38) {
+        const q = (p - 0.38) / 0.9;
+        for (const f of w.foam) {
+          if (q > f.life) continue;
+          const a = (1 - q / f.life) * 0.55 * dim;
+          const y = edge(f.x) + reachOf(f.x, w) - 1 - f.d * 0.6;
+          ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(f.x, y, f.s * (1 - q * 0.4), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      if (runup <= 0.01) continue;
+      // 얇은 물막
+      const sheet = ctx.createLinearGradient(0, shoreY, 0, shoreY + R * w.amp);
+      sheet.addColorStop(0, `rgba(170,205,215,${(0.42 * (0.5 + 0.5 * bright)).toFixed(3)})`);
+      sheet.addColorStop(1, `rgba(225,240,240,${(0.3 * (0.5 + 0.5 * bright)).toFixed(3)})`);
+      band(w, runup, sheet);
+      // 앞머리 흰 거품 줄: 굵기가 곳곳 다르게 (끊겼다 이어졌다)
+      const foamA = (p < 0.38 ? 0.85 : 0.85 * runup) * dim;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      let prev = null;
+      for (let x = -STEP; x <= W + STEP; x += STEP) {
+        const y = edge(x) + reachOf(x, w) * runup;
+        if (prev) {
+          const thick = 0.5 + 0.5 * Math.sin(x / 31 + w.p2) * Math.sin(x / 13 + w.p3);
+          const lw = (p < 0.38 ? 1.2 + 2.2 * thick : 0.8 + 1 * thick) * Math.min(1.3, 0.6 + w.amp * 0.6);
+          ctx.strokeStyle = `rgba(255,255,255,${(foamA * (0.45 + 0.55 * thick)).toFixed(3)})`;
+          ctx.lineWidth = Math.max(0.6, lw);
+          ctx.beginPath();
+          ctx.moveTo(prev[0], prev[1]);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+        prev = [x, y];
+      }
+      // 거품 알갱이: 앞머리를 따라 뭉쳤다 흩어졌다
+      for (const f of w.foam) {
+        const y = edge(f.x) + reachOf(f.x, w) * runup - 1.5 - f.d;
+        ctx.fillStyle = `rgba(255,255,255,${(foamA * 0.75).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(f.x, y, f.s, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
