@@ -6,10 +6,10 @@
 - 작업 중 대표님 피드백으로 새 규칙이 생기면 그 문서에 바로 추가하고, 이미 있는 스테이지에도 맞춥니다.
 
 ## 서비스
-- 사이트: 이불 밖은 추우니까 (영어: Too Cold to Leave the Blanket) / 열차: 방구석 해돋이호 (영어: **Blanket-In Express** — 드라이브인처럼 이불 덮은 채로 타는 열차).
+- 사이트: 이불 밖은 추우니까 (영어: Too Cold to Leave the Blanket) / 열차: 방구석 해돋이호 (영어: **Blanket Express** — 세계 누구나 아는 쉬운 두 단어, 담요 특급열차).
   본질은 힐링·불멍, 소원, 그리운 이에게 메시지.
-- 도메인(예정): 정식 **blanketinexpress.com**, 짧은 주소 **blanketin.com**(정식 주소로 넘김) — 대표님이 구매 후 Render에 연결, `PUBLIC_URL`을 새 주소로.
-  (blanketexpress.com은 2006년부터 다른 사람이 쓰고 있어 제외)
+- 도메인(예정): **theblanketexpress.com** (The Orient Express처럼 열차 이름 앞 The) — 대표님이 구매 후 Render에 연결, `PUBLIC_URL`을 새 주소로.
+  (blanketexpress.com은 2006년부터 다른 사람이 쓰고 있어 제외. 글로벌 기준으로 Blanket-In보다 Blanket Express가 뜻·철자 전달이 쉬워 선택)
 - 배포: 브랜치 `claude/stoic-clarke-s22qwm` → Render 자동 배포 (https://bangguseok-haedoti.onrender.com)
 - 구조: `server.js`(웹소켓·API), `shop.js`(상점·로그인·결제), `public/js/scene.js`(장면), `sealife.js`(바다 이벤트),
   `train.js`(출발·귀가 막간), `characters.js`(사람·반려동물), `ambience.js`(소리), `camera.js`(카메라 공통 규칙).
