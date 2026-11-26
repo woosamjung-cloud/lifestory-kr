@@ -436,6 +436,21 @@ test('귀가 후기: 왕복 승차권 + 머문 시간 + SNS 글 주소면 동전
   await wait(200);
 });
 
+test('별점·건의: 저장되고 통계엔 개수·평균만, 운영자 키 없이는 글 목록 못 봄', async () => {
+  const empty = await post('/api/feedback', { visitor: 'fbtester0001' });
+  assert.ok(empty.body.error);
+  const ok = await post('/api/feedback', { visitor: 'fbtester0001', stars: 4, text: '불멍 너무 좋아요', place: 'east', lang: 'ko' });
+  assert.equal(ok.body.ok, true);
+  const again = await post('/api/feedback', { visitor: 'fbtester0001', stars: 5 });
+  assert.ok(again.body.error); // 1분 안에 또는 안 됨
+  const stats = await (await fetch(`http://localhost:${PORT}/api/stats`)).json();
+  assert.equal(stats.feedback.count, 1);
+  assert.equal(stats.feedback.stars, 4);
+  assert.equal(JSON.stringify(stats).includes('불멍 너무 좋아요'), false);
+  const hidden = await fetch(`http://localhost:${PORT}/api/feedback?key=wrong`);
+  assert.equal(hidden.status, 404);
+});
+
 test('보안: 너무 큰 요청은 413, 배열·이상한 본문은 400', async () => {
   const big = await fetch(`http://localhost:${PORT}/api/shop/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(10000) });
   assert.equal(big.status, 413);

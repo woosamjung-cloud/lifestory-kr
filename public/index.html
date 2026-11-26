@@ -208,6 +208,7 @@
     <button class="btn wide" id="menu-shop">🎁 상점 · 내 아이템</button>
     <button class="btn wide" id="menu-nick">🙂 별명 · 이름표</button>
     <button class="btn wide" id="menu-music" hidden>🎵 우리 음악</button>
+    <button class="btn wide" id="menu-feedback">⭐ 별점 · 건의하기</button>
     <button class="btn wide" id="show-help">이용 안내</button>
     <button class="btn wide ghost" id="menu-close">닫기</button>
   </dialog>
@@ -393,6 +394,24 @@
     </div>
     <p class="muted small" id="home-oneway" hidden>다음엔 <b>왕복 승차권</b>으로 타 보세요. 돌아와서 후기를 남기면 소원 동전 10개를 드려요.</p>
     <button class="btn ghost wide" id="home-close">닫기</button>
+  </dialog>
+
+  <!-- 별점 · 건의하기 -->
+  <dialog id="feedbackdlg" class="modal">
+    <form method="dialog" id="feedback-form">
+      <h3>이불 밖은 추우니까, 어땠어요?</h3>
+      <p class="muted small">별점과 한마디는 더 따뜻한 곳을 만드는 데 그대로 쓰여요.</p>
+      <div class="stars" id="fb-stars" role="radiogroup" aria-label="별점">
+        <button type="button" data-v="1" aria-label="별 1개">★</button><button type="button" data-v="2" aria-label="별 2개">★</button><button type="button" data-v="3" aria-label="별 3개">★</button><button type="button" data-v="4" aria-label="별 4개">★</button><button type="button" data-v="5" aria-label="별 5개">★</button>
+      </div>
+      <p class="muted small center" id="fb-star-label">별을 눌러 주세요</p>
+      <textarea id="fb-text" maxlength="500" rows="4" placeholder="불편했던 점, 바라는 점, 좋았던 점을 자유롭게 적어 주세요"></textarea>
+      <p class="muted tiny">따로 답장은 드리지 못해요. 전화번호 같은 개인정보는 적지 말아 주세요.</p>
+      <div class="btn-row">
+        <button class="btn ghost" value="cancel">닫기</button>
+        <button class="btn primary" value="send" id="fb-send">보내기</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- 우리 음악 -->

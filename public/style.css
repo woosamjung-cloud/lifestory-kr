@@ -828,3 +828,11 @@ html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }
 .home-claim-row { display: flex; gap: 6px; margin: 8px 0 4px; }
 .home-claim-row input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--line); background: #fff; }
 .tiny { font-size: 11px; }
+
+/* 별점 · 건의하기 */
+.stars { display: flex; justify-content: center; gap: 6px; margin: 14px 0 4px; }
+.stars button { border: 0; background: transparent; font-size: 38px; line-height: 1; color: rgba(150, 130, 115, 0.45); cursor: pointer; padding: 2px; transition: transform 0.12s; }
+.stars button.on { color: #f4b53f; }
+.stars button:active { transform: scale(0.9); }
+.center { text-align: center; }
+#fb-text { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--paper-2); color: var(--ink); resize: vertical; margin-top: 8px; }

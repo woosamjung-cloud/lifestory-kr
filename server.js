@@ -5,6 +5,7 @@
 
 import { cleanCustom, CUSTOM_GAP_MS, cleanChat } from './saycheck.js';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -185,6 +186,55 @@ function reviewReward(body, ip) {
   stays.delete(visitor); // 다음 여행은 다시 0분부터
   bump('review');
   return { ok: true, coins: shop.REVIEW_COINS, wallet };
+}
+// ---------- 별점·건의하기 ----------
+// 글은 data/feedback.jsonl에만 (공개 통계에는 개수·평균만). 운영자는 ADMIN_KEY로 /api/feedback?key=… 에서 확인
+const FEEDBACK_FILE = () => path.join(DATA_DIR, 'feedback.jsonl');
+const feedbackHits = new Map(); // ip -> [시각]
+const feedbackLast = new Map(); // visitor -> 시각
+function saveFeedback(body, ip) {
+  const stars = Number(body.stars);
+  const text = String(body.text || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f\u200b-\u200f\u2028-\u202e\ufeff]/g, '').trim().slice(0, 500);
+  if (!(Number.isInteger(stars) && stars >= 1 && stars <= 5) && !text) return { error: '별점이나 하고 싶은 말을 남겨 주세요' };
+  const visitor = typeof body.visitor === 'string' && /^[a-z0-9]{8,40}$/i.test(body.visitor) ? body.visitor : '';
+  const now = Date.now();
+  if (visitor && now - (feedbackLast.get(visitor) || 0) < 60 * 1000) return { error: '방금 남겨 주셨어요. 잠시 뒤에 또 남겨 주세요' };
+  const hits = (feedbackHits.get(ip) || []).filter((t) => now - t < 86400000);
+  if (hits.length >= 10) return { error: '오늘은 여기까지 받을게요. 고마워요!' };
+  hits.push(now);
+  feedbackHits.set(ip, hits);
+  if (visitor) feedbackLast.set(visitor, now);
+  const place = ['east', 'west'].includes(body.place) ? body.place : '';
+  const line = { at: new Date(now).toISOString(), stars: stars >= 1 && stars <= 5 ? stars : null, text, place, lang: String(body.lang || '').slice(0, 5), visitor: visitor.slice(0, 8) };
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.appendFileSync(FEEDBACK_FILE(), JSON.stringify(line) + '\n');
+  } catch (err) {
+    console.error('건의 저장 실패:', err && err.message);
+    return { error: '잠시 후 다시 시도해 주세요' };
+  }
+  counts.feedback = counts.feedback || { n: 0, sum: 0, rated: 0 };
+  counts.feedback.n += 1;
+  if (line.stars) {
+    counts.feedback.sum += line.stars;
+    counts.feedback.rated += 1;
+  }
+  countsDirty = true;
+  return { ok: true };
+}
+function readFeedback(limit = 100) {
+  try {
+    const lines = fs.readFileSync(FEEDBACK_FILE(), 'utf8').trim().split('\n').filter(Boolean);
+    return lines.slice(-limit).reverse().map((l) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const STAT_KINDS = ['ticket', 'card', 'save', 'preview', 'musiclink', 'home'];
@@ -909,6 +959,26 @@ function route(req, res) {
       .catch(() => go('/?loginerr=1'));
     return;
   }
+  if (url.pathname === '/api/feedback') {
+    if (req.method === 'POST') {
+      const ip = clientIp(req);
+      readJson(req)
+        .then((body) => {
+          if (body === null) return json(res, 413, { error: '글이 너무 길어요' });
+          if (typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: '잘못된 요청이에요' });
+          const r = saveFeedback(body, ip);
+          json(res, r.error ? 400 : 200, r);
+        })
+        .catch(() => json(res, 500, { error: '서버 오류' }));
+      return;
+    }
+    // 운영자만: ADMIN_KEY가 맞아야 글 목록을 보여 줌
+    const key = String(url.searchParams.get('key') || '');
+    const admin = process.env.ADMIN_KEY || '';
+    const ok = admin.length >= 8 && key.length === admin.length && crypto.timingSafeEqual(Buffer.from(key), Buffer.from(admin));
+    if (!ok) return json(res, 404, { error: '없는 주소예요' });
+    return json(res, 200, { summary: counts.feedback || { n: 0, sum: 0, rated: 0 }, items: readFeedback(200) });
+  }
   if (url.pathname === '/api/status') {
     const body = Object.fromEntries(
       Object.values(rooms).map((r) => {
@@ -939,7 +1009,8 @@ function route(req, res) {
       }),
     );
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify({ now: new Date().toISOString(), online: clients.size, seats: SEATS, live, total, shop: shop.shopStats(), days: days.map((k) => ({ date: k, ...counts.daily[k] })) }));
+    const fb = counts.feedback || { n: 0, sum: 0, rated: 0 };
+    res.end(JSON.stringify({ now: new Date().toISOString(), online: clients.size, seats: SEATS, live, total, shop: shop.shopStats(), feedback: { count: fb.n, stars: fb.rated ? Math.round((fb.sum / fb.rated) * 10) / 10 : null, rated: fb.rated }, days: days.map((k) => ({ date: k, ...counts.daily[k] })) }));
     return;
   }
   if (url.pathname === '/healthz') {
@@ -1106,6 +1177,8 @@ setInterval(() => {
   }
   for (const [k, t] of rated) if (now - t > 86400000) rated.delete(k);
   for (const [k, s] of stays) if (now - s.at > 86400000) stays.delete(k);
+  for (const [k, t] of feedbackLast) if (now - t > 3600000) feedbackLast.delete(k);
+  for (const [k, v] of feedbackHits) if (!v.some((t) => now - t < 86400000)) feedbackHits.delete(k);
   for (const [k, v] of reviewIp) if (!v.some((t) => now - t < 86400000)) reviewIp.delete(k);
 }, 30 * 1000).unref();
 

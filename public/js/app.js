@@ -983,6 +983,39 @@ $('act-menu').addEventListener('click', () => {
   $('menu').showModal();
 });
 // 다른 장소(서버)로 가려면 대합실에서 새 승차권을 끊음 (바로 옮겨 가지 않음)
+// ---------- 별점 · 건의하기 ----------
+let fbStars = 0;
+const STAR_WORDS = ['', '아쉬워요', '조금 아쉬워요', '괜찮아요', '좋아요', '정말 좋아요'];
+function paintStars() {
+  document.querySelectorAll('#fb-stars button').forEach((b) => b.classList.toggle('on', Number(b.dataset.v) <= fbStars));
+  $('fb-star-label').textContent = fbStars ? `${'★'.repeat(fbStars)} ${STAR_WORDS[fbStars]}` : '별을 눌러 주세요';
+}
+document.querySelectorAll('#fb-stars button').forEach((b) =>
+  b.addEventListener('click', () => {
+    fbStars = Number(b.dataset.v);
+    paintStars();
+  }),
+);
+$('menu-feedback').addEventListener('click', () => {
+  $('menu').close();
+  fbStars = 0;
+  $('fb-text').value = '';
+  paintStars();
+  $('feedbackdlg').showModal();
+});
+$('feedback-form').addEventListener('submit', async (e) => {
+  if (!(e.submitter && e.submitter.value === 'send')) return;
+  e.preventDefault();
+  const text = $('fb-text').value.trim();
+  if (!fbStars && !text) return toast('⭐ 별점이나 하고 싶은 말을 남겨 주세요');
+  $('fb-send').disabled = true;
+  const r = await postJson('api/feedback', { visitor: net.visitor, stars: fbStars || null, text, place: state.event ? state.event.place : '', lang: getLang() }).catch(() => ({ ok: false, body: {} }));
+  $('fb-send').disabled = false;
+  if (!r.ok) return toast((r.body && r.body.error) || '잠시 후 다시 시도해 주세요');
+  $('feedbackdlg').close();
+  toast('💌 소중한 말씀 고마워요. 꼭 읽고 반영할게요');
+});
+
 $('menu-station').addEventListener('click', () => {
   $('menu').close();
   if (state.screen !== 'ride') return;
