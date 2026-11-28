@@ -296,15 +296,29 @@ export class SeaLife {
       ctx.stroke();
       if (!night) for (let i = 0; i < 6; i++) lamp(-5 * k + i * 1.9 * k, -3.2 * k, Math.max(0.5, k * 0.25), '#e8e2d6');
       if (night) {
-        const g = ctx.createRadialGradient(0, -4 * k, 0, 0, -4 * k, 14 * k);
-        g.addColorStop(0, 'rgba(255,250,215,0.45)');
+        // 집어등 불빛 무리: 둥글게 번지고 끝이 잘리지 않게 (원 안만 칠함)
+        const g = ctx.createRadialGradient(0, -4 * k, 0, 0, -4 * k, 13 * k);
+        g.addColorStop(0, 'rgba(255,250,215,0.42)');
+        g.addColorStop(0.5, 'rgba(255,250,215,0.14)');
         g.addColorStop(1, 'rgba(255,250,215,0)');
         ctx.fillStyle = g;
-        ctx.fillRect(-14 * k, -18 * k, 28 * k, 22 * k);
+        ctx.beginPath();
+        ctx.ellipse(0, -4 * k, 13 * k, 11 * k, 0, 0, TAU);
+        ctx.fill();
         for (let i = 0; i < s.lights; i++) lamp(-5 * k + (i * 9.8 * k) / s.lights, -3.2 * k, Math.max(0.7, k * 0.42), 'rgba(255,253,230,1)');
-        // 물에 비친 불빛
-        ctx.fillStyle = 'rgba(255,245,200,0.18)';
-        ctx.fillRect(-5 * k, 0, 10 * k, 3 * k);
+        // 물에 비친 불빛: 등마다 아래로 흔들리며 흐려지는 가는 빛줄기 (네모 상자처럼 보이지 않게)
+        for (let i = 0; i < s.lights; i++) {
+          const lx = -5 * k + (i * 9.8 * k) / s.lights;
+          for (let j = 0; j < 5; j++) {
+            const y = 0.3 * k + j * 0.9 * k;
+            const sway = Math.sin(now / 520 + i * 1.7 + j * 1.3 + s.seed) * 0.5 * k;
+            const w = k * (0.55 - j * 0.07);
+            ctx.fillStyle = `rgba(255,245,200,${(0.32 * (1 - j / 5)).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.ellipse(lx + sway, y, Math.max(0.6, w), Math.max(0.3, k * 0.16), 0, 0, TAU);
+            ctx.fill();
+          }
+        }
       }
     } else if (s.kind === 'yacht') {
       // 고급 세일링 요트: 날렵한 흰 선체(남색 띠·티크 갑판), 낮은 선실 창, 높은 돛대와 붐,
