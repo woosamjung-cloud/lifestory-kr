@@ -2273,6 +2273,32 @@ function hash(str) {
   return h >>> 0;
 }
 
+// ---------- 화면 확대·밀림 되돌리기 ----------
+// 아이폰에서 글자를 쓰고 나면 확대된 채로 남거나 화면이 밀릴 때가 있어, 칸을 벗어나면 원래 크기·위치로 되돌림
+(function keepViewport() {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  const base = meta.getAttribute('content');
+  const reset = () => {
+    // 잠깐 최대 배율을 1로 묶었다가 풀면 아이폰이 원래 크기로 돌아옴 (손가락 확대는 그대로 가능)
+    meta.setAttribute('content', `${base}, maximum-scale=1`);
+    setTimeout(() => meta.setAttribute('content', base), 300);
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+  };
+  document.addEventListener('focusout', (e) => {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) setTimeout(reset, 50);
+  });
+  document.addEventListener('close', reset, true); // 창(dialog)을 닫을 때
+  window.addEventListener('orientationchange', () => setTimeout(reset, 300));
+  document.addEventListener('visibilitychange', () => !document.hidden && reset());
+  if (window.visualViewport) {
+    // 확대 안 됐는데 화면만 밀려 있으면 제자리로
+    window.visualViewport.addEventListener('resize', () => {
+      if (Math.abs(window.visualViewport.scale - 1) < 0.01 && (window.scrollX || window.scrollY) && state.screen === 'ride') window.scrollTo(0, 0);
+    });
+  }
+})();
+
 // ---------- 시작 ----------
 applyEvent(pickEvent(realNow()));
 buildPicker();

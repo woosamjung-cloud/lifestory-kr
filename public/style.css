@@ -848,3 +848,6 @@ html[lang="en"] #home-title { font-weight: 250; line-height: 1.35; }
 .live-badge i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: livepulse 2.4s ease-in-out infinite; }
 @keyframes livepulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .live-badge i { animation: none; } }
+
+/* 아이폰은 16px보다 작은 글자 칸을 누르면 화면을 확대하고 안 돌아오는 일이 있어 모든 글자 칸을 16px 이상으로 */
+input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: max(16px, 1em) !important; }
